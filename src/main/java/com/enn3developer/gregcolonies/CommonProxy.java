@@ -1,5 +1,8 @@
 package com.enn3developer.gregcolonies;
 
+import com.enn3developer.gregcolonies.block.GCBlocks;
+import com.enn3developer.gregcolonies.command.ColonyCommand;
+
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
@@ -14,6 +17,8 @@ public class CommonProxy {
 
         GregColonies.LOG.info(Config.greeting);
         GregColonies.LOG.info("I am GregColonies at version " + Tags.VERSION);
+
+        GCBlocks.register();
     }
 
     // load "Do your mod setup. Build whatever data structures you care about. Register recipes." (Remove if not needed)
@@ -23,5 +28,7 @@ public class CommonProxy {
     public void postInit(FMLPostInitializationEvent event) {}
 
     // register server commands in this event handler (Remove if not needed)
-    public void serverStarting(FMLServerStartingEvent event) {}
+    public void serverStarting(FMLServerStartingEvent event) {
+        event.registerServerCommand(new ColonyCommand());
+    }
 }
