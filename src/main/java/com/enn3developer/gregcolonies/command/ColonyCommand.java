@@ -1,12 +1,12 @@
 package com.enn3developer.gregcolonies.command;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.command.WrongUsageException;
-import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChunkCoordinates;
 import net.minecraft.util.EnumChatFormatting;
@@ -15,14 +15,11 @@ import net.minecraft.world.World;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
-import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandMoveTo;
 
 public class ColonyCommand extends CommandBase {
 
     private static final List<String> SUB_COMMANDS = Arrays.asList("list", "info", "spawn", "order", "cancel");
-
-    private static final double CITIZEN_RANGE = 32.0D;
 
     @Override
     public String getCommandName() {
@@ -31,7 +28,7 @@ public class ColonyCommand extends CommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/colony <list|info <id>|spawn [colonyId]|order <x> <y> <z>|cancel>";
+        return "/colony <list|info <id>|spawn [colonyId]|order <x> <y> <z> [colonyId]|cancel [colonyId]>";
     }
 
     @Override
@@ -95,6 +92,7 @@ public class ColonyCommand extends CommandBase {
             sender.addChatMessage(new ChatComponentText(EnumChatFormatting.GOLD + colony.getName()));
             sender.addChatMessage(new ChatComponentText("id: " + colony.getId()));
             sender.addChatMessage(new ChatComponentText("owner: " + colony.getOwnerName() + " " + colony.getOwner()));
+            sender.addChatMessage(new ChatComponentText("pending orders: " + colony.getOrderCount()));
             sender.addChatMessage(
                 new ChatComponentText(
                     "center: dim " + colony
@@ -147,40 +145,63 @@ public class ColonyCommand extends CommandBase {
             if (args.length < 4) {
                 throw new WrongUsageException(getCommandUsage(sender));
             }
+            Colony colony = findColony(sender, manager, args.length >= 5 ? parseInt(sender, args[4]) : 0);
+            if (colony == null) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                return;
+            }
+
             int x = parseInt(sender, args[1]);
             int y = parseInt(sender, args[2]);
             int z = parseInt(sender, args[3]);
+            manager.enqueueOrder(colony.getId(), new CitizenCommandMoveTo(x, y, z));
 
-            int ordered = 0;
-            for (EntityCitizen citizen : findCitizens(sender, world)) {
-                CitizenCommand command = new CitizenCommandMoveTo(x, y, z);
-                citizen.getCommands()
-                    .enqueue(command);
-                ordered++;
-            }
-            sender.addChatMessage(new ChatComponentText("Queued move_to for " + ordered + " citizen(s)"));
+            sender.addChatMessage(
+                new ChatComponentText(
+                    "Queued move_to for colony #" + colony.getId()
+                        + " ("
+                        + colony.getOrderCount()
+                        + " order(s) pending)"));
             return;
         }
 
         if ("cancel".equals(args[0])) {
-            int cleared = 0;
-            for (EntityCitizen citizen : findCitizens(sender, world)) {
+            Colony colony = findColony(sender, manager, args.length >= 2 ? parseInt(sender, args[1]) : 0);
+            if (colony == null) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                return;
+            }
+
+            int cleared = manager.clearOrders(colony.getId());
+            int stopped = 0;
+            for (EntityCitizen citizen : findCitizens(world, colony.getId())) {
                 citizen.getCommands()
                     .clear(citizen);
-                cleared++;
+                stopped++;
             }
-            sender.addChatMessage(new ChatComponentText("Cleared queues of " + cleared + " citizen(s)"));
+            sender.addChatMessage(
+                new ChatComponentText("Dropped " + cleared + " pending order(s), stopped " + stopped + " citizen(s)"));
             return;
         }
 
         throw new WrongUsageException(getCommandUsage(sender));
     }
 
-    private List<EntityCitizen> findCitizens(ICommandSender sender, World world) {
+    private Colony findColony(ICommandSender sender, ColonyManager manager, int colonyId) {
+        if (colonyId != 0) {
+            return manager.getColony(colonyId);
+        }
         ChunkCoordinates at = sender.getPlayerCoordinates();
-        AxisAlignedBB box = AxisAlignedBB
-            .getBoundingBox(at.posX, at.posY, at.posZ, at.posX + 1.0D, at.posY + 1.0D, at.posZ + 1.0D)
-            .expand(CITIZEN_RANGE, CITIZEN_RANGE / 2.0D, CITIZEN_RANGE);
-        return world.getEntitiesWithinAABB(EntityCitizen.class, box);
+        return manager.getNearestColony(sender.getEntityWorld().provider.dimensionId, at.posX, at.posZ);
+    }
+
+    private List<EntityCitizen> findCitizens(World world, int colonyId) {
+        List<EntityCitizen> citizens = new ArrayList<>();
+        for (Object entity : world.loadedEntityList) {
+            if (entity instanceof EntityCitizen && ((EntityCitizen) entity).getColonyId() == colonyId) {
+                citizens.add((EntityCitizen) entity);
+            }
+        }
+        return citizens;
     }
 }

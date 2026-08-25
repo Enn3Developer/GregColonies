@@ -12,6 +12,8 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldSavedData;
 import net.minecraft.world.storage.MapStorage;
 
+import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
+
 public class ColonyManager extends WorldSavedData {
 
     public static final String DATA_NAME = "gregcolonies_colonies";
@@ -76,6 +78,41 @@ public class ColonyManager extends WorldSavedData {
         colonies.put(colony.getId(), colony);
         markDirty();
         return colony;
+    }
+
+    public boolean enqueueOrder(int colonyId, CitizenCommand command) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null) {
+            return false;
+        }
+        colony.enqueueOrder(command);
+        markDirty();
+        return true;
+    }
+
+    public CitizenCommand pollOrder(int colonyId) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null) {
+            return null;
+        }
+        CitizenCommand order = colony.pollOrder();
+        if (order != null) {
+            markDirty();
+        }
+        return order;
+    }
+
+    public int clearOrders(int colonyId) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null) {
+            return 0;
+        }
+        int cleared = colony.getOrderCount();
+        colony.clearOrders();
+        if (cleared > 0) {
+            markDirty();
+        }
+        return cleared;
     }
 
     public boolean removeColony(int id) {

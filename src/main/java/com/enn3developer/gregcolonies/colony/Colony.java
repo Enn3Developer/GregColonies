@@ -1,8 +1,15 @@
 package com.enn3developer.gregcolonies.colony;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.UUID;
 
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+
+import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
+import com.enn3developer.gregcolonies.entity.ai.CitizenCommandRegistry;
 
 public class Colony {
 
@@ -14,6 +21,7 @@ public class Colony {
     private int x;
     private int y;
     private int z;
+    private final Deque<CitizenCommand> orders = new ArrayDeque<>();
 
     private Colony() {}
 
@@ -64,6 +72,30 @@ public class Colony {
         return z;
     }
 
+    public boolean isOwner(UUID uuid) {
+        return owner.equals(uuid);
+    }
+
+    public boolean canAccess(EntityPlayer player) {
+        return isOwner(player.getUniqueID());
+    }
+
+    public void enqueueOrder(CitizenCommand command) {
+        orders.addLast(command);
+    }
+
+    public CitizenCommand pollOrder() {
+        return orders.pollFirst();
+    }
+
+    public int getOrderCount() {
+        return orders.size();
+    }
+
+    public void clearOrders() {
+        orders.clear();
+    }
+
     public boolean isCenteredAt(int dimension, int x, int y, int z) {
         return this.dimension == dimension && this.x == x && this.y == y && this.z == z;
     }
@@ -87,6 +119,12 @@ public class Colony {
         tag.setInteger("x", x);
         tag.setInteger("y", y);
         tag.setInteger("z", z);
+
+        NBTTagList orderList = new NBTTagList();
+        for (CitizenCommand order : orders) {
+            orderList.appendTag(CitizenCommandRegistry.write(order));
+        }
+        tag.setTag("orders", orderList);
         return tag;
     }
 
@@ -100,6 +138,14 @@ public class Colony {
         colony.x = tag.getInteger("x");
         colony.y = tag.getInteger("y");
         colony.z = tag.getInteger("z");
+
+        NBTTagList orderList = tag.getTagList("orders", 10);
+        for (int i = 0; i < orderList.tagCount(); i++) {
+            CitizenCommand order = CitizenCommandRegistry.read(orderList.getCompoundTagAt(i));
+            if (order != null) {
+                colony.orders.addLast(order);
+            }
+        }
         return colony;
     }
 
