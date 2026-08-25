@@ -12,6 +12,10 @@ public abstract class CitizenCommand {
         return true;
     }
 
+    public boolean fearsEnemies() {
+        return true;
+    }
+
     public void start(EntityCitizen citizen) {}
 
     public abstract CitizenCommandResult update(EntityCitizen citizen);

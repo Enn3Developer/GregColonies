@@ -30,6 +30,14 @@ public class CitizenCommandQueue {
         return pending.size();
     }
 
+    public boolean fearsEnemies() {
+        if (current != null) {
+            return current.fearsEnemies();
+        }
+        CitizenCommand next = pending.peekFirst();
+        return next == null || next.fearsEnemies();
+    }
+
     public boolean hasWork() {
         return current != null || !pending.isEmpty();
     }

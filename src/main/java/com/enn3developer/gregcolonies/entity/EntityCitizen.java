@@ -42,6 +42,7 @@ import com.enn3developer.gregcolonies.colony.ColonyManager;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandQueue;
 import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenCommands;
+import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenFlee;
 import com.enn3developer.gregcolonies.entity.diet.CitizenDiet;
 
 public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGuiData> {
@@ -104,9 +105,10 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         tasks.taskEntries.clear();
         targetTasks.taskEntries.clear();
         tasks.addTask(0, new EntityAISwimming(this));
-        tasks.addTask(1, new EntityAICitizenCommands(this));
-        tasks.addTask(2, new EntityAIOpenDoor(this, true));
-        tasks.addTask(3, new EntityAIWatchClosest(this, EntityPlayer.class, 6.0F));
+        tasks.addTask(1, new EntityAICitizenFlee(this));
+        tasks.addTask(2, new EntityAICitizenCommands(this));
+        tasks.addTask(3, new EntityAIOpenDoor(this, true));
+        tasks.addTask(4, new EntityAIWatchClosest(this, EntityPlayer.class, 6.0F));
         for (int i = 0; i < equipmentDropChances.length; i++) {
             equipmentDropChances[i] = 0.0F;
         }
@@ -163,6 +165,10 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         }
         commands.enqueue(order);
         return true;
+    }
+
+    public boolean isAfraid() {
+        return commands.fearsEnemies();
     }
 
     public boolean canAccessInventory(EntityPlayer player) {

@@ -58,6 +58,11 @@ public class CitizenCommandGuard extends CitizenCommand {
     }
 
     @Override
+    public boolean fearsEnemies() {
+        return false;
+    }
+
+    @Override
     public boolean canBeTakenBy(EntityCitizen citizen) {
         return citizen.getColony() != null;
     }
