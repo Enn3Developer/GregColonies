@@ -15,6 +15,7 @@ import net.minecraft.item.ItemTool;
 import net.minecraft.nbt.NBTTagCompound;
 
 import com.cleanroommc.modularui.utils.item.ItemStackHandler;
+import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
 
 public class CitizenInventory {
 
@@ -103,6 +104,52 @@ public class CitizenInventory {
         }
         Set<String> toolClasses = item.getToolClasses(stack);
         return toolClasses != null && !toolClasses.isEmpty();
+    }
+
+    public boolean canStore(List<ItemStack> stacks) {
+        if (stacks == null || stacks.isEmpty()) {
+            return true;
+        }
+        ItemStackHandler probe = new ItemStackHandler(MAIN_SLOTS);
+        for (int i = 0; i < MAIN_SLOTS; i++) {
+            ItemStack stack = main.getStackInSlot(i);
+            probe.setStackInSlot(i, stack == null ? null : stack.copy());
+        }
+        for (ItemStack stack : stacks) {
+            if (stack == null) {
+                continue;
+            }
+            ItemStack rest = stack.copy();
+            for (int i = 0; i < MAIN_SLOTS && rest != null; i++) {
+                rest = probe.insertItem(i, rest, false);
+            }
+            if (rest != null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public ItemStack takeScaffold() {
+        for (int i = 0; i < MAIN_SLOTS; i++) {
+            ItemStack stack = main.getStackInSlot(i);
+            if (!WorkBlocks.isScaffold(stack)) {
+                continue;
+            }
+            ItemStack taken = main.extractItem(i, 1, false);
+            if (taken != null && taken.stackSize > 0) {
+                return taken;
+            }
+        }
+        return null;
+    }
+
+    public ItemStack store(ItemStack stack) {
+        ItemStack rest = stack;
+        for (int i = 0; i < MAIN_SLOTS && rest != null; i++) {
+            rest = main.insertItem(i, rest, false);
+        }
+        return rest;
     }
 
     public List<ItemStack> takeAll() {

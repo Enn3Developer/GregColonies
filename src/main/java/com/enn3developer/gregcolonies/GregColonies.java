@@ -15,7 +15,7 @@ import cpw.mods.fml.common.event.FMLServerStartingEvent;
     version = Tags.VERSION,
     name = "GregColonies",
     acceptedMinecraftVersions = "[1.7.10]",
-    dependencies = "required-after:nutrition;required-after:SpiceOfLife;after:controlling")
+    dependencies = "required-after:gregtech;required-after:nutrition;required-after:SpiceOfLife;after:controlling")
 public class GregColonies {
 
     public static final String MODID = "gregcolonies";

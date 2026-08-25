@@ -10,8 +10,11 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
+import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandQueue;
+import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandChop;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandGuard;
+import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandMine;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandMoveTo;
 
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -27,6 +30,10 @@ public class PacketCitizenCommand implements IMessage {
 
     public static final byte CANCEL = 2;
 
+    public static final byte CHOP = 3;
+
+    public static final byte MINE = 4;
+
     private static final int MAX_CITIZENS = 512;
 
     private int colonyId;
@@ -35,11 +42,19 @@ public class PacketCitizenCommand implements IMessage {
     private int x;
     private int y;
     private int z;
+    private int x2;
+    private int y2;
+    private int z2;
     private final List<UUID> citizens = new ArrayList<>();
 
     public PacketCitizenCommand() {}
 
     public PacketCitizenCommand(int colonyId, byte action, boolean append, int x, int y, int z,
+        Collection<UUID> citizens) {
+        this(colonyId, action, append, x, y, z, x, y, z, citizens);
+    }
+
+    public PacketCitizenCommand(int colonyId, byte action, boolean append, int x, int y, int z, int x2, int y2, int z2,
         Collection<UUID> citizens) {
         this.colonyId = colonyId;
         this.action = action;
@@ -47,6 +62,9 @@ public class PacketCitizenCommand implements IMessage {
         this.x = x;
         this.y = y;
         this.z = z;
+        this.x2 = x2;
+        this.y2 = y2;
+        this.z2 = z2;
         this.citizens.addAll(citizens);
     }
 
@@ -58,6 +76,9 @@ public class PacketCitizenCommand implements IMessage {
         x = buf.readInt();
         y = buf.readInt();
         z = buf.readInt();
+        x2 = buf.readInt();
+        y2 = buf.readInt();
+        z2 = buf.readInt();
         int count = Math.min(buf.readInt(), MAX_CITIZENS);
         for (int i = 0; i < count; i++) {
             citizens.add(new UUID(buf.readLong(), buf.readLong()));
@@ -72,6 +93,9 @@ public class PacketCitizenCommand implements IMessage {
         buf.writeInt(x);
         buf.writeInt(y);
         buf.writeInt(z);
+        buf.writeInt(x2);
+        buf.writeInt(y2);
+        buf.writeInt(z2);
         buf.writeInt(Math.min(citizens.size(), MAX_CITIZENS));
         for (int i = 0; i < Math.min(citizens.size(), MAX_CITIZENS); i++) {
             UUID id = citizens.get(i);
@@ -105,14 +129,31 @@ public class PacketCitizenCommand implements IMessage {
                     commands.clear(citizen);
                     continue;
                 }
+                CitizenCommand command = build(message);
+                if (command == null) {
+                    continue;
+                }
                 if (!message.append) {
                     commands.clear(citizen);
                 }
-                commands.enqueue(
-                    message.action == GUARD ? new CitizenCommandGuard()
-                        : new CitizenCommandMoveTo(message.x, message.y, message.z));
+                commands.enqueue(command);
             }
             GCNetwork.sendColony(player, colony);
+        }
+
+        private static CitizenCommand build(PacketCitizenCommand message) {
+            switch (message.action) {
+                case GUARD:
+                    return new CitizenCommandGuard();
+                case MOVE:
+                    return new CitizenCommandMoveTo(message.x, message.y, message.z);
+                case CHOP:
+                    return new CitizenCommandChop(message.x, message.y, message.z, message.x2, message.y2, message.z2);
+                case MINE:
+                    return new CitizenCommandMine(message.x, message.z);
+                default:
+                    return null;
+            }
         }
     }
 }

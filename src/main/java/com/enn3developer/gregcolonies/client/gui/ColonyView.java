@@ -27,6 +27,12 @@ public class ColonyView {
 
     public static final String UNGROUPED = "ungrouped";
 
+    public static final int TARGET_NONE = 0;
+
+    public static final int TARGET_CHOP = 1;
+
+    public static final int TARGET_MINE = 2;
+
     private static final int MAX_GROUP_ROWS = 10;
 
     private static final int SIDE_WIDTH = 148;
@@ -45,6 +51,8 @@ public class ColonyView {
 
     private static final int BUTTON_BACKGROUND = 0xFF232833;
 
+    private static final int ACTIVE_COLOR = 0xFF7CE07C;
+
     private static final String SELECT_HINT = "LMB select   LMB drag box   shift add   RMB move";
 
     private static final String CAMERA_HINT = "RMB drag pan   MMB drag turn   scroll zoom   WASD pan   Q/E turn";
@@ -58,6 +66,12 @@ public class ColonyView {
     private ColonySnapshot colony;
 
     private TextFieldWidget groupField;
+
+    private final int[] pending = new int[6];
+
+    private int targeting = TARGET_NONE;
+
+    private boolean hasPending;
 
     public ColonyView(ColonySnapshot colony) {
         setColony(colony);
@@ -130,6 +144,37 @@ public class ColonyView {
         return loaded;
     }
 
+    public int getTargeting() {
+        return targeting;
+    }
+
+    public void setTargeting(int mode) {
+        targeting = targeting == mode ? TARGET_NONE : mode;
+        hasPending = false;
+    }
+
+    public boolean hasPending() {
+        return targeting != TARGET_NONE && hasPending;
+    }
+
+    public int[] getPending() {
+        return pending;
+    }
+
+    public void setPending(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+        pending[0] = minX;
+        pending[1] = minY;
+        pending[2] = minZ;
+        pending[3] = maxX;
+        pending[4] = maxY;
+        pending[5] = maxZ;
+        hasPending = true;
+    }
+
+    public void clearPending() {
+        hasPending = false;
+    }
+
     public boolean isEditing() {
         return groupField != null && groupField.isFocused();
     }
@@ -139,6 +184,14 @@ public class ColonyView {
             return;
         }
         GCNetwork.CHANNEL.sendToServer(new PacketCitizenCommand(colony.getId(), action, append, x, y, z, selection));
+    }
+
+    public void sendArea(byte action, boolean append, int x1, int y1, int z1, int x2, int y2, int z2) {
+        if (selection.isEmpty()) {
+            return;
+        }
+        GCNetwork.CHANNEL
+            .sendToServer(new PacketCitizenCommand(colony.getId(), action, append, x1, y1, z1, x2, y2, z2, selection));
     }
 
     public void sendGroup(String group) {
@@ -242,7 +295,44 @@ public class ColonyView {
                     .height(BUTTON_HEIGHT)
                     .childPadding(3)
                     .child(button("Guard", 66, () -> sendCommand(PacketCitizenCommand.GUARD, false, 0, 0, 0)))
-                    .child(button("Cancel", 66, () -> sendCommand(PacketCitizenCommand.CANCEL, false, 0, 0, 0))));
+                    .child(button("Cancel", 66, () -> sendCommand(PacketCitizenCommand.CANCEL, false, 0, 0, 0))))
+            .child(
+                Flow.row()
+                    .widthRel(1.0F)
+                    .height(BUTTON_HEIGHT)
+                    .childPadding(3)
+                    .child(modeButton("Chop", 66, TARGET_CHOP))
+                    .child(modeButton("Mine", 66, TARGET_MINE)))
+            .child(
+                IKey.dynamic(this::targetingLabel)
+                    .asWidget()
+                    .color(HINT_COLOR)
+                    .shadow(true));
+    }
+
+    private ButtonWidget<?> modeButton(String label, int width, int mode) {
+        return new ButtonWidget<>().size(width, BUTTON_HEIGHT)
+            .background(new Rectangle().color(BUTTON_BACKGROUND))
+            .child(
+                IKey.str(label)
+                    .asWidget()
+                    .color(() -> targeting == mode ? ACTIVE_COLOR : TEXT_COLOR)
+                    .shadow(true)
+                    .posRel(Alignment.Center))
+            .onMousePressed(mouseButton -> {
+                setTargeting(mode);
+                return true;
+            });
+    }
+
+    private String targetingLabel() {
+        if (targeting == TARGET_CHOP) {
+            return "drag a region, RMB cancels";
+        }
+        if (targeting == TARGET_MINE) {
+            return "click a chunk, RMB cancels";
+        }
+        return "";
     }
 
     private TextFieldWidget groupField() {

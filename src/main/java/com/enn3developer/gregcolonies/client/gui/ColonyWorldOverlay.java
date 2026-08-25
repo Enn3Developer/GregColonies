@@ -3,11 +3,14 @@ package com.enn3developer.gregcolonies.client.gui;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
+import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.entity.Entity;
+import net.minecraft.util.MathHelper;
 import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
+import net.minecraft.world.World;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderHandEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
@@ -44,6 +47,14 @@ public class ColonyWorldOverlay {
 
     private static final int SELECTION_COLOR = 0xE0FFFFFF;
 
+    private static final int CHOP_COLOR = 0xB07CE07C;
+
+    private static final int MINE_COLOR = 0xB0FFB040;
+
+    private static final double AREA_HEIGHT = 4.0D;
+
+    private static final double AREA_EDGE = 0.3D;
+
     private static final double TERRITORY_THICKNESS = 0.35D;
 
     private static final double GROUND_OFFSET = 0.06D;
@@ -62,7 +73,11 @@ public class ColonyWorldOverlay {
 
     private static final FloatBuffer UNPROJECTED = BufferUtils.createFloatBuffer(3);
 
-    private static final double PICK_RANGE = 512.0D;
+    private static final double PICK_RANGE = 640.0D;
+
+    private static final double PICK_STEP = 1.0D;
+
+    private static final double PICK_REFINE = 0.05D;
 
     private static boolean matricesValid;
 
@@ -116,6 +131,7 @@ public class ColonyWorldOverlay {
         GL11.glDisable(GL11.GL_TEXTURE_2D);
         GL11.glDisable(GL11.GL_LIGHTING);
         GL11.glDisable(GL11.GL_DEPTH_TEST);
+        GL11.glDisable(GL11.GL_CULL_FACE);
         GL11.glDepthMask(false);
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
@@ -149,6 +165,19 @@ public class ColonyWorldOverlay {
             }
         }
 
+        ColonyView view = screen.getView();
+        if (view.hasPending()) {
+            int[] area = view.getPending();
+            drawArea(
+                area[0],
+                area[1],
+                area[2],
+                area[3] + 1,
+                area[5] + 1,
+                view.getTargeting() == ColonyView.TARGET_MINE ? MINE_COLOR : CHOP_COLOR);
+        }
+
+        GL11.glEnable(GL11.GL_CULL_FACE);
         GL11.glDisable(GL11.GL_BLEND);
         GL11.glDepthMask(true);
         GL11.glEnable(GL11.GL_DEPTH_TEST);
@@ -204,19 +233,58 @@ public class ColonyWorldOverlay {
     }
 
     public static MovingObjectPosition pick(double guiX, double guiY) {
+        World world = Minecraft.getMinecraft().theWorld;
         Vec3 near = unProject(guiX, guiY, 0.0F);
         Vec3 far = unProject(guiX, guiY, 1.0F);
-        if (near == null || far == null || Minecraft.getMinecraft().theWorld == null) {
+        if (near == null || far == null || world == null) {
             return null;
         }
         Vec3 direction = Vec3
             .createVectorHelper(far.xCoord - near.xCoord, far.yCoord - near.yCoord, far.zCoord - near.zCoord)
             .normalize();
-        Vec3 end = Vec3.createVectorHelper(
-            near.xCoord + direction.xCoord * PICK_RANGE,
-            near.yCoord + direction.yCoord * PICK_RANGE,
-            near.zCoord + direction.zCoord * PICK_RANGE);
-        return Minecraft.getMinecraft().theWorld.rayTraceBlocks(near, end);
+
+        double hit = -1.0D;
+        for (double distance = 0.0D; distance <= PICK_RANGE; distance += PICK_STEP) {
+            if (isPickable(world, near, direction, distance)) {
+                hit = distance;
+                break;
+            }
+        }
+        if (hit < 0.0D) {
+            return null;
+        }
+        for (double distance = hit - PICK_STEP + PICK_REFINE; distance < hit; distance += PICK_REFINE) {
+            if (isPickable(world, near, direction, distance)) {
+                hit = distance;
+                break;
+            }
+        }
+
+        double x = near.xCoord + direction.xCoord * hit;
+        double y = near.yCoord + direction.yCoord * hit;
+        double z = near.zCoord + direction.zCoord * hit;
+        return new MovingObjectPosition(
+            MathHelper.floor_double(x),
+            MathHelper.floor_double(y),
+            MathHelper.floor_double(z),
+            1,
+            Vec3.createVectorHelper(x, y, z));
+    }
+
+    private static boolean isPickable(World world, Vec3 origin, Vec3 direction, double distance) {
+        int y = MathHelper.floor_double(origin.yCoord + direction.yCoord * distance);
+        if (y < 0 || y >= world.getHeight()) {
+            return false;
+        }
+        int x = MathHelper.floor_double(origin.xCoord + direction.xCoord * distance);
+        int z = MathHelper.floor_double(origin.zCoord + direction.zCoord * distance);
+        if (!world.blockExists(x, y, z)) {
+            return false;
+        }
+        Block block = world.getBlock(x, y, z);
+        return block != null && !block.isAir(world, x, y, z)
+            && block.getMaterial()
+                .blocksMovement();
     }
 
     private static Vec3 unProject(double guiX, double guiY, float winZ) {
@@ -241,6 +309,47 @@ public class ColonyWorldOverlay {
             UNPROJECTED.get(0) + cameraX,
             UNPROJECTED.get(1) + cameraY,
             UNPROJECTED.get(2) + cameraZ);
+    }
+
+    private static void drawArea(double x0, double y, double z0, double x1, double z1, int color) {
+        float alpha = (color >>> 24) / 255.0F;
+        float red = (color >> 16 & 0xFF) / 255.0F;
+        float green = (color >> 8 & 0xFF) / 255.0F;
+        float blue = (color & 0xFF) / 255.0F;
+        double ground = y + GROUND_OFFSET;
+        double top = ground + AREA_HEIGHT;
+
+        GL11.glBegin(GL11.GL_QUADS);
+        drawWall(x0, z0, x1, z0, ground, top, red, green, blue, alpha);
+        drawWall(x1, z0, x1, z1, ground, top, red, green, blue, alpha);
+        drawWall(x1, z1, x0, z1, ground, top, red, green, blue, alpha);
+        drawWall(x0, z1, x0, z0, ground, top, red, green, blue, alpha);
+
+        GL11.glColor4f(red, green, blue, alpha);
+        drawGroundQuad(x0, z0, x1, z0 + AREA_EDGE, ground);
+        drawGroundQuad(x0, z1 - AREA_EDGE, x1, z1, ground);
+        drawGroundQuad(x0, z0, x0 + AREA_EDGE, z1, ground);
+        drawGroundQuad(x1 - AREA_EDGE, z0, x1, z1, ground);
+        GL11.glEnd();
+    }
+
+    private static void drawWall(double x0, double z0, double x1, double z1, double bottom, double top, float red,
+        float green, float blue, float alpha) {
+        GL11.glColor4f(red, green, blue, alpha);
+        GL11.glVertex3d(x0, bottom, z0);
+        GL11.glColor4f(red, green, blue, alpha);
+        GL11.glVertex3d(x1, bottom, z1);
+        GL11.glColor4f(red, green, blue, 0.0F);
+        GL11.glVertex3d(x1, top, z1);
+        GL11.glColor4f(red, green, blue, 0.0F);
+        GL11.glVertex3d(x0, top, z0);
+    }
+
+    private static void drawGroundQuad(double x0, double z0, double x1, double z1, double y) {
+        GL11.glVertex3d(x0, y, z0);
+        GL11.glVertex3d(x0, y, z1);
+        GL11.glVertex3d(x1, y, z1);
+        GL11.glVertex3d(x1, y, z0);
     }
 
     private static void drawRing(double x, double y, double z, double radius, double thickness, int color,
