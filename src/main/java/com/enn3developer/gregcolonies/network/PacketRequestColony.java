@@ -1,5 +1,7 @@
 package com.enn3developer.gregcolonies.network;
 
+import net.minecraft.entity.player.EntityPlayerMP;
+
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -17,7 +19,8 @@ public class PacketRequestColony implements IMessage {
 
         @Override
         public IMessage onMessage(PacketRequestColony message, MessageContext ctx) {
-            GCNetwork.queueRequest(ctx.getServerHandler().playerEntity);
+            EntityPlayerMP player = ctx.getServerHandler().playerEntity;
+            GCNetwork.enqueue(() -> GCNetwork.sendColony(player));
             return null;
         }
     }

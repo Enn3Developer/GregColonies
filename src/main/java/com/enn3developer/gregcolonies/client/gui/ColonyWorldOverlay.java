@@ -6,6 +6,8 @@ import java.nio.IntBuffer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.entity.Entity;
+import net.minecraft.util.MovingObjectPosition;
+import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderHandEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
@@ -36,6 +38,12 @@ public class ColonyWorldOverlay {
 
     private static final double CENTER_RADIUS = 1.6D;
 
+    private static final double SELECTION_RADIUS = 0.85D;
+
+    private static final double SELECTION_THICKNESS = 0.07D;
+
+    private static final int SELECTION_COLOR = 0xE0FFFFFF;
+
     private static final double TERRITORY_THICKNESS = 0.35D;
 
     private static final double GROUND_OFFSET = 0.06D;
@@ -51,6 +59,10 @@ public class ColonyWorldOverlay {
     private static final IntBuffer VIEWPORT = BufferUtils.createIntBuffer(16);
 
     private static final FloatBuffer PROJECTED = BufferUtils.createFloatBuffer(3);
+
+    private static final FloatBuffer UNPROJECTED = BufferUtils.createFloatBuffer(3);
+
+    private static final double PICK_RANGE = 512.0D;
 
     private static boolean matricesValid;
 
@@ -131,6 +143,10 @@ public class ColonyWorldOverlay {
                 color = color & 0x00FFFFFF | OFFLINE_ALPHA << 24;
             }
             drawRing(x, y, z, CITIZEN_RADIUS, CITIZEN_THICKNESS, color, CIRCLE_SEGMENTS);
+            if (screen.getView()
+                .isSelected(citizen.getId())) {
+                drawRing(x, y, z, SELECTION_RADIUS, SELECTION_THICKNESS, SELECTION_COLOR, CIRCLE_SEGMENTS);
+            }
         }
 
         GL11.glDisable(GL11.GL_BLEND);
@@ -185,6 +201,46 @@ public class ColonyWorldOverlay {
 
     public static void invalidate() {
         matricesValid = false;
+    }
+
+    public static MovingObjectPosition pick(double guiX, double guiY) {
+        Vec3 near = unProject(guiX, guiY, 0.0F);
+        Vec3 far = unProject(guiX, guiY, 1.0F);
+        if (near == null || far == null || Minecraft.getMinecraft().theWorld == null) {
+            return null;
+        }
+        Vec3 direction = Vec3
+            .createVectorHelper(far.xCoord - near.xCoord, far.yCoord - near.yCoord, far.zCoord - near.zCoord)
+            .normalize();
+        Vec3 end = Vec3.createVectorHelper(
+            near.xCoord + direction.xCoord * PICK_RANGE,
+            near.yCoord + direction.yCoord * PICK_RANGE,
+            near.zCoord + direction.zCoord * PICK_RANGE);
+        return Minecraft.getMinecraft().theWorld.rayTraceBlocks(near, end);
+    }
+
+    private static Vec3 unProject(double guiX, double guiY, float winZ) {
+        if (!matricesValid) {
+            return null;
+        }
+        Minecraft minecraft = Minecraft.getMinecraft();
+        ScaledResolution resolution = new ScaledResolution(minecraft, minecraft.displayWidth, minecraft.displayHeight);
+        float scale = resolution.getScaleFactor();
+        UNPROJECTED.clear();
+        if (!GLU.gluUnProject(
+            (float) (guiX * scale),
+            (float) (minecraft.displayHeight - guiY * scale),
+            winZ,
+            MODELVIEW,
+            PROJECTION,
+            VIEWPORT,
+            UNPROJECTED)) {
+            return null;
+        }
+        return Vec3.createVectorHelper(
+            UNPROJECTED.get(0) + cameraX,
+            UNPROJECTED.get(1) + cameraY,
+            UNPROJECTED.get(2) + cameraZ);
     }
 
     private static void drawRing(double x, double y, double z, double radius, double thickness, int color,

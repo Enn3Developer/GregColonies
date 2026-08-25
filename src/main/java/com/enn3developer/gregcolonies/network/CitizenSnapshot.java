@@ -1,5 +1,7 @@
 package com.enn3developer.gregcolonies.network;
 
+import java.util.UUID;
+
 import net.minecraft.entity.SharedMonsterAttributes;
 
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
@@ -10,6 +12,8 @@ import cpw.mods.fml.common.network.ByteBufUtils;
 import io.netty.buffer.ByteBuf;
 
 public class CitizenSnapshot {
+
+    private UUID id;
 
     private int entityId = -1;
     private String group = "";
@@ -26,6 +30,7 @@ public class CitizenSnapshot {
 
     public static CitizenSnapshot of(ColonyCitizen entry, EntityCitizen citizen) {
         CitizenSnapshot snapshot = new CitizenSnapshot();
+        snapshot.id = entry.getId();
         snapshot.group = entry.getGroup();
         if (citizen == null) {
             snapshot.x = entry.getX() + 0.5D;
@@ -50,6 +55,10 @@ public class CitizenSnapshot {
             .getCurrent();
         snapshot.task = current == null ? "" : current.describe();
         return snapshot;
+    }
+
+    public UUID getId() {
+        return id;
     }
 
     public boolean isLoaded() {
@@ -97,6 +106,8 @@ public class CitizenSnapshot {
     }
 
     public void write(ByteBuf buf) {
+        buf.writeLong(id.getMostSignificantBits());
+        buf.writeLong(id.getLeastSignificantBits());
         buf.writeInt(entityId);
         ByteBufUtils.writeUTF8String(buf, group);
         buf.writeDouble(x);
@@ -111,6 +122,7 @@ public class CitizenSnapshot {
 
     public static CitizenSnapshot read(ByteBuf buf) {
         CitizenSnapshot snapshot = new CitizenSnapshot();
+        snapshot.id = new UUID(buf.readLong(), buf.readLong());
         snapshot.entityId = buf.readInt();
         snapshot.group = ByteBufUtils.readUTF8String(buf);
         snapshot.x = buf.readDouble();
