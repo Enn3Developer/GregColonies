@@ -73,6 +73,8 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
 
     private boolean hasTarget;
 
+    private boolean hadTool;
+
     private int targetX;
 
     private int targetY;
@@ -148,6 +150,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
         skips = 0;
         homeTicks = 0;
         pillarCooldown = 0;
+        hadTool = false;
         skipped.clear();
         breaker.clear(citizen);
         resetWork();
@@ -193,9 +196,10 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
         ItemStack tool = citizen.getInventory()
             .getHeldTool();
         if (!WorkBlocks.isEffectiveOn(tool, referenceBlock())) {
-            reason = "no tool";
+            reason = hadTool ? "tool broken" : "no tool";
             return startReturn(citizen);
         }
+        hadTool = true;
         if (!citizen.worldObj.blockExists((minX + maxX) / 2, 64, (minZ + maxZ) / 2)) {
             reason = "out of range";
             return startReturn(citizen);
