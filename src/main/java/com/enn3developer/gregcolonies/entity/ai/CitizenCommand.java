@@ -8,6 +8,10 @@ public abstract class CitizenCommand {
 
     public abstract String getId();
 
+    public boolean canBeTakenBy(EntityCitizen citizen) {
+        return true;
+    }
+
     public void start(EntityCitizen citizen) {}
 
     public abstract CitizenCommandResult update(EntityCitizen citizen);

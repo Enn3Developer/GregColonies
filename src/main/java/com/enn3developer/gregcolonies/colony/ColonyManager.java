@@ -12,6 +12,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldSavedData;
 import net.minecraft.world.storage.MapStorage;
 
+import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 
 public class ColonyManager extends WorldSavedData {
@@ -60,6 +61,22 @@ public class ColonyManager extends WorldSavedData {
         return null;
     }
 
+    public Colony getNearestColonyOf(UUID owner, int dimension, int x, int z) {
+        Colony nearest = null;
+        double nearestDistance = Double.MAX_VALUE;
+        for (Colony colony : colonies.values()) {
+            if (!colony.isOwner(owner)) {
+                continue;
+            }
+            double distance = colony.distanceSqTo(dimension, x, z);
+            if (distance < nearestDistance) {
+                nearest = colony;
+                nearestDistance = distance;
+            }
+        }
+        return nearest;
+    }
+
     public Colony getNearestColony(int dimension, int x, int z) {
         Colony nearest = null;
         double nearestDistance = Double.MAX_VALUE;
@@ -90,12 +107,12 @@ public class ColonyManager extends WorldSavedData {
         return true;
     }
 
-    public CitizenCommand pollOrder(int colonyId) {
+    public CitizenCommand pollOrder(int colonyId, EntityCitizen citizen) {
         Colony colony = colonies.get(colonyId);
         if (colony == null) {
             return null;
         }
-        CitizenCommand order = colony.pollOrder();
+        CitizenCommand order = colony.pollOrderFor(citizen);
         if (order != null) {
             markDirty();
         }

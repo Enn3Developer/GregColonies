@@ -1,8 +1,12 @@
 package com.enn3developer.gregcolonies.entity;
 
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
+
+import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.entity.ai.EntityAIOpenDoor;
 import net.minecraft.entity.ai.EntityAISwimming;
-import net.minecraft.entity.ai.EntityAIWander;
 import net.minecraft.entity.ai.EntityAIWatchClosest;
 import net.minecraft.entity.passive.EntityVillager;
 import net.minecraft.entity.player.EntityPlayer;
@@ -35,11 +39,14 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     public static final int INVENTORY_SIZE = 9;
 
+    private static final double PATH_RANGE = 64.0D;
+
     private static final String SLOT_GROUP = "citizen_inventory";
 
     private final CitizenCommandQueue commands = new CitizenCommandQueue();
     private final CitizenParameters parameters = new CitizenParameters();
     private final ItemStackHandler inventory = new ItemStackHandler(INVENTORY_SIZE);
+    private final Set<EntityPlayer> viewers = new HashSet<>();
     private int colonyId;
 
     public EntityCitizen(World world) {
@@ -50,7 +57,12 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         tasks.addTask(1, new EntityAICitizenCommands(this));
         tasks.addTask(2, new EntityAIOpenDoor(this, true));
         tasks.addTask(3, new EntityAIWatchClosest(this, EntityPlayer.class, 6.0F));
-        tasks.addTask(4, new EntityAIWander(this, 0.4D));
+    }
+
+    @Override
+    protected void applyEntityAttributes() {
+        super.applyEntityAttributes();
+        getEntityAttribute(SharedMonsterAttributes.followRange).setBaseValue(PATH_RANGE);
     }
 
     public CitizenCommandQueue getCommands() {
@@ -86,7 +98,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
             return false;
         }
         CitizenCommand order = ColonyManager.get(worldObj)
-            .pollOrder(colonyId);
+            .pollOrder(colonyId, this);
         if (order == null) {
             return false;
         }
@@ -97,6 +109,31 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     public boolean canAccessInventory(EntityPlayer player) {
         Colony colony = getColony();
         return colony != null && colony.canAccess(player);
+    }
+
+    public boolean isViewed() {
+        return !viewers.isEmpty();
+    }
+
+    @Override
+    protected boolean isMovementBlocked() {
+        return isViewed() || super.isMovementBlocked();
+    }
+
+    @Override
+    public void onLivingUpdate() {
+        if (!worldObj.isRemote && !viewers.isEmpty()) {
+            Iterator<EntityPlayer> iterator = viewers.iterator();
+            while (iterator.hasNext()) {
+                EntityPlayer viewer = iterator.next();
+                if (viewer.isDead || viewer.worldObj != worldObj
+                    || viewer.openContainer == viewer.inventoryContainer
+                    || getDistanceSqToEntity(viewer) > 400.0D) {
+                    iterator.remove();
+                }
+            }
+        }
+        super.onLivingUpdate();
     }
 
     @Override
@@ -120,6 +157,11 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     @Override
     public ModularPanel buildUI(EntityGuiData data, PanelSyncManager syncManager, UISettings settings) {
         syncManager.registerSlotGroup(new SlotGroup(SLOT_GROUP, INVENTORY_SIZE, true));
+        syncManager.addOpenListener(viewer -> {
+            viewers.add(viewer);
+            getNavigator().clearPathEntity();
+        });
+        syncManager.addCloseListener(viewers::remove);
 
         ModularPanel panel = ModularPanel.defaultPanel("citizen_inventory");
         panel.child(

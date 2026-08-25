@@ -8,6 +8,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 
+import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandRegistry;
 
@@ -86,6 +87,16 @@ public class Colony {
 
     public CitizenCommand pollOrder() {
         return orders.pollFirst();
+    }
+
+    public CitizenCommand pollOrderFor(EntityCitizen citizen) {
+        for (CitizenCommand order : orders) {
+            if (order.canBeTakenBy(citizen)) {
+                orders.remove(order);
+                return order;
+            }
+        }
+        return null;
     }
 
     public int getOrderCount() {

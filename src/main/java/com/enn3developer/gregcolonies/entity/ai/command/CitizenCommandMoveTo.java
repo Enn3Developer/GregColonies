@@ -10,14 +10,26 @@ public class CitizenCommandMoveTo extends CitizenCommand {
 
     public static final String ID = "move_to";
 
-    private static final int DEFAULT_TIMEOUT = 600;
+    private static final int DEFAULT_STALL_TICKS = 600;
+
+    private static final int MAX_PATH_FAILURES = 20;
+
+    private static final double HOP_DISTANCE = 12.0D;
+
+    private static final double ARRIVED_DISTANCE_SQ = 4.0D;
+
+    private static final double PROGRESS_EPSILON = 1.0D;
+
+    private static final double CLAIM_DISTANCE_SQ = 96.0D * 96.0D;
 
     private int x;
     private int y;
     private int z;
     private double speed = 0.6D;
-    private int timeout = DEFAULT_TIMEOUT;
-    private int ticks;
+    private int stallTicks = DEFAULT_STALL_TICKS;
+    private int ticksWithoutProgress;
+    private int pathFailures;
+    private double bestDistanceSq = Double.MAX_VALUE;
 
     public CitizenCommandMoveTo() {}
 
@@ -33,28 +45,60 @@ public class CitizenCommandMoveTo extends CitizenCommand {
     }
 
     @Override
+    public boolean canBeTakenBy(EntityCitizen citizen) {
+        return citizen.getDistanceSq(x + 0.5D, y, z + 0.5D) < CLAIM_DISTANCE_SQ;
+    }
+
+    @Override
     public void start(EntityCitizen citizen) {
-        ticks = 0;
-        citizen.getNavigator()
-            .tryMoveToXYZ(x + 0.5D, y, z + 0.5D, speed);
+        ticksWithoutProgress = 0;
+        pathFailures = 0;
+        bestDistanceSq = Double.MAX_VALUE;
+        pathTowards(citizen);
     }
 
     @Override
     public CitizenCommandResult update(EntityCitizen citizen) {
-        ticks++;
-        if (citizen.getDistanceSq(x + 0.5D, y, z + 0.5D) < 2.0D) {
+        double distanceSq = citizen.getDistanceSq(x + 0.5D, y, z + 0.5D);
+        if (distanceSq < ARRIVED_DISTANCE_SQ) {
             return CitizenCommandResult.DONE;
         }
-        if (ticks > timeout) {
+
+        if (distanceSq < bestDistanceSq - PROGRESS_EPSILON) {
+            bestDistanceSq = distanceSq;
+            ticksWithoutProgress = 0;
+        } else {
+            ticksWithoutProgress++;
+        }
+        if (ticksWithoutProgress > stallTicks) {
             return CitizenCommandResult.FAILED;
         }
+
         if (citizen.getNavigator()
-            .noPath()
-            && !citizen.getNavigator()
-                .tryMoveToXYZ(x + 0.5D, y, z + 0.5D, speed)) {
-            return CitizenCommandResult.FAILED;
+            .noPath()) {
+            if (pathTowards(citizen)) {
+                pathFailures = 0;
+            } else if (++pathFailures > MAX_PATH_FAILURES) {
+                return CitizenCommandResult.FAILED;
+            }
         }
         return CitizenCommandResult.RUNNING;
+    }
+
+    private boolean pathTowards(EntityCitizen citizen) {
+        double dx = x + 0.5D - citizen.posX;
+        double dy = y - citizen.posY;
+        double dz = z + 0.5D - citizen.posZ;
+        double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        if (distance <= HOP_DISTANCE) {
+            return citizen.getNavigator()
+                .tryMoveToXYZ(x + 0.5D, y, z + 0.5D, speed);
+        }
+
+        double scale = HOP_DISTANCE / distance;
+        return citizen.getNavigator()
+            .tryMoveToXYZ(citizen.posX + dx * scale, citizen.posY + dy * scale, citizen.posZ + dz * scale, speed);
     }
 
     @Override
@@ -69,7 +113,7 @@ public class CitizenCommandMoveTo extends CitizenCommand {
         y = tag.getInteger("y");
         z = tag.getInteger("z");
         speed = tag.hasKey("speed") ? tag.getDouble("speed") : speed;
-        timeout = tag.hasKey("timeout") ? tag.getInteger("timeout") : DEFAULT_TIMEOUT;
+        stallTicks = tag.hasKey("stallTicks") ? tag.getInteger("stallTicks") : DEFAULT_STALL_TICKS;
     }
 
     @Override
@@ -78,7 +122,7 @@ public class CitizenCommandMoveTo extends CitizenCommand {
         tag.setInteger("y", y);
         tag.setInteger("z", z);
         tag.setDouble("speed", speed);
-        tag.setInteger("timeout", timeout);
+        tag.setInteger("stallTicks", stallTicks);
     }
 
     @Override

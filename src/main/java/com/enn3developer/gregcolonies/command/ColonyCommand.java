@@ -7,6 +7,7 @@ import java.util.List;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.command.WrongUsageException;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChunkCoordinates;
 import net.minecraft.util.EnumChatFormatting;
@@ -101,17 +102,19 @@ public class ColonyCommand extends CommandBase {
         }
 
         if ("spawn".equals(args[0])) {
-            Colony colony;
+            Colony colony = findColony(sender, manager, args.length >= 2 ? parseInt(sender, args[1]) : 0);
+            if (colony == null) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                return;
+            }
+            if (!canManage(sender, colony)) {
+                return;
+            }
+
             int x;
             int y;
             int z;
-
             if (args.length >= 2) {
-                colony = manager.getColony(parseInt(sender, args[1]));
-                if (colony == null) {
-                    sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No such colony"));
-                    return;
-                }
                 x = colony.getX();
                 y = colony.getY() + 1;
                 z = colony.getZ();
@@ -120,24 +123,16 @@ public class ColonyCommand extends CommandBase {
                 x = at.posX;
                 y = at.posY;
                 z = at.posZ;
-                colony = manager.getNearestColony(world.provider.dimensionId, x, z);
             }
 
             EntityCitizen citizen = new EntityCitizen(world);
             citizen.setLocationAndAngles(x + 0.5D, y, z + 0.5D, 0.0F, 0.0F);
-            if (colony != null) {
-                citizen.setColonyId(colony.getId());
-            }
+            citizen.setColonyId(colony.getId());
             world.spawnEntityInWorld(citizen);
 
             sender.addChatMessage(
                 new ChatComponentText(
-                    "Spawned citizen at " + x
-                        + "/"
-                        + y
-                        + "/"
-                        + z
-                        + (colony == null ? " (no colony)" : " for colony #" + colony.getId())));
+                    "Spawned citizen at " + x + "/" + y + "/" + z + " for colony #" + colony.getId()));
             return;
         }
 
@@ -148,6 +143,9 @@ public class ColonyCommand extends CommandBase {
             Colony colony = findColony(sender, manager, args.length >= 5 ? parseInt(sender, args[4]) : 0);
             if (colony == null) {
                 sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                return;
+            }
+            if (!canManage(sender, colony)) {
                 return;
             }
 
@@ -171,6 +169,9 @@ public class ColonyCommand extends CommandBase {
                 sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
                 return;
             }
+            if (!canManage(sender, colony)) {
+                return;
+            }
 
             int cleared = manager.clearOrders(colony.getId());
             int stopped = 0;
@@ -191,8 +192,24 @@ public class ColonyCommand extends CommandBase {
         if (colonyId != 0) {
             return manager.getColony(colonyId);
         }
+        if (!(sender instanceof EntityPlayer)) {
+            return null;
+        }
         ChunkCoordinates at = sender.getPlayerCoordinates();
-        return manager.getNearestColony(sender.getEntityWorld().provider.dimensionId, at.posX, at.posZ);
+        return manager.getNearestColonyOf(
+            ((EntityPlayer) sender).getUniqueID(),
+            sender.getEntityWorld().provider.dimensionId,
+            at.posX,
+            at.posZ);
+    }
+
+    private boolean canManage(ICommandSender sender, Colony colony) {
+        if (!(sender instanceof EntityPlayer) || colony.canAccess((EntityPlayer) sender)) {
+            return true;
+        }
+        sender.addChatMessage(
+            new ChatComponentText(EnumChatFormatting.RED + "Colony #" + colony.getId() + " is not yours"));
+        return false;
     }
 
     private List<EntityCitizen> findCitizens(World world, int colonyId) {

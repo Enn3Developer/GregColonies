@@ -16,13 +16,13 @@ public class EntityAICitizenCommands extends EntityAIBase {
     @Override
     public boolean shouldExecute() {
         return citizen.getCommands()
-            .hasWork();
+            .hasWork() || citizen.takeColonyOrder();
     }
 
     @Override
     public boolean continueExecuting() {
         return citizen.getCommands()
-            .hasWork();
+            .hasWork() || citizen.takeColonyOrder();
     }
 
     @Override
