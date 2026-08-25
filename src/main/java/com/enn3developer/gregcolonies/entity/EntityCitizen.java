@@ -5,12 +5,17 @@ import java.util.Iterator;
 import java.util.Set;
 
 import net.minecraft.block.material.Material;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.entity.ai.EntityAIOpenDoor;
 import net.minecraft.entity.ai.EntityAISwimming;
 import net.minecraft.entity.ai.EntityAIWatchClosest;
+import net.minecraft.entity.ai.attributes.AttributeModifier;
 import net.minecraft.entity.passive.EntityVillager;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemArmor;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChatComponentText;
@@ -55,11 +60,23 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     private static final float SPRINT_JUMP_EXHAUSTION = 0.8F;
 
+    private static final float ATTACK_EXHAUSTION = 0.3F;
+
+    private static final double BASE_ATTACK_DAMAGE = 1.0D;
+
+    private static final double LEAP_LIFT = 0.4D;
+
+    private static final double LEAP_PUSH = 0.4D;
+
+    private static final String ARMOR_GROUP = "citizen_armor";
+
     private static final String FOOD_GROUP = "citizen_food";
 
     private static final String TOOL_GROUP = "citizen_tool";
 
     private static final String MAIN_GROUP = "citizen_main";
+
+    private static final int ARMOR_PRIORITY = 40;
 
     private static final int FOOD_PRIORITY = 50;
 
@@ -77,7 +94,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     private final CitizenCommandQueue commands = new CitizenCommandQueue();
     private final CitizenParameters parameters = new CitizenParameters();
-    private final CitizenInventory inventory = new CitizenInventory();
+    private final CitizenInventory inventory = new CitizenInventory(this);
     private final CitizenDiet diet = new CitizenDiet();
     private final Set<EntityPlayer> viewers = new HashSet<>();
     private int colonyId;
@@ -90,12 +107,17 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         tasks.addTask(1, new EntityAICitizenCommands(this));
         tasks.addTask(2, new EntityAIOpenDoor(this, true));
         tasks.addTask(3, new EntityAIWatchClosest(this, EntityPlayer.class, 6.0F));
+        for (int i = 0; i < equipmentDropChances.length; i++) {
+            equipmentDropChances[i] = 0.0F;
+        }
     }
 
     @Override
     protected void applyEntityAttributes() {
         super.applyEntityAttributes();
         getEntityAttribute(SharedMonsterAttributes.followRange).setBaseValue(PATH_RANGE);
+        getAttributeMap().registerAttribute(SharedMonsterAttributes.attackDamage);
+        getEntityAttribute(SharedMonsterAttributes.attackDamage).setBaseValue(BASE_ATTACK_DAMAGE);
     }
 
     public CitizenCommandQueue getCommands() {
@@ -173,8 +195,110 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         super.onLivingUpdate();
 
         if (!worldObj.isRemote) {
+            syncEquipment();
             diet.update(this);
         }
+    }
+
+    private void syncEquipment() {
+        setCurrentItemOrArmor(
+            0,
+            inventory.getTool()
+                .getStackInSlot(0));
+        for (int i = 0; i < CitizenInventory.ARMOR_SLOTS; i++) {
+            setCurrentItemOrArmor(
+                4 - i,
+                inventory.getArmor()
+                    .getStackInSlot(i));
+        }
+    }
+
+    public void leapTowards(Entity target) {
+        double dx = target.posX - posX;
+        double dz = target.posZ - posZ;
+        float distance = MathHelper.sqrt_double(dx * dx + dz * dz);
+        if (distance >= 1.0E-4F) {
+            motionX += dx / distance * LEAP_PUSH + motionX * 0.2D;
+            motionZ += dz / distance * LEAP_PUSH + motionZ * 0.2D;
+        }
+        motionY = LEAP_LIFT;
+        diet.addExhaustion(isSprinting() ? SPRINT_JUMP_EXHAUSTION : JUMP_EXHAUSTION);
+    }
+
+    @Override
+    protected void damageArmor(float damage) {
+        if (damage < 0.0F) {
+            return;
+        }
+        damage /= 4.0F;
+        if (damage < 1.0F) {
+            damage = 1.0F;
+        }
+        for (int i = 0; i < CitizenInventory.ARMOR_SLOTS; i++) {
+            ItemStack stack = inventory.getArmor()
+                .getStackInSlot(i);
+            if (stack == null || !(stack.getItem() instanceof ItemArmor)) {
+                continue;
+            }
+            stack.damageItem((int) damage, this);
+            if (stack.stackSize <= 0) {
+                inventory.getArmor()
+                    .setStackInSlot(i, null);
+            }
+        }
+    }
+
+    public boolean attackTarget(EntityLivingBase target) {
+        ItemStack tool = inventory.getHeldTool();
+        float damage = (float) getEntityAttribute(SharedMonsterAttributes.attackDamage).getAttributeValue()
+            + toolDamage(tool)
+            + EnchantmentHelper.getEnchantmentModifierLiving(this, target);
+        int knockback = EnchantmentHelper.getKnockbackModifier(this, target);
+
+        swingItem();
+        diet.addExhaustion(ATTACK_EXHAUSTION);
+        if (!target.attackEntityFrom(DamageSource.causeMobDamage(this), damage)) {
+            return false;
+        }
+
+        if (knockback > 0) {
+            target.addVelocity(
+                -MathHelper.sin(rotationYaw * (float) Math.PI / 180.0F) * knockback * 0.5F,
+                0.1D,
+                MathHelper.cos(rotationYaw * (float) Math.PI / 180.0F) * knockback * 0.5F);
+            motionX *= 0.6D;
+            motionZ *= 0.6D;
+        }
+
+        int fireAspect = EnchantmentHelper.getFireAspectModifier(this);
+        if (fireAspect > 0) {
+            target.setFire(fireAspect * 4);
+        }
+
+        if (tool != null) {
+            tool.getItem()
+                .hitEntity(tool, target, this);
+            if (tool.stackSize <= 0) {
+                inventory.getTool()
+                    .setStackInSlot(0, null);
+            }
+        }
+        return true;
+    }
+
+    private static float toolDamage(ItemStack stack) {
+        if (stack == null) {
+            return 0.0F;
+        }
+        float bonus = 0.0F;
+        for (Object entry : stack.getAttributeModifiers()
+            .get(SharedMonsterAttributes.attackDamage.getAttributeUnlocalizedName())) {
+            AttributeModifier modifier = (AttributeModifier) entry;
+            if (modifier.getOperation() == 0) {
+                bonus += (float) modifier.getAmount();
+            }
+        }
+        return bonus;
     }
 
     @Override
@@ -249,6 +373,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     @Override
     public ModularPanel buildUI(EntityGuiData data, PanelSyncManager syncManager, UISettings settings) {
+        syncManager.registerSlotGroup(new SlotGroup(ARMOR_GROUP, 1, ARMOR_PRIORITY, true));
         syncManager.registerSlotGroup(new SlotGroup(FOOD_GROUP, 1, FOOD_PRIORITY, true));
         syncManager.registerSlotGroup(new SlotGroup(TOOL_GROUP, 1, TOOL_PRIORITY, true));
         syncManager.registerSlotGroup(new SlotGroup(MAIN_GROUP, CitizenInventory.MAIN_SLOTS, MAIN_PRIORITY, true));
@@ -261,6 +386,19 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         ModularPanel panel = ModularPanel.defaultPanel("citizen_inventory", PANEL_WIDTH, PANEL_HEIGHT);
         panel.child(
             SlotGroupWidget.builder()
+                .row("A")
+                .row("A")
+                .row("A")
+                .row("A")
+                .key(
+                    'A',
+                    index -> new ItemSlot().slot(
+                        new ModularSlot(inventory.getArmor(), index).slotGroup(ARMOR_GROUP)
+                            .filter(stack -> CitizenInventory.isArmor(stack, index, this))))
+                .build()
+                .pos(7, 8));
+        panel.child(
+            SlotGroupWidget.builder()
                 .row("F")
                 .row("F")
                 .row("F")
@@ -270,15 +408,15 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
                         new ModularSlot(inventory.getFood(), index).slotGroup(FOOD_GROUP)
                             .filter(CitizenInventory::isFood)))
                 .build()
-                .pos(7, 8));
+                .pos(151, 8));
         panel.child(
             new ItemSlot().slot(
                 new ModularSlot(inventory.getTool(), 0).slotGroup(TOOL_GROUP)
                     .filter(CitizenInventory::isTool))
-                .pos(7, 66));
+                .pos(151, 66));
         panel.child(
             new Widget<>().size(PREVIEW_WIDTH, PREVIEW_HEIGHT)
-                .pos(70, 8)
+                .pos(61, 8)
                 .background(GuiTextures.DISPLAY, new EntityDisplayWidget(() -> this).doesLookAtMouse(true)));
         panel.child(
             SlotGroupWidget.builder()

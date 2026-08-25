@@ -8,6 +8,7 @@ public class Config {
 
     public static String greeting = "Hello World";
     public static int minColonyDistance = 128;
+    public static int colonyRadius = 64;
 
     public static void synchronizeConfiguration(File configFile) {
         Configuration configuration = new Configuration(configFile);
@@ -21,6 +22,14 @@ public class Config {
             16,
             4096,
             "Minimum distance in blocks between two colony centers");
+
+        colonyRadius = configuration.getInt(
+            "colonyRadius",
+            Configuration.CATEGORY_GENERAL,
+            colonyRadius,
+            8,
+            1024,
+            "Radius in blocks of the region a colony owns and guards");
 
         if (configuration.hasChanged()) {
             configuration.save();

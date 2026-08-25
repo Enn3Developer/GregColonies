@@ -8,6 +8,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 
+import com.enn3developer.gregcolonies.Config;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandRegistry;
@@ -109,6 +110,15 @@ public class Colony {
 
     public boolean isCenteredAt(int dimension, int x, int y, int z) {
         return this.dimension == dimension && this.x == x && this.y == y && this.z == z;
+    }
+
+    public boolean isInside(int dimension, double x, double z) {
+        if (this.dimension != dimension) {
+            return false;
+        }
+        double dx = this.x + 0.5D - x;
+        double dz = this.z + 0.5D - z;
+        return dx * dx + dz * dz <= (double) Config.colonyRadius * Config.colonyRadius;
     }
 
     public double distanceSqTo(int dimension, int x, int z) {

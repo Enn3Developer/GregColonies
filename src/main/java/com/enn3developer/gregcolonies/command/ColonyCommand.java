@@ -16,11 +16,12 @@ import net.minecraft.world.World;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
+import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandGuard;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandMoveTo;
 
 public class ColonyCommand extends CommandBase {
 
-    private static final List<String> SUB_COMMANDS = Arrays.asList("list", "info", "spawn", "order", "cancel");
+    private static final List<String> SUB_COMMANDS = Arrays.asList("list", "info", "spawn", "order", "guard", "cancel");
 
     @Override
     public String getCommandName() {
@@ -29,7 +30,7 @@ public class ColonyCommand extends CommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/colony <list|info <id>|spawn [colonyId]|order <x> <y> <z> [colonyId]|cancel [colonyId]>";
+        return "/colony <list|info <id>|spawn [colonyId]|order <x> <y> <z> [colonyId]|guard [colonyId]|cancel [colonyId]>";
     }
 
     @Override
@@ -157,6 +158,26 @@ public class ColonyCommand extends CommandBase {
             sender.addChatMessage(
                 new ChatComponentText(
                     "Queued move_to for colony #" + colony.getId()
+                        + " ("
+                        + colony.getOrderCount()
+                        + " order(s) pending)"));
+            return;
+        }
+
+        if ("guard".equals(args[0])) {
+            Colony colony = findColony(sender, manager, args.length >= 2 ? parseInt(sender, args[1]) : 0);
+            if (colony == null) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                return;
+            }
+            if (!canManage(sender, colony)) {
+                return;
+            }
+
+            manager.enqueueOrder(colony.getId(), new CitizenCommandGuard());
+            sender.addChatMessage(
+                new ChatComponentText(
+                    "Queued guard for colony #" + colony.getId()
                         + " ("
                         + colony.getOrderCount()
                         + " order(s) pending)"));

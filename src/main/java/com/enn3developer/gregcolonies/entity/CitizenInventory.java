@@ -4,7 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import net.minecraft.entity.Entity;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemArmor;
 import net.minecraft.item.ItemFood;
 import net.minecraft.item.ItemHoe;
 import net.minecraft.item.ItemStack;
@@ -16,11 +18,23 @@ import com.cleanroommc.modularui.utils.item.ItemStackHandler;
 
 public class CitizenInventory {
 
+    public static final int ARMOR_SLOTS = 4;
+
     public static final int FOOD_SLOTS = 3;
 
     public static final int TOOL_SLOTS = 1;
 
     public static final int MAIN_SLOTS = 9;
+
+    private final Entity owner;
+
+    private final ItemStackHandler armor = new ItemStackHandler(ARMOR_SLOTS) {
+
+        @Override
+        public boolean isItemValid(int slot, ItemStack stack) {
+            return isArmor(stack, slot, owner);
+        }
+    };
 
     private final ItemStackHandler food = new ItemStackHandler(FOOD_SLOTS) {
 
@@ -40,6 +54,14 @@ public class CitizenInventory {
 
     private final ItemStackHandler main = new ItemStackHandler(MAIN_SLOTS);
 
+    public CitizenInventory(Entity owner) {
+        this.owner = owner;
+    }
+
+    public ItemStackHandler getArmor() {
+        return armor;
+    }
+
     public ItemStackHandler getFood() {
         return food;
     }
@@ -54,6 +76,17 @@ public class CitizenInventory {
 
     public ItemStack getHeldTool() {
         return tool.getStackInSlot(0);
+    }
+
+    public static boolean isArmor(ItemStack stack, int slot, Entity wearer) {
+        if (stack == null) {
+            return false;
+        }
+        Item item = stack.getItem();
+        if (item instanceof ItemArmor) {
+            return ((ItemArmor) item).armorType == slot;
+        }
+        return item.isValidArmor(stack, slot, wearer);
     }
 
     public static boolean isFood(ItemStack stack) {
@@ -74,7 +107,7 @@ public class CitizenInventory {
 
     public List<ItemStack> takeAll() {
         List<ItemStack> stacks = new ArrayList<>();
-        for (ItemStackHandler handler : new ItemStackHandler[] { food, tool, main }) {
+        for (ItemStackHandler handler : new ItemStackHandler[] { armor, food, tool, main }) {
             for (int i = 0; i < handler.getSlots(); i++) {
                 ItemStack stack = handler.getStackInSlot(i);
                 if (stack != null) {
@@ -87,12 +120,14 @@ public class CitizenInventory {
     }
 
     public void writeToNBT(NBTTagCompound tag) {
+        tag.setTag("armor", armor.serializeNBT());
         tag.setTag("food", food.serializeNBT());
         tag.setTag("tool", tool.serializeNBT());
         tag.setTag("main", main.serializeNBT());
     }
 
     public void readFromNBT(NBTTagCompound tag) {
+        armor.deserializeNBT(tag.getCompoundTag("armor"));
         food.deserializeNBT(tag.getCompoundTag("food"));
         tool.deserializeNBT(tag.getCompoundTag("tool"));
         main.deserializeNBT(tag.getCompoundTag("main"));

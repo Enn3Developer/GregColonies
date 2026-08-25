@@ -7,6 +7,7 @@ import java.util.function.Supplier;
 import net.minecraft.nbt.NBTTagCompound;
 
 import com.enn3developer.gregcolonies.GregColonies;
+import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandGuard;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandMoveTo;
 
 public final class CitizenCommandRegistry {
@@ -23,6 +24,7 @@ public final class CitizenCommandRegistry {
 
     public static void registerDefaults() {
         register(CitizenCommandMoveTo.ID, CitizenCommandMoveTo::new);
+        register(CitizenCommandGuard.ID, CitizenCommandGuard::new);
     }
 
     public static CitizenCommand create(String id) {
