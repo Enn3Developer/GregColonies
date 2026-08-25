@@ -14,6 +14,9 @@ import cpw.mods.fml.common.event.FMLServerStartingEvent;
 public class GregColonies {
 
     public static final String MODID = "gregcolonies";
+
+    @Mod.Instance(MODID)
+    public static GregColonies instance;
     public static final Logger LOG = LogManager.getLogger(MODID);
 
     @SidedProxy(

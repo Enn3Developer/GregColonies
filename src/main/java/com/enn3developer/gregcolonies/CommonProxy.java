@@ -2,6 +2,7 @@ package com.enn3developer.gregcolonies;
 
 import com.enn3developer.gregcolonies.block.GCBlocks;
 import com.enn3developer.gregcolonies.command.ColonyCommand;
+import com.enn3developer.gregcolonies.entity.GCEntities;
 
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
@@ -19,6 +20,7 @@ public class CommonProxy {
         GregColonies.LOG.info("I am GregColonies at version " + Tags.VERSION);
 
         GCBlocks.register();
+        GCEntities.register();
     }
 
     // load "Do your mod setup. Build whatever data structures you care about. Register recipes." (Remove if not needed)
