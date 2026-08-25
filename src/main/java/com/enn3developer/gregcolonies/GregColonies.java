@@ -10,7 +10,12 @@ import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 
-@Mod(modid = GregColonies.MODID, version = Tags.VERSION, name = "GregColonies", acceptedMinecraftVersions = "[1.7.10]")
+@Mod(
+    modid = GregColonies.MODID,
+    version = Tags.VERSION,
+    name = "GregColonies",
+    acceptedMinecraftVersions = "[1.7.10]",
+    dependencies = "required-after:nutrition;required-after:SpiceOfLife")
 public class GregColonies {
 
     public static final String MODID = "gregcolonies";

@@ -14,6 +14,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 
 import com.cleanroommc.modularui.api.IGuiHolder;
@@ -34,12 +35,15 @@ import com.enn3developer.gregcolonies.colony.ColonyManager;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandQueue;
 import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenCommands;
+import com.enn3developer.gregcolonies.entity.diet.CitizenDiet;
 
 public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGuiData> {
 
     public static final String NAME = "citizen";
 
     private static final double PATH_RANGE = 64.0D;
+
+    private static final float WALK_EXHAUSTION = 0.01F;
 
     private static final String FOOD_GROUP = "citizen_food";
 
@@ -64,6 +68,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     private final CitizenCommandQueue commands = new CitizenCommandQueue();
     private final CitizenParameters parameters = new CitizenParameters();
     private final CitizenInventory inventory = new CitizenInventory();
+    private final CitizenDiet diet = new CitizenDiet();
     private final Set<EntityPlayer> viewers = new HashSet<>();
     private int colonyId;
 
@@ -93,6 +98,10 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     public CitizenInventory getInventory() {
         return inventory;
+    }
+
+    public CitizenDiet getDiet() {
+        return diet;
     }
 
     public int getColonyId() {
@@ -152,6 +161,22 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
             }
         }
         super.onLivingUpdate();
+
+        if (!worldObj.isRemote) {
+            updateDiet();
+        }
+    }
+
+    private void updateDiet() {
+        if (onGround) {
+            double dx = posX - prevPosX;
+            double dz = posZ - prevPosZ;
+            int distance = Math.round(MathHelper.sqrt_double(dx * dx + dz * dz) * 100.0F);
+            if (distance > 0) {
+                diet.addExhaustion(WALK_EXHAUSTION * distance * 0.01F);
+            }
+        }
+        diet.update(this);
     }
 
     @Override
@@ -232,6 +257,10 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         NBTTagCompound parametersTag = new NBTTagCompound();
         parameters.writeToNBT(parametersTag);
         tag.setTag("parameters", parametersTag);
+
+        NBTTagCompound dietTag = new NBTTagCompound();
+        diet.writeToNBT(dietTag);
+        tag.setTag("diet", dietTag);
     }
 
     @Override
@@ -241,6 +270,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         inventory.readFromNBT(tag.getCompoundTag("inventory"));
         commands.readFromNBT(tag.getCompoundTag("commands"));
         parameters.readFromNBT(tag.getCompoundTag("parameters"));
+        diet.readFromNBT(tag.getCompoundTag("diet"));
     }
 
     @Override
