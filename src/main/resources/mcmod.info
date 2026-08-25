@@ -1,0 +1,21 @@
+{
+	"modListVersion": 2,
+	"modList": [{
+		"modid": "${modId}",
+		"name": "${modName}",
+		"description": "A colony-building mod in the spirit of MineColonies, built for GregTech: New Horizons.",
+		"version": "${modVersion}",
+		"mcversion": "${minecraftVersion}",
+		"url": "https://github.com/enn3developer/GregColonies",
+		"updateUrl": "",
+		"authorList": ["enn3developer"],
+		"credits": "",
+		"logoFile": "",
+		"screenshots": [],
+		"parent": "",
+		"requiredMods": ["Forge@[10.13.4.1614,)", "gregtech", "structurelib", "gtnhlib", "modularui2"],
+		"dependencies": ["gregtech", "structurelib", "gtnhlib", "modularui2"],
+		"dependants": [],
+		"useDependencyInformation": true
+	}]
+}
