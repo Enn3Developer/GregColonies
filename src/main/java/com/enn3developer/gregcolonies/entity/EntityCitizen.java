@@ -40,6 +40,8 @@ import com.cleanroommc.modularui.widgets.slot.SlotGroup;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.compat.Mods;
+import com.enn3developer.gregcolonies.compat.TinkersTools;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandQueue;
 import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenCommands;
@@ -305,6 +307,9 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     public boolean attackTarget(EntityLivingBase target) {
         ItemStack tool = inventory.getHeldTool();
+        if (tool != null && Mods.tinkers() && TinkersTools.isTool(tool)) {
+            return attackWithTinkersTool(tool, target);
+        }
         float damage = (float) getEntityAttribute(SharedMonsterAttributes.attackDamage).getAttributeValue()
             + toolDamage(tool)
             + EnchantmentHelper.getEnchantmentModifierLiving(this, target);
@@ -339,6 +344,17 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
             }
         }
         return true;
+    }
+
+    private boolean attackWithTinkersTool(ItemStack tool, EntityLivingBase target) {
+        swingItem();
+        diet.addExhaustion(ATTACK_EXHAUSTION);
+        boolean hit = TinkersTools.attack(tool, this, target);
+        if (tool.stackSize <= 0) {
+            inventory.getTool()
+                .setStackInSlot(0, null);
+        }
+        return hit;
     }
 
     private static float toolDamage(ItemStack stack) {

@@ -15,6 +15,8 @@ import net.minecraft.item.ItemTool;
 import net.minecraft.nbt.NBTTagCompound;
 
 import com.cleanroommc.modularui.utils.item.ItemStackHandler;
+import com.enn3developer.gregcolonies.compat.Mods;
+import com.enn3developer.gregcolonies.compat.TinkersTools;
 import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
 
 public class CitizenInventory {
@@ -101,6 +103,9 @@ public class CitizenInventory {
         Item item = stack.getItem();
         if (item instanceof ItemTool || item instanceof ItemSword || item instanceof ItemHoe) {
             return true;
+        }
+        if (Mods.tinkers() && TinkersTools.isTool(stack)) {
+            return !TinkersTools.isBroken(stack);
         }
         Set<String> toolClasses = item.getToolClasses(stack);
         return toolClasses != null && !toolClasses.isEmpty();
