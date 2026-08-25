@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
+import net.minecraft.block.material.Material;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.entity.ai.EntityAIOpenDoor;
 import net.minecraft.entity.ai.EntityAISwimming;
@@ -13,6 +14,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
@@ -44,6 +46,14 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     private static final double PATH_RANGE = 64.0D;
 
     private static final float WALK_EXHAUSTION = 0.01F;
+
+    private static final float SPRINT_EXHAUSTION = 0.099999994F;
+
+    private static final float SWIM_EXHAUSTION = 0.015F;
+
+    private static final float JUMP_EXHAUSTION = 0.2F;
+
+    private static final float SPRINT_JUMP_EXHAUSTION = 0.8F;
 
     private static final String FOOD_GROUP = "citizen_food";
 
@@ -163,20 +173,60 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         super.onLivingUpdate();
 
         if (!worldObj.isRemote) {
-            updateDiet();
+            diet.update(this);
         }
     }
 
-    private void updateDiet() {
-        if (onGround) {
-            double dx = posX - prevPosX;
-            double dz = posZ - prevPosZ;
-            int distance = Math.round(MathHelper.sqrt_double(dx * dx + dz * dz) * 100.0F);
+    @Override
+    public void moveEntityWithHeading(float strafe, float forward) {
+        double x = posX;
+        double y = posY;
+        double z = posZ;
+        super.moveEntityWithHeading(strafe, forward);
+        if (!worldObj.isRemote) {
+            addMovementExhaustion(posX - x, posY - y, posZ - z);
+        }
+    }
+
+    private void addMovementExhaustion(double dx, double dy, double dz) {
+        if (ridingEntity != null) {
+            return;
+        }
+
+        int distance;
+        if (isInsideOfMaterial(Material.water)) {
+            distance = Math.round(MathHelper.sqrt_double(dx * dx + dy * dy + dz * dz) * 100.0F);
             if (distance > 0) {
-                diet.addExhaustion(WALK_EXHAUSTION * distance * 0.01F);
+                diet.addExhaustion(SWIM_EXHAUSTION * distance * 0.01F);
+            }
+        } else if (isInWater()) {
+            distance = Math.round(MathHelper.sqrt_double(dx * dx + dz * dz) * 100.0F);
+            if (distance > 0) {
+                diet.addExhaustion(SWIM_EXHAUSTION * distance * 0.01F);
+            }
+        } else if (!isOnLadder() && onGround) {
+            distance = Math.round(MathHelper.sqrt_double(dx * dx + dz * dz) * 100.0F);
+            if (distance > 0) {
+                diet.addExhaustion((isSprinting() ? SPRINT_EXHAUSTION : WALK_EXHAUSTION) * distance * 0.01F);
             }
         }
-        diet.update(this);
+    }
+
+    @Override
+    protected void jump() {
+        super.jump();
+        if (!worldObj.isRemote) {
+            diet.addExhaustion(isSprinting() ? SPRINT_JUMP_EXHAUSTION : JUMP_EXHAUSTION);
+        }
+    }
+
+    @Override
+    protected void damageEntity(DamageSource source, float amount) {
+        float before = getHealth();
+        super.damageEntity(source, amount);
+        if (!worldObj.isRemote && getHealth() != before) {
+            diet.addExhaustion(source.getHungerDamage());
+        }
     }
 
     @Override

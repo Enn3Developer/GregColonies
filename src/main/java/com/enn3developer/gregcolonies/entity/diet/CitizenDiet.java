@@ -12,6 +12,7 @@ import net.minecraft.potion.Potion;
 import net.minecraft.potion.PotionEffect;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.MathHelper;
+import net.minecraft.world.EnumDifficulty;
 
 import com.enn3developer.gregcolonies.entity.CitizenInventory;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
@@ -34,7 +35,11 @@ public class CitizenDiet {
 
     private static final float MAX_NUTRIENT = 100.0F;
 
-    private static final float EXHAUSTION_PER_LEVEL = 4.0F;
+    private static final float MAX_EXHAUSTION_LEVEL = 4.0F;
+
+    private static final float EXHAUSTION_CAP = 40.0F;
+
+    private static final float HUNGER_POTION_EXHAUSTION = 0.025F;
 
     private static final float DECAY_SCALE = 0.075F;
 
@@ -46,13 +51,11 @@ public class CitizenDiet {
 
     private static final int EFFECT_DURATION = 619;
 
-    private static final int HEAL_INTERVAL = 80;
+    private static final int FOOD_TIMER_PERIOD = 80;
 
     private static final int HEAL_FOOD_LEVEL = 18;
 
     private static final float HEAL_EXHAUSTION = 3.0F;
-
-    private static final int STARVE_INTERVAL = 80;
 
     private final Map<String, Float> nutrients = new HashMap<>();
     private final FoodHistory history = new FoodHistory();
@@ -61,8 +64,7 @@ public class CitizenDiet {
     private float exhaustion;
     private int eatCooldown;
     private int effectTimer;
-    private int healTimer;
-    private int starveTimer;
+    private int foodTimer;
 
     public int getFoodLevel() {
         return foodLevel;
@@ -86,11 +88,45 @@ public class CitizenDiet {
     }
 
     public void addExhaustion(float amount) {
-        exhaustion = Math.min(exhaustion + amount, 40.0F);
+        exhaustion = Math.min(exhaustion + amount, EXHAUSTION_CAP);
     }
 
     public void update(EntityCitizen citizen) {
-        consumeExhaustion();
+        EnumDifficulty difficulty = citizen.worldObj.difficultySetting;
+
+        PotionEffect hunger = citizen.getActivePotionEffect(Potion.hunger);
+        if (hunger != null) {
+            addExhaustion(HUNGER_POTION_EXHAUSTION * (hunger.getAmplifier() + 1));
+        }
+
+        if (exhaustion > MAX_EXHAUSTION_LEVEL) {
+            exhaustion -= MAX_EXHAUSTION_LEVEL;
+            if (saturation > 0.0F) {
+                saturation = Math.max(saturation - 1.0F, 0.0F);
+            } else if (difficulty != EnumDifficulty.PEACEFUL) {
+                foodLevel = Math.max(foodLevel - 1, 0);
+                decay(1);
+            }
+        }
+
+        if (citizen.worldObj.getGameRules()
+            .getGameRuleBooleanValue("naturalRegeneration") && foodLevel >= HEAL_FOOD_LEVEL && shouldHeal(citizen)) {
+            if (++foodTimer >= FOOD_TIMER_PERIOD) {
+                foodTimer = 0;
+                citizen.heal(1.0F);
+                addExhaustion(HEAL_EXHAUSTION);
+            }
+        } else if (foodLevel <= 0) {
+            if (++foodTimer >= FOOD_TIMER_PERIOD) {
+                foodTimer = 0;
+                if (citizen.getHealth() > 10.0F || difficulty == EnumDifficulty.HARD
+                    || citizen.getHealth() > 1.0F && difficulty == EnumDifficulty.NORMAL) {
+                    citizen.attackEntityFrom(DamageSource.starve, 1.0F);
+                }
+            }
+        } else {
+            foodTimer = 0;
+        }
 
         if (eatCooldown > 0) {
             eatCooldown--;
@@ -98,48 +134,14 @@ public class CitizenDiet {
             tryEat(citizen);
         }
 
-        heal(citizen);
-        starve(citizen);
-
         if (++effectTimer > EFFECT_INTERVAL) {
             effectTimer = 0;
             applyEffects(citizen);
         }
     }
 
-    private void consumeExhaustion() {
-        while (exhaustion >= EXHAUSTION_PER_LEVEL) {
-            exhaustion -= EXHAUSTION_PER_LEVEL;
-            if (saturation > 0.0F) {
-                saturation = Math.max(saturation - 1.0F, 0.0F);
-            } else if (foodLevel > 0) {
-                foodLevel--;
-                decay(1);
-            }
-        }
-    }
-
-    private void heal(EntityCitizen citizen) {
-        if (foodLevel < HEAL_FOOD_LEVEL || citizen.getHealth() >= citizen.getMaxHealth()) {
-            healTimer = 0;
-            return;
-        }
-        if (++healTimer >= HEAL_INTERVAL) {
-            healTimer = 0;
-            citizen.heal(1.0F);
-            addExhaustion(HEAL_EXHAUSTION);
-        }
-    }
-
-    private void starve(EntityCitizen citizen) {
-        if (foodLevel > 0) {
-            starveTimer = 0;
-            return;
-        }
-        if (++starveTimer >= STARVE_INTERVAL) {
-            starveTimer = 0;
-            citizen.attackEntityFrom(DamageSource.starve, 1.0F);
-        }
+    private boolean shouldHeal(EntityCitizen citizen) {
+        return citizen.getHealth() > 0.0F && citizen.getHealth() < citizen.getMaxHealth();
     }
 
     private void tryEat(EntityCitizen citizen) {
@@ -281,6 +283,7 @@ public class CitizenDiet {
         tag.setInteger("foodLevel", foodLevel);
         tag.setFloat("saturation", saturation);
         tag.setFloat("exhaustion", exhaustion);
+        tag.setInteger("foodTimer", foodTimer);
         tag.setInteger("totalFoodsEaten", history.totalFoodsEatenAllTime);
 
         NBTTagCompound nutrientTag = new NBTTagCompound();
@@ -304,6 +307,7 @@ public class CitizenDiet {
         }
         saturation = tag.getFloat("saturation");
         exhaustion = tag.getFloat("exhaustion");
+        foodTimer = tag.getInteger("foodTimer");
 
         nutrients.clear();
         NBTTagCompound nutrientTag = tag.getCompoundTag("nutrients");
