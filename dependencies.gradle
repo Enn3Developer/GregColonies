@@ -46,6 +46,8 @@ dependencies {
     // GUI framework for the colony/builder/citizen screens.
     implementation("com.github.GTNewHorizons:ModularUI2:2.3.86-1.7.10:dev")
 
+    devOnlyNonPublishable("com.github.GTNewHorizons:Controlling:2.1.10:dev")
+
     implementation("com.github.GTNewHorizons:Nutrition:1.0.1:dev")
 
     implementation("com.github.GTNewHorizons:SpiceOfLife:2.2.10-carrot:dev")

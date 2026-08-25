@@ -1,2 +1,4 @@
 tile.gregcolonies.colony_core.name=Colony Core
 entity.gregcolonies.citizen.name=Citizen
+key.categories.gregcolonies=GregColonies
+key.gregcolonies.colony=Colony View

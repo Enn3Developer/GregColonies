@@ -3,6 +3,8 @@ package com.enn3developer.gregcolonies;
 import com.enn3developer.gregcolonies.block.GCBlocks;
 import com.enn3developer.gregcolonies.command.ColonyCommand;
 import com.enn3developer.gregcolonies.entity.GCEntities;
+import com.enn3developer.gregcolonies.network.ColonySnapshot;
+import com.enn3developer.gregcolonies.network.GCNetwork;
 
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
@@ -21,7 +23,10 @@ public class CommonProxy {
 
         GCBlocks.register();
         GCEntities.register();
+        GCNetwork.register();
     }
+
+    public void openColonyScreen(ColonySnapshot colony) {}
 
     // load "Do your mod setup. Build whatever data structures you care about. Register recipes." (Remove if not needed)
     public void init(FMLInitializationEvent event) {}
