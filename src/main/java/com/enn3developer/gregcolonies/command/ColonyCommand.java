@@ -2,9 +2,11 @@ package com.enn3developer.gregcolonies.command;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.UUID;
 
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.ICommandSender;
@@ -16,6 +18,7 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.colony.Colony;
+import com.enn3developer.gregcolonies.colony.ColonyCitizen;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandGuard;
@@ -105,6 +108,7 @@ public class ColonyCommand extends CommandBase {
             sender.addChatMessage(new ChatComponentText(EnumChatFormatting.GOLD + colony.getName()));
             sender.addChatMessage(new ChatComponentText("id: " + colony.getId()));
             sender.addChatMessage(new ChatComponentText("owner: " + colony.getOwnerName() + " " + colony.getOwner()));
+            sender.addChatMessage(new ChatComponentText("citizens: " + colony.getCitizenCount()));
             sender.addChatMessage(new ChatComponentText("pending orders: " + colony.getOrderCount()));
             sender.addChatMessage(
                 new ChatComponentText(
@@ -239,13 +243,13 @@ public class ColonyCommand extends CommandBase {
                 return;
             }
             Map<String, Integer> counts = new TreeMap<>();
-            for (EntityCitizen citizen : findCitizens(world, colony.getId())) {
+            for (ColonyCitizen citizen : colony.getCitizens()) {
                 String group = citizen.getGroup()
                     .isEmpty() ? "(none)" : citizen.getGroup();
                 counts.put(group, counts.getOrDefault(group, 0) + 1);
             }
             if (counts.isEmpty()) {
-                sender.addChatMessage(new ChatComponentText("No loaded citizens"));
+                sender.addChatMessage(new ChatComponentText("No citizens"));
                 return;
             }
             sender
@@ -286,14 +290,28 @@ public class ColonyCommand extends CommandBase {
             }
 
             EntityPlayer player = (EntityPlayer) sender;
-            int changed = 0;
+            Map<UUID, EntityCitizen> loaded = new HashMap<>();
             for (EntityCitizen citizen : findCitizens(world, colony.getId())) {
-                if (citizen.getDistanceSqToEntity(player) > (double) radius * radius) {
+                loaded.put(citizen.getUniqueID(), citizen);
+            }
+
+            int dimension = world.provider.dimensionId;
+            int changed = 0;
+            for (ColonyCitizen entry : colony.getCitizens()) {
+                EntityCitizen citizen = loaded.get(entry.getId());
+                double distanceSq = citizen != null ? citizen.getDistanceSqToEntity(player)
+                    : entry.distanceSqTo(dimension, player.posX, player.posZ);
+                if (distanceSq > (double) radius * radius) {
                     continue;
                 }
-                citizen.setGroup(group);
+                if (citizen != null) {
+                    citizen.setGroup(group);
+                } else {
+                    entry.setGroup(group);
+                }
                 changed++;
             }
+            manager.markDirty();
             sender.addChatMessage(
                 new ChatComponentText(changed + " citizen(s) " + (clearing ? "ungrouped" : "put into group " + group)));
             return;

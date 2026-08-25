@@ -97,6 +97,39 @@ public class ColonyManager extends WorldSavedData {
         return colony;
     }
 
+    public ColonyCitizen registerCitizen(int colonyId, EntityCitizen citizen) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null) {
+            return null;
+        }
+        ColonyCitizen entry = colony.registerCitizen(citizen);
+        markDirty();
+        return entry;
+    }
+
+    public boolean removeCitizen(int colonyId, UUID id) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null || !colony.removeCitizen(id)) {
+            return false;
+        }
+        markDirty();
+        return true;
+    }
+
+    public boolean setCitizenGroup(int colonyId, UUID id, String group) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null) {
+            return false;
+        }
+        ColonyCitizen entry = colony.getCitizen(id);
+        if (entry == null) {
+            return false;
+        }
+        entry.setGroup(group);
+        markDirty();
+        return true;
+    }
+
     public boolean enqueueOrder(int colonyId, CitizenCommand command) {
         Colony colony = colonies.get(colonyId);
         if (colony == null) {

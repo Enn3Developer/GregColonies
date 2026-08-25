@@ -38,6 +38,7 @@ import com.cleanroommc.modularui.widgets.slot.ItemSlot;
 import com.cleanroommc.modularui.widgets.slot.ModularSlot;
 import com.cleanroommc.modularui.widgets.slot.SlotGroup;
 import com.enn3developer.gregcolonies.colony.Colony;
+import com.enn3developer.gregcolonies.colony.ColonyCitizen;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandQueue;
@@ -64,6 +65,8 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     private static final float ATTACK_EXHAUSTION = 0.3F;
 
     private static final double BASE_ATTACK_DAMAGE = 1.0D;
+
+    private static final int ROSTER_REFRESH_TICKS = 100;
 
     private static final double LEAP_LIFT = 0.4D;
 
@@ -100,6 +103,8 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     private final Set<EntityPlayer> viewers = new HashSet<>();
     private int colonyId;
     private String group = "";
+    private boolean rosterRegistered;
+    private int rosterTicks;
 
     public EntityCitizen(World world) {
         super(world);
@@ -149,10 +154,15 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     public void setGroup(String group) {
         this.group = group == null ? "" : group;
+        if (colonyId != 0 && worldObj != null && !worldObj.isRemote) {
+            ColonyManager.get(worldObj)
+                .setCitizenGroup(colonyId, getUniqueID(), this.group);
+        }
     }
 
     public void setColonyId(int colonyId) {
         this.colonyId = colonyId;
+        this.rosterRegistered = false;
     }
 
     public Colony getColony() {
@@ -210,8 +220,38 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         super.onLivingUpdate();
 
         if (!worldObj.isRemote) {
+            updateRoster();
             syncEquipment();
             diet.update(this);
+        }
+    }
+
+    private void updateRoster() {
+        if (colonyId == 0) {
+            return;
+        }
+        ColonyManager manager = ColonyManager.get(worldObj);
+        if (!rosterRegistered) {
+            ColonyCitizen entry = manager.registerCitizen(colonyId, this);
+            if (entry == null) {
+                return;
+            }
+            group = entry.getGroup();
+            rosterRegistered = true;
+            return;
+        }
+        if (++rosterTicks >= ROSTER_REFRESH_TICKS) {
+            rosterTicks = 0;
+            manager.registerCitizen(colonyId, this);
+        }
+    }
+
+    @Override
+    public void onDeath(DamageSource cause) {
+        super.onDeath(cause);
+        if (!worldObj.isRemote && colonyId != 0) {
+            ColonyManager.get(worldObj)
+                .removeCitizen(colonyId, getUniqueID());
         }
     }
 

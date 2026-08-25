@@ -1,8 +1,11 @@
 package com.enn3developer.gregcolonies.colony;
 
 import java.util.ArrayDeque;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import net.minecraft.entity.player.EntityPlayer;
@@ -25,6 +28,7 @@ public class Colony {
     private int y;
     private int z;
     private final Deque<CitizenCommand> orders = new ArrayDeque<>();
+    private final Map<UUID, ColonyCitizen> citizens = new LinkedHashMap<>();
 
     private Colony() {}
 
@@ -73,6 +77,33 @@ public class Colony {
 
     public int getZ() {
         return z;
+    }
+
+    public ColonyCitizen registerCitizen(EntityCitizen citizen) {
+        ColonyCitizen entry = citizens.get(citizen.getUniqueID());
+        if (entry == null) {
+            entry = new ColonyCitizen(citizen);
+            citizens.put(entry.getId(), entry);
+        } else {
+            entry.updatePosition(citizen);
+        }
+        return entry;
+    }
+
+    public ColonyCitizen getCitizen(UUID id) {
+        return citizens.get(id);
+    }
+
+    public boolean removeCitizen(UUID id) {
+        return citizens.remove(id) != null;
+    }
+
+    public Collection<ColonyCitizen> getCitizens() {
+        return citizens.values();
+    }
+
+    public int getCitizenCount() {
+        return citizens.size();
     }
 
     public boolean isOwner(UUID uuid) {
@@ -179,6 +210,12 @@ public class Colony {
             orderList.appendTag(CitizenCommandRegistry.write(order));
         }
         tag.setTag("orders", orderList);
+
+        NBTTagList citizenList = new NBTTagList();
+        for (ColonyCitizen citizen : citizens.values()) {
+            citizenList.appendTag(citizen.writeToNBT());
+        }
+        tag.setTag("citizens", citizenList);
         return tag;
     }
 
@@ -199,6 +236,12 @@ public class Colony {
             if (order != null) {
                 colony.orders.addLast(order);
             }
+        }
+
+        NBTTagList citizenList = tag.getTagList("citizens", 10);
+        for (int i = 0; i < citizenList.tagCount(); i++) {
+            ColonyCitizen citizen = ColonyCitizen.readFromNBT(citizenList.getCompoundTagAt(i));
+            colony.citizens.put(citizen.getId(), citizen);
         }
         return colony;
     }
