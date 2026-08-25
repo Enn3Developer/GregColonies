@@ -23,6 +23,8 @@ import com.enn3developer.gregcolonies.network.PacketRequestColony;
 
 public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Interactable {
 
+    private static final int DRAG_PICK_INTERVAL = 2;
+
     private static final int DATA_INTERVAL = 20;
 
     private static final float ZOOM_STEP = 1.2F;
@@ -77,7 +79,21 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
 
     private boolean areaDragging;
 
+    private int areaCornerX;
+
+    private int areaCornerZ;
+
+    private boolean hasAreaCorner;
+
+    private int areaPickX;
+
+    private int areaPickY;
+
+    private int areaPickTicks;
+
     private int areaAnchorX;
+
+    private int areaAnchorY;
 
     private int areaAnchorZ;
 
@@ -161,11 +177,13 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             view.clearPending();
             return;
         }
+        if (areaDragging && mode == ColonyView.TARGET_CHOP) {
+            updateDragArea(false);
+            return;
+        }
         MovingObjectPosition hit = ColonyWorldOverlay.pick(getContext().getMouseX(), getContext().getMouseY());
         if (hit == null || hit.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK) {
-            if (!areaDragging) {
-                view.clearPending();
-            }
+            view.clearPending();
             return;
         }
         if (mode == ColonyView.TARGET_MINE) {
@@ -174,17 +192,35 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             view.setPending(chunkX << 4, hit.blockY, chunkZ << 4, (chunkX << 4) + 15, hit.blockY, (chunkZ << 4) + 15);
             return;
         }
-        int anchorX = areaDragging ? areaAnchorX : hit.blockX;
-        int anchorZ = areaDragging ? areaAnchorZ : hit.blockZ;
-        int x = clampSide(anchorX, hit.blockX);
-        int z = clampSide(anchorZ, hit.blockZ);
+        view.setPending(hit.blockX, hit.blockY, hit.blockZ, hit.blockX, hit.blockY, hit.blockZ);
+    }
+
+    private void updateDragArea(boolean force) {
+        int screenX = getContext().getMouseX();
+        int screenY = getContext().getMouseY();
+        if (force || areaPickTicks >= DRAG_PICK_INTERVAL || screenX != areaPickX || screenY != areaPickY) {
+            MovingObjectPosition hit = ColonyWorldOverlay.pick(screenX, screenY);
+            if (hit != null && hit.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) {
+                areaCornerX = hit.blockX;
+                areaCornerZ = hit.blockZ;
+                hasAreaCorner = true;
+            }
+            areaPickX = screenX;
+            areaPickY = screenY;
+            areaPickTicks = 0;
+        }
+        if (!hasAreaCorner) {
+            return;
+        }
+        int x = clampSide(areaAnchorX, areaCornerX);
+        int z = clampSide(areaAnchorZ, areaCornerZ);
         view.setPending(
-            Math.min(anchorX, x),
-            hit.blockY,
-            Math.min(anchorZ, z),
-            Math.max(anchorX, x),
-            hit.blockY,
-            Math.max(anchorZ, z));
+            Math.min(areaAnchorX, x),
+            areaAnchorY,
+            Math.min(areaAnchorZ, z),
+            Math.max(areaAnchorX, x),
+            areaAnchorY,
+            Math.max(areaAnchorZ, z));
     }
 
     private static int clampSide(int anchor, int value) {
@@ -219,6 +255,7 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
     @Override
     public void onUpdate() {
         super.onUpdate();
+        areaPickTicks++;
         if (++dataTicks >= DATA_INTERVAL) {
             dataTicks = 0;
             GCNetwork.CHANNEL.sendToServer(new PacketRequestColony());
@@ -347,7 +384,14 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             MovingObjectPosition hit = ColonyWorldOverlay.pick(getContext().getMouseX(), getContext().getMouseY());
             if (hit != null && hit.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) {
                 areaAnchorX = hit.blockX;
+                areaAnchorY = hit.blockY;
                 areaAnchorZ = hit.blockZ;
+                areaCornerX = hit.blockX;
+                areaCornerZ = hit.blockZ;
+                hasAreaCorner = true;
+                areaPickX = getContext().getMouseX();
+                areaPickY = getContext().getMouseY();
+                areaPickTicks = 0;
                 areaDragging = true;
             }
             return Result.SUCCESS;
@@ -363,8 +407,9 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
     @Override
     public boolean onMouseRelease(int mouseButton) {
         if (mouseButton == 0 && areaDragging) {
-            updateTargetPreview();
+            updateDragArea(true);
             areaDragging = false;
+            hasAreaCorner = false;
             issueArea();
             dragButton = -1;
             return true;
