@@ -17,12 +17,14 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
 import com.cleanroommc.modularui.api.IGuiHolder;
+import com.cleanroommc.modularui.drawable.GuiTextures;
 import com.cleanroommc.modularui.factory.EntityGuiData;
 import com.cleanroommc.modularui.factory.GuiFactories;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.UISettings;
-import com.cleanroommc.modularui.utils.item.ItemStackHandler;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
+import com.cleanroommc.modularui.widget.Widget;
+import com.cleanroommc.modularui.widgets.EntityDisplayWidget;
 import com.cleanroommc.modularui.widgets.SlotGroupWidget;
 import com.cleanroommc.modularui.widgets.slot.ItemSlot;
 import com.cleanroommc.modularui.widgets.slot.ModularSlot;
@@ -37,15 +39,31 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     public static final String NAME = "citizen";
 
-    public static final int INVENTORY_SIZE = 9;
-
     private static final double PATH_RANGE = 64.0D;
 
-    private static final String SLOT_GROUP = "citizen_inventory";
+    private static final String FOOD_GROUP = "citizen_food";
+
+    private static final String TOOL_GROUP = "citizen_tool";
+
+    private static final String MAIN_GROUP = "citizen_main";
+
+    private static final int FOOD_PRIORITY = 50;
+
+    private static final int TOOL_PRIORITY = 60;
+
+    private static final int MAIN_PRIORITY = 100;
+
+    private static final int PANEL_WIDTH = 176;
+
+    private static final int PANEL_HEIGHT = 192;
+
+    private static final int PREVIEW_WIDTH = 54;
+
+    private static final int PREVIEW_HEIGHT = 72;
 
     private final CitizenCommandQueue commands = new CitizenCommandQueue();
     private final CitizenParameters parameters = new CitizenParameters();
-    private final ItemStackHandler inventory = new ItemStackHandler(INVENTORY_SIZE);
+    private final CitizenInventory inventory = new CitizenInventory();
     private final Set<EntityPlayer> viewers = new HashSet<>();
     private int colonyId;
 
@@ -73,7 +91,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         return parameters;
     }
 
-    public ItemStackHandler getInventory() {
+    public CitizenInventory getInventory() {
         return inventory;
     }
 
@@ -156,20 +174,45 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     @Override
     public ModularPanel buildUI(EntityGuiData data, PanelSyncManager syncManager, UISettings settings) {
-        syncManager.registerSlotGroup(new SlotGroup(SLOT_GROUP, INVENTORY_SIZE, true));
+        syncManager.registerSlotGroup(new SlotGroup(FOOD_GROUP, 1, FOOD_PRIORITY, true));
+        syncManager.registerSlotGroup(new SlotGroup(TOOL_GROUP, 1, TOOL_PRIORITY, true));
+        syncManager.registerSlotGroup(new SlotGroup(MAIN_GROUP, CitizenInventory.MAIN_SLOTS, MAIN_PRIORITY, true));
         syncManager.addOpenListener(viewer -> {
             viewers.add(viewer);
             getNavigator().clearPathEntity();
         });
         syncManager.addCloseListener(viewers::remove);
 
-        ModularPanel panel = ModularPanel.defaultPanel("citizen_inventory");
+        ModularPanel panel = ModularPanel.defaultPanel("citizen_inventory", PANEL_WIDTH, PANEL_HEIGHT);
+        panel.child(
+            SlotGroupWidget.builder()
+                .row("F")
+                .row("F")
+                .row("F")
+                .key(
+                    'F',
+                    index -> new ItemSlot().slot(
+                        new ModularSlot(inventory.getFood(), index).slotGroup(FOOD_GROUP)
+                            .filter(CitizenInventory::isFood)))
+                .build()
+                .pos(7, 8));
+        panel.child(
+            new ItemSlot().slot(
+                new ModularSlot(inventory.getTool(), 0).slotGroup(TOOL_GROUP)
+                    .filter(CitizenInventory::isTool))
+                .pos(7, 66));
+        panel.child(
+            new Widget<>().size(PREVIEW_WIDTH, PREVIEW_HEIGHT)
+                .pos(70, 8)
+                .background(GuiTextures.DISPLAY, new EntityDisplayWidget(() -> this).doesLookAtMouse(true)));
         panel.child(
             SlotGroupWidget.builder()
                 .row("IIIIIIIII")
-                .key('I', index -> new ItemSlot().slot(new ModularSlot(inventory, index).slotGroup(SLOT_GROUP)))
+                .key(
+                    'I',
+                    index -> new ItemSlot().slot(new ModularSlot(inventory.getMain(), index).slotGroup(MAIN_GROUP)))
                 .build()
-                .pos(7, 20));
+                .pos(7, 86));
         panel.child(SlotGroupWidget.playerInventory(true));
         return panel;
     }
@@ -178,7 +221,9 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     public void writeEntityToNBT(NBTTagCompound tag) {
         super.writeEntityToNBT(tag);
         tag.setInteger("colonyId", colonyId);
-        tag.setTag("inventory", inventory.serializeNBT());
+        NBTTagCompound inventoryTag = new NBTTagCompound();
+        inventory.writeToNBT(inventoryTag);
+        tag.setTag("inventory", inventoryTag);
 
         NBTTagCompound commandsTag = new NBTTagCompound();
         commands.writeToNBT(commandsTag);
@@ -193,7 +238,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     public void readEntityFromNBT(NBTTagCompound tag) {
         super.readEntityFromNBT(tag);
         colonyId = tag.getInteger("colonyId");
-        inventory.deserializeNBT(tag.getCompoundTag("inventory"));
+        inventory.readFromNBT(tag.getCompoundTag("inventory"));
         commands.readFromNBT(tag.getCompoundTag("commands"));
         parameters.readFromNBT(tag.getCompoundTag("parameters"));
     }
@@ -201,12 +246,8 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     @Override
     protected void dropEquipment(boolean recentlyHit, int looting) {
         super.dropEquipment(recentlyHit, looting);
-        for (int i = 0; i < inventory.getSlots(); i++) {
-            ItemStack stack = inventory.getStackInSlot(i);
-            if (stack != null) {
-                entityDropItem(stack, 0.0F);
-                inventory.setStackInSlot(i, null);
-            }
+        for (ItemStack stack : inventory.takeAll()) {
+            entityDropItem(stack, 0.0F);
         }
     }
 }
