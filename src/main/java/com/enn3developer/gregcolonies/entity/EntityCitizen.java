@@ -99,6 +99,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     private final CitizenDiet diet = new CitizenDiet();
     private final Set<EntityPlayer> viewers = new HashSet<>();
     private int colonyId;
+    private String group = "";
 
     public EntityCitizen(World world) {
         super(world);
@@ -140,6 +141,14 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     public int getColonyId() {
         return colonyId;
+    }
+
+    public String getGroup() {
+        return group;
+    }
+
+    public void setGroup(String group) {
+        this.group = group == null ? "" : group;
     }
 
     public void setColonyId(int colonyId) {
@@ -440,6 +449,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     public void writeEntityToNBT(NBTTagCompound tag) {
         super.writeEntityToNBT(tag);
         tag.setInteger("colonyId", colonyId);
+        tag.setString("group", group);
         NBTTagCompound inventoryTag = new NBTTagCompound();
         inventory.writeToNBT(inventoryTag);
         tag.setTag("inventory", inventoryTag);
@@ -461,6 +471,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     public void readEntityFromNBT(NBTTagCompound tag) {
         super.readEntityFromNBT(tag);
         colonyId = tag.getInteger("colonyId");
+        group = tag.getString("group");
         inventory.readFromNBT(tag.getCompoundTag("inventory"));
         commands.readFromNBT(tag.getCompoundTag("commands"));
         parameters.readFromNBT(tag.getCompoundTag("parameters"));

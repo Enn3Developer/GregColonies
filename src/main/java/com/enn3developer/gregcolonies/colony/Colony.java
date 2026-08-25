@@ -2,6 +2,7 @@ package com.enn3developer.gregcolonies.colony;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.UUID;
 
 import net.minecraft.entity.player.EntityPlayer;
@@ -92,7 +93,7 @@ public class Colony {
 
     public CitizenCommand pollOrderFor(EntityCitizen citizen) {
         for (CitizenCommand order : orders) {
-            if (order.canBeTakenBy(citizen)) {
+            if (order.canBeClaimedBy(citizen)) {
                 orders.remove(order);
                 return order;
             }
@@ -106,6 +107,38 @@ public class Colony {
 
     public void clearOrders() {
         orders.clear();
+    }
+
+    public int clearOrders(String group) {
+        if (group == null || group.isEmpty()) {
+            int cleared = orders.size();
+            orders.clear();
+            return cleared;
+        }
+        int cleared = 0;
+        Iterator<CitizenCommand> iterator = orders.iterator();
+        while (iterator.hasNext()) {
+            if (group.equals(
+                iterator.next()
+                    .getTargetGroup())) {
+                iterator.remove();
+                cleared++;
+            }
+        }
+        return cleared;
+    }
+
+    public int getOrderCount(String group) {
+        if (group == null || group.isEmpty()) {
+            return orders.size();
+        }
+        int count = 0;
+        for (CitizenCommand order : orders) {
+            if (group.equals(order.getTargetGroup())) {
+                count++;
+            }
+        }
+        return count;
     }
 
     public boolean isCenteredAt(int dimension, int x, int y, int z) {

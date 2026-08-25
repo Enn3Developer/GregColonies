@@ -3,6 +3,8 @@ package com.enn3developer.gregcolonies.command;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.ICommandSender;
@@ -21,7 +23,13 @@ import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandMoveTo;
 
 public class ColonyCommand extends CommandBase {
 
-    private static final List<String> SUB_COMMANDS = Arrays.asList("list", "info", "spawn", "order", "guard", "cancel");
+    private static final List<String> GROUP_SUB_COMMANDS = Arrays
+        .asList("list", "set", "clear", "order", "guard", "cancel");
+
+    private static final int DEFAULT_GROUP_RADIUS = 16;
+
+    private static final List<String> SUB_COMMANDS = Arrays
+        .asList("list", "info", "spawn", "order", "guard", "group", "cancel");
 
     @Override
     public String getCommandName() {
@@ -30,7 +38,7 @@ public class ColonyCommand extends CommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/colony <list|info <id>|spawn [colonyId]|order <x> <y> <z> [colonyId]|guard [colonyId]|cancel [colonyId]>";
+        return "/colony <list|info <id>|spawn [colonyId]|order <x> <y> <z> [colonyId]|guard [colonyId]|group ...|cancel [colonyId]>";
     }
 
     @Override
@@ -42,6 +50,9 @@ public class ColonyCommand extends CommandBase {
     public List<String> addTabCompletionOptions(ICommandSender sender, String[] args) {
         if (args.length == 1) {
             return getListOfStringsMatchingLastWord(args, SUB_COMMANDS.toArray(new String[0]));
+        }
+        if (args.length == 2 && "group".equals(args[0])) {
+            return getListOfStringsMatchingLastWord(args, GROUP_SUB_COMMANDS.toArray(new String[0]));
         }
         return null;
     }
@@ -184,6 +195,11 @@ public class ColonyCommand extends CommandBase {
             return;
         }
 
+        if ("group".equals(args[0])) {
+            processGroup(sender, args, world, manager);
+            return;
+        }
+
         if ("cancel".equals(args[0])) {
             Colony colony = findColony(sender, manager, args.length >= 2 ? parseInt(sender, args[1]) : 0);
             if (colony == null) {
@@ -207,6 +223,173 @@ public class ColonyCommand extends CommandBase {
         }
 
         throw new WrongUsageException(getCommandUsage(sender));
+    }
+
+    private void processGroup(ICommandSender sender, String[] args, World world, ColonyManager manager) {
+        if (args.length < 2) {
+            throw new WrongUsageException(getGroupUsage());
+        }
+
+        if ("list".equals(args[1])) {
+            Colony colony = findColony(sender, manager, args.length >= 3 ? parseInt(sender, args[2]) : 0);
+            if (colony == null || !canManage(sender, colony)) {
+                if (colony == null) {
+                    sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                }
+                return;
+            }
+            Map<String, Integer> counts = new TreeMap<>();
+            for (EntityCitizen citizen : findCitizens(world, colony.getId())) {
+                String group = citizen.getGroup()
+                    .isEmpty() ? "(none)" : citizen.getGroup();
+                counts.put(group, counts.getOrDefault(group, 0) + 1);
+            }
+            if (counts.isEmpty()) {
+                sender.addChatMessage(new ChatComponentText("No loaded citizens"));
+                return;
+            }
+            sender
+                .addChatMessage(new ChatComponentText(EnumChatFormatting.GOLD + "Groups of colony #" + colony.getId()));
+            for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+                sender.addChatMessage(
+                    new ChatComponentText(
+                        entry.getKey() + ": "
+                            + entry.getValue()
+                            + " citizen(s), "
+                            + colony.getOrderCount("(none)".equals(entry.getKey()) ? "" : entry.getKey())
+                            + " order(s) pending"));
+            }
+            return;
+        }
+
+        if ("set".equals(args[1]) || "clear".equals(args[1])) {
+            boolean clearing = "clear".equals(args[1]);
+            if (!clearing && args.length < 3) {
+                throw new WrongUsageException(getGroupUsage());
+            }
+            if (!(sender instanceof EntityPlayer)) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "Only a player can do this"));
+                return;
+            }
+
+            String group = clearing ? "" : args[2];
+            int radiusArg = clearing ? 2 : 3;
+            int radius = args.length > radiusArg ? parseInt(sender, args[radiusArg]) : DEFAULT_GROUP_RADIUS;
+
+            Colony colony = findColony(sender, manager, 0);
+            if (colony == null) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                return;
+            }
+            if (!canManage(sender, colony)) {
+                return;
+            }
+
+            EntityPlayer player = (EntityPlayer) sender;
+            int changed = 0;
+            for (EntityCitizen citizen : findCitizens(world, colony.getId())) {
+                if (citizen.getDistanceSqToEntity(player) > (double) radius * radius) {
+                    continue;
+                }
+                citizen.setGroup(group);
+                changed++;
+            }
+            sender.addChatMessage(
+                new ChatComponentText(changed + " citizen(s) " + (clearing ? "ungrouped" : "put into group " + group)));
+            return;
+        }
+
+        if (args.length < 3) {
+            throw new WrongUsageException(getGroupUsage());
+        }
+        String group = args[2];
+
+        if ("order".equals(args[1])) {
+            if (args.length < 6) {
+                throw new WrongUsageException(getGroupUsage());
+            }
+            Colony colony = findColony(sender, manager, args.length >= 7 ? parseInt(sender, args[6]) : 0);
+            if (colony == null) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                return;
+            }
+            if (!canManage(sender, colony)) {
+                return;
+            }
+
+            CitizenCommandMoveTo command = new CitizenCommandMoveTo(
+                parseInt(sender, args[3]),
+                parseInt(sender, args[4]),
+                parseInt(sender, args[5]));
+            command.setTargetGroup(group);
+            manager.enqueueOrder(colony.getId(), command);
+            sender.addChatMessage(
+                new ChatComponentText(
+                    "Queued move_to for group " + group
+                        + " of colony #"
+                        + colony.getId()
+                        + " ("
+                        + colony.getOrderCount(group)
+                        + " order(s) pending)"));
+            return;
+        }
+
+        if ("guard".equals(args[1])) {
+            Colony colony = findColony(sender, manager, args.length >= 4 ? parseInt(sender, args[3]) : 0);
+            if (colony == null) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                return;
+            }
+            if (!canManage(sender, colony)) {
+                return;
+            }
+
+            CitizenCommandGuard command = new CitizenCommandGuard();
+            command.setTargetGroup(group);
+            manager.enqueueOrder(colony.getId(), command);
+            sender.addChatMessage(
+                new ChatComponentText(
+                    "Queued guard for group " + group
+                        + " of colony #"
+                        + colony.getId()
+                        + " ("
+                        + colony.getOrderCount(group)
+                        + " order(s) pending)"));
+            return;
+        }
+
+        if ("cancel".equals(args[1])) {
+            Colony colony = findColony(sender, manager, args.length >= 4 ? parseInt(sender, args[3]) : 0);
+            if (colony == null) {
+                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                return;
+            }
+            if (!canManage(sender, colony)) {
+                return;
+            }
+
+            int cleared = manager.clearOrders(colony.getId(), group);
+            int stopped = 0;
+            for (EntityCitizen citizen : findCitizens(world, colony.getId())) {
+                if (!group.equals(citizen.getGroup())) {
+                    continue;
+                }
+                citizen.getCommands()
+                    .clear(citizen);
+                stopped++;
+            }
+            sender.addChatMessage(
+                new ChatComponentText(
+                    "Dropped " + cleared + " order(s) for group " + group + ", stopped " + stopped + " citizen(s)"));
+            return;
+        }
+
+        throw new WrongUsageException(getGroupUsage());
+    }
+
+    private String getGroupUsage() {
+        return "/colony group <list [colonyId]|set <group> [radius]|clear [radius]|order <group> <x> <y> <z> [colonyId]"
+            + "|guard <group> [colonyId]|cancel <group> [colonyId]>";
     }
 
     private Colony findColony(ICommandSender sender, ColonyManager manager, int colonyId) {

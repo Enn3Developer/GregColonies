@@ -35,6 +35,7 @@ public final class CitizenCommandRegistry {
     public static NBTTagCompound write(CitizenCommand command) {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setString("id", command.getId());
+        tag.setString("group", command.getTargetGroup());
         NBTTagCompound payload = new NBTTagCompound();
         command.writeToNBT(payload);
         tag.setTag("data", payload);
@@ -48,6 +49,7 @@ public final class CitizenCommandRegistry {
             GregColonies.LOG.warn("Unknown citizen command id " + id + ", dropping it");
             return null;
         }
+        command.setTargetGroup(tag.getString("group"));
         command.readFromNBT(tag.getCompoundTag("data"));
         return command;
     }

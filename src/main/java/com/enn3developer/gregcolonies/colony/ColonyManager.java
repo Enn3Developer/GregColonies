@@ -120,12 +120,15 @@ public class ColonyManager extends WorldSavedData {
     }
 
     public int clearOrders(int colonyId) {
+        return clearOrders(colonyId, "");
+    }
+
+    public int clearOrders(int colonyId, String group) {
         Colony colony = colonies.get(colonyId);
         if (colony == null) {
             return 0;
         }
-        int cleared = colony.getOrderCount();
-        colony.clearOrders();
+        int cleared = colony.clearOrders(group);
         if (cleared > 0) {
             markDirty();
         }

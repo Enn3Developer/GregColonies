@@ -6,7 +6,21 @@ import com.enn3developer.gregcolonies.entity.EntityCitizen;
 
 public abstract class CitizenCommand {
 
+    private String targetGroup = "";
+
     public abstract String getId();
+
+    public String getTargetGroup() {
+        return targetGroup;
+    }
+
+    public void setTargetGroup(String targetGroup) {
+        this.targetGroup = targetGroup == null ? "" : targetGroup;
+    }
+
+    public final boolean canBeClaimedBy(EntityCitizen citizen) {
+        return (targetGroup.isEmpty() || targetGroup.equals(citizen.getGroup())) && canBeTakenBy(citizen);
+    }
 
     public boolean canBeTakenBy(EntityCitizen citizen) {
         return true;
