@@ -28,9 +28,11 @@ public class ClientProxy extends CommonProxy {
     @Override
     public void init(FMLInitializationEvent event) {
         super.init(event);
+        GCClientEvents events = new GCClientEvents();
         FMLCommonHandler.instance()
             .bus()
-            .register(new GCClientEvents());
+            .register(events);
+        MinecraftForge.EVENT_BUS.register(events);
         MinecraftForge.EVENT_BUS.register(new ColonyWorldOverlay());
     }
 

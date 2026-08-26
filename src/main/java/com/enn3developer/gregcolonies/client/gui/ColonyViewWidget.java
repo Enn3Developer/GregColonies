@@ -1,11 +1,14 @@
 package com.enn3developer.gregcolonies.client.gui;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.entity.Entity;
+import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.MovingObjectPosition;
 
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.opengl.GL11;
 
 import com.cleanroommc.modularui.api.UpOrDown;
 import com.cleanroommc.modularui.api.drawable.IKey;
@@ -39,19 +42,37 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
 
     private static final int CLICK_SLOP = 4;
 
+    private static final long DOUBLE_CLICK_MS = 400L;
+
     private static final double HIT_RADIUS = 12.0D;
 
     private static final double DEFAULT_FOV = 70.0D;
 
     private static final double MARKER_HEIGHT = 2.4D;
 
-    private static final float MARKER_SIZE = 5.0F;
+    private static final float MARKER_SIZE = 4.5F;
 
-    private static final float MARKER_HOVER_SIZE = 8.0F;
+    private static final float MARKER_HOVER_SIZE = 7.0F;
 
-    private static final int MARKER_OUTLINE = 0xC0000000;
+    private static final float MARKER_RING = 1.5F;
+
+    private static final float SELECTED_RING = 5.0F;
+
+    private static final float SELECTED_HALO = 3.5F;
+
+    private static final float OFFLINE_FRACTION = 0.45F;
+
+    private static final int MARKER_OUTLINE = 0x99000000;
 
     private static final int SELECTED_OUTLINE = 0xFFFFFFFF;
+
+    private static final int LABEL_BACKGROUND = 0xA0060810;
+
+    private static final int LABEL_COLOR = 0xFFE8ECF4;
+
+    private static final float LABEL_SCALE = 0.75F;
+
+    private static final int LABEL_LIMIT = 8;
 
     private static final int BOX_FILL = 0x2033CCFF;
 
@@ -70,6 +91,10 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
     private int dragButton = -1;
 
     private int dragTravel;
+
+    private java.util.UUID lastClicked;
+
+    private long lastClickTime;
 
     private int boxStartX;
 
@@ -109,29 +134,50 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
                 .isEmpty() ? "no group" : citizen.getGroup();
             String name = citizen.getName()
                 .isEmpty() ? "Citizen" : citizen.getName();
-            tooltip.add(IKey.str(name + " (" + group + ")"))
+            tooltip.add(
+                IKey.str(name)
+                    .style(EnumChatFormatting.WHITE))
                 .newLine();
-            tooltip.add(IKey.str(String.format("%.0f / %.0f / %.0f", citizen.getX(), citizen.getY(), citizen.getZ())))
+            tooltip.add(
+                IKey.str(
+                    group + "   " + String.format("%.0f / %.0f / %.0f", citizen.getX(), citizen.getY(), citizen.getZ()))
+                    .style(EnumChatFormatting.GRAY))
                 .newLine();
             if (!citizen.isLoaded()) {
-                tooltip.add(IKey.str("last seen, chunk not loaded"))
+                tooltip.add(
+                    IKey.str("last seen here, chunk not loaded")
+                        .style(EnumChatFormatting.DARK_GRAY))
                     .newLine();
                 return;
             }
-            tooltip.add(IKey.str(String.format("health %.1f / %.1f", citizen.getHealth(), citizen.getMaxHealth())))
-                .newLine();
-            tooltip.add(IKey.str("food " + citizen.getFoodLevel() + " / 20"))
+            tooltip
+                .add(
+                    IKey.str(
+                        String.format("health %.1f / %.1f", citizen.getHealth(), citizen.getMaxHealth()) + "   food "
+                            + citizen.getFoodLevel()
+                            + " / 20")
+                        .style(EnumChatFormatting.GRAY))
                 .newLine();
             String task = citizen.getTask()
                 .isEmpty() ? "idle" : citizen.getTask();
-            tooltip.add(IKey.str("task " + task + " (+" + citizen.getPendingCount() + " queued)"))
+            tooltip.add(
+                IKey.str(task)
+                    .style(EnumChatFormatting.AQUA))
                 .newLine();
+            if (citizen.getPendingCount() > 0) {
+                tooltip.add(
+                    IKey.str(citizen.getPendingCount() + " queued")
+                        .style(EnumChatFormatting.DARK_GRAY))
+                    .newLine();
+            }
         });
     }
 
     @Override
     public void draw(ModularGuiContext context, WidgetThemeEntry<?> widgetTheme) {
         CitizenSnapshot hovered = findHovered();
+        boolean labelSelection = view.getSelection()
+            .size() <= LABEL_LIMIT;
         for (CitizenSnapshot citizen : view.getColony()
             .getCitizens()) {
             if (!projectCitizen(citizen)) {
@@ -139,22 +185,27 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             }
             boolean selected = view.isSelected(citizen.getId());
             float size = citizen == hovered ? MARKER_HOVER_SIZE : MARKER_SIZE;
-            int color = ColonyWorldOverlay.groupColor(citizen.getGroup());
-            if (!citizen.isLoaded()) {
-                color = color & 0x00FFFFFF | 0x60000000;
-            }
-            int outline = selected ? SELECTED_OUTLINE : MARKER_OUTLINE;
+            int color = ColonyWorldOverlay.groupColor(citizen.getGroup()) | 0xFF000000;
+            float ring = size + (selected ? SELECTED_RING : MARKER_RING);
             float x = (float) projected[0];
             float y = (float) projected[1];
-            GuiDraw.drawEllipse(
-                x - size / 2.0F - 1.5F,
-                y - size / 2.0F - 1.5F,
-                size + 3.0F,
-                size + 3.0F,
-                outline,
-                outline,
-                12);
-            GuiDraw.drawEllipse(x - size / 2.0F, y - size / 2.0F, size, size, color, color, 12);
+            if (view.isOverChrome((int) x, (int) y)) {
+                continue;
+            }
+            if (selected) {
+                drawDot(x, y, ring, MARKER_OUTLINE);
+                drawDot(x, y, size + SELECTED_HALO, SELECTED_OUTLINE);
+            }
+            drawDot(x, y, size + MARKER_RING, MARKER_OUTLINE);
+            if (citizen.isLoaded()) {
+                drawDot(x, y, size, color);
+            } else {
+                drawDot(x, y, size, 0xC0121722);
+                drawDot(x, y, size * OFFLINE_FRACTION, color);
+            }
+            if (citizen == hovered || selected && labelSelection) {
+                drawLabel(citizen.getName(), x, y + ring / 2.0F + 4.0F, citizen == hovered ? LABEL_COLOR : color);
+            }
         }
         updateTargetPreview();
         if (boxSelecting) {
@@ -168,6 +219,25 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             GuiDraw.drawRect(x0, y0, 1, y1 - y0, BOX_EDGE);
             GuiDraw.drawRect(x1 - 1, y0, 1, y1 - y0, BOX_EDGE);
         }
+    }
+
+    private static void drawDot(float x, float y, float size, int color) {
+        GuiDraw.drawEllipse(x - size / 2.0F, y - size / 2.0F, size, size, color, color, 12);
+    }
+
+    private static void drawLabel(String text, float x, float y, int color) {
+        if (text.isEmpty()) {
+            return;
+        }
+        FontRenderer font = Minecraft.getMinecraft().fontRenderer;
+        float width = font.getStringWidth(text);
+        GL11.glPushMatrix();
+        GL11.glTranslatef(x, y, 0.0F);
+        GL11.glScalef(LABEL_SCALE, LABEL_SCALE, 1.0F);
+        GuiDraw.drawRect(-width / 2.0F - 2.0F, -1.0F, width + 4.0F, font.FONT_HEIGHT + 1.0F, LABEL_BACKGROUND);
+        font.drawStringWithShadow(text, (int) (-width / 2.0F), 0, color);
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        GL11.glPopMatrix();
     }
 
     private void updateTargetPreview() {
@@ -376,18 +446,29 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
     private void selectAt(int mouseX, int mouseY) {
         CitizenSnapshot citizen = citizenAt(mouseX, mouseY);
         if (citizen == null) {
+            lastClicked = null;
             if (!Interactable.hasShiftDown()) {
                 view.clearSelection();
             }
             return;
         }
         if (Interactable.hasShiftDown()) {
+            lastClicked = null;
             view.toggle(citizen.getId());
             return;
         }
+        long now = System.currentTimeMillis();
+        boolean again = citizen.getId()
+            .equals(lastClicked) && now - lastClickTime <= DOUBLE_CLICK_MS;
+        lastClicked = citizen.getId();
+        lastClickTime = now;
         view.clearSelection();
         view.getSelection()
             .add(citizen.getId());
+        if (again) {
+            lastClicked = null;
+            view.openCitizen(citizen);
+        }
     }
 
     private void issueMove(int mouseX, int mouseY) {
@@ -516,6 +597,10 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
         }
         if (camera != null && keyCode == Keyboard.KEY_R) {
             camera.reset(view.getColony());
+            return Result.SUCCESS;
+        }
+        if (keyCode == Keyboard.KEY_H) {
+            view.toggleHelp();
             return Result.SUCCESS;
         }
         if (keyCode == Keyboard.KEY_G) {

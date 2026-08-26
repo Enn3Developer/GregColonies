@@ -25,15 +25,22 @@ import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 
 import com.cleanroommc.modularui.api.IGuiHolder;
+import com.cleanroommc.modularui.api.drawable.IDrawable;
+import com.cleanroommc.modularui.api.drawable.IKey;
 import com.cleanroommc.modularui.drawable.GuiTextures;
+import com.cleanroommc.modularui.drawable.Rectangle;
 import com.cleanroommc.modularui.factory.EntityGuiData;
 import com.cleanroommc.modularui.factory.GuiFactories;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.UISettings;
+import com.cleanroommc.modularui.utils.Alignment;
+import com.cleanroommc.modularui.value.sync.IntSyncValue;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
+import com.cleanroommc.modularui.value.sync.StringSyncValue;
 import com.cleanroommc.modularui.widget.Widget;
 import com.cleanroommc.modularui.widgets.EntityDisplayWidget;
 import com.cleanroommc.modularui.widgets.SlotGroupWidget;
+import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.slot.ItemSlot;
 import com.cleanroommc.modularui.widgets.slot.ModularSlot;
 import com.cleanroommc.modularui.widgets.slot.SlotGroup;
@@ -88,6 +95,10 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     private static final String MAIN_GROUP = "citizen_main";
 
+    private static final String[] ARMOR_HINTS = { "Helmet", "Chestplate", "Leggings", "Boots" };
+
+    private static boolean previewRender;
+
     private static final int ARMOR_PRIORITY = 40;
 
     private static final int FOOD_PRIORITY = 50;
@@ -98,7 +109,31 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     private static final int PANEL_WIDTH = 176;
 
-    private static final int PANEL_HEIGHT = 192;
+    private static final int PANEL_HEIGHT = 225;
+
+    private static final int PANEL_TITLE_COLOR = 0xFF404040;
+
+    private static final int PANEL_TEXT_COLOR = 0xFF585F68;
+
+    private static final int PANEL_TASK_COLOR = 0xFF1E5F72;
+
+    private static final int PANEL_LINE_COLOR = 0x30000000;
+
+    private static final int TITLE_ROW = 6;
+
+    private static final int STATUS_ROW = 17;
+
+    private static final int SEPARATOR_ROW = 28;
+
+    private static final int TOP_ROW = 31;
+
+    private static final int TASK_ROW = TOP_ROW + 76;
+
+    private static final int MAIN_ROW = TOP_ROW + 88;
+
+    private static final int TEXT_HEIGHT = 10;
+
+    private static final int TEXT_MARGIN = 8;
 
     private static final int PREVIEW_WIDTH = 54;
 
@@ -160,6 +195,10 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     public CitizenDiet getDiet() {
         return diet;
+    }
+
+    public static boolean isPreviewRender() {
+        return previewRender;
     }
 
     public String getIdleTask() {
@@ -519,7 +558,37 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         });
         syncManager.addCloseListener(viewers::remove);
 
+        StringSyncValue task = new StringSyncValue(this::describeActivity);
+        StringSyncValue group = new StringSyncValue(this::groupLabel);
+        IntSyncValue food = new IntSyncValue(diet::getFoodLevel);
+        syncManager.syncValue("task", task);
+        syncManager.syncValue("group", group);
+        syncManager.syncValue("food", food);
+
         ModularPanel panel = ModularPanel.defaultPanel("citizen_inventory", PANEL_WIDTH, PANEL_HEIGHT);
+        panel.child(
+            textRow(
+                TITLE_ROW,
+                IKey.dynamic(this::getCitizenName),
+                PANEL_TITLE_COLOR,
+                IKey.dynamic(this::healthLabel),
+                PANEL_TITLE_COLOR));
+        panel.child(
+            textRow(
+                STATUS_ROW,
+                IKey.dynamic(group::getValue),
+                PANEL_TEXT_COLOR,
+                IKey.dynamic(() -> "food " + food.getIntValue() + " / 20"),
+                PANEL_TEXT_COLOR));
+        panel.child(
+            new Widget<>().size(PANEL_WIDTH - TEXT_MARGIN * 2, 1)
+                .pos(TEXT_MARGIN, SEPARATOR_ROW)
+                .background(new Rectangle().color(PANEL_LINE_COLOR)));
+        panel.child(
+            IKey.dynamic(task::getValue)
+                .asWidget()
+                .color(PANEL_TASK_COLOR)
+                .pos(TEXT_MARGIN, TASK_ROW));
         panel.child(
             SlotGroupWidget.builder()
                 .row("A")
@@ -528,11 +597,13 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
                 .row("A")
                 .key(
                     'A',
-                    index -> new ItemSlot().slot(
-                        new ModularSlot(inventory.getArmor(), index).slotGroup(ARMOR_GROUP)
-                            .filter(stack -> CitizenInventory.isArmor(stack, index, this))))
+                    index -> hint(
+                        new ItemSlot().slot(
+                            new ModularSlot(inventory.getArmor(), index).slotGroup(ARMOR_GROUP)
+                                .filter(stack -> CitizenInventory.isArmor(stack, index, this))),
+                        ARMOR_HINTS[index]))
                 .build()
-                .pos(7, 8));
+                .pos(7, TOP_ROW));
         panel.child(
             SlotGroupWidget.builder()
                 .row("F")
@@ -540,20 +611,31 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
                 .row("F")
                 .key(
                     'F',
-                    index -> new ItemSlot().slot(
-                        new ModularSlot(inventory.getFood(), index).slotGroup(FOOD_GROUP)
-                            .filter(CitizenInventory::isFood)))
+                    index -> hint(
+                        new ItemSlot().slot(
+                            new ModularSlot(inventory.getFood(), index).slotGroup(FOOD_GROUP)
+                                .filter(CitizenInventory::isFood)),
+                        "Food"))
                 .build()
-                .pos(151, 8));
+                .pos(151, TOP_ROW));
         panel.child(
-            new ItemSlot().slot(
-                new ModularSlot(inventory.getTool(), 0).slotGroup(TOOL_GROUP)
-                    .filter(CitizenInventory::isTool))
-                .pos(151, 66));
+            hint(
+                new ItemSlot().slot(
+                    new ModularSlot(inventory.getTool(), 0).slotGroup(TOOL_GROUP)
+                        .filter(CitizenInventory::isTool)),
+                "Tool").pos(151, TOP_ROW + 58));
+        IDrawable display = new EntityDisplayWidget(() -> this).doesLookAtMouse(true);
         panel.child(
             new Widget<>().size(PREVIEW_WIDTH, PREVIEW_HEIGHT)
-                .pos(61, 8)
-                .background(GuiTextures.DISPLAY, new EntityDisplayWidget(() -> this).doesLookAtMouse(true)));
+                .pos(61, TOP_ROW)
+                .background(GuiTextures.DISPLAY, (context, x, y, width, height, theme) -> {
+                    previewRender = true;
+                    try {
+                        display.draw(context, x, y, width, height, theme);
+                    } finally {
+                        previewRender = false;
+                    }
+                }));
         panel.child(
             SlotGroupWidget.builder()
                 .row("IIIIIIIII")
@@ -561,9 +643,54 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
                     'I',
                     index -> new ItemSlot().slot(new ModularSlot(inventory.getMain(), index).slotGroup(MAIN_GROUP)))
                 .build()
-                .pos(7, 86));
+                .pos(7, MAIN_ROW));
         panel.child(SlotGroupWidget.playerInventory(true));
         return panel;
+    }
+
+    private static Flow textRow(int y, IKey left, int leftColor, IKey right, int rightColor) {
+        return Flow.row()
+            .widthRel(1.0F)
+            .height(TEXT_HEIGHT)
+            .pos(0, y)
+            .padding(TEXT_MARGIN, 0)
+            .mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
+            .child(
+                left.asWidget()
+                    .color(leftColor))
+            .child(
+                right.asWidget()
+                    .color(rightColor));
+    }
+
+    private static ItemSlot hint(ItemSlot slot, String text) {
+        slot.tooltip()
+            .add(IKey.str(text));
+        return slot;
+    }
+
+    public String describeActivity() {
+        String living = getLivingTask();
+        if (!living.isEmpty()) {
+            return living;
+        }
+        CitizenCommand current = commands.getCurrent();
+        if (current != null) {
+            return current.describe();
+        }
+        String idle = getIdleTask();
+        return idle.isEmpty() ? "idle" : "idle " + idle;
+    }
+
+    private String groupLabel() {
+        return group.isEmpty() ? "no group" : group;
+    }
+
+    private String healthLabel() {
+        return String.format(
+            "hp %.0f / %.0f",
+            getHealth(),
+            (float) getEntityAttribute(SharedMonsterAttributes.maxHealth).getAttributeValue());
     }
 
     @Override

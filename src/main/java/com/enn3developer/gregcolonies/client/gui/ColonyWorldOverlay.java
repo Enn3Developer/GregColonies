@@ -97,9 +97,11 @@ public class ColonyWorldOverlay {
 
     @SubscribeEvent
     public void onRenderOverlay(RenderGameOverlayEvent.Pre event) {
-        if (event.type != RenderGameOverlayEvent.ElementType.ALL && ColonyScreen.getOpen() != null) {
-            event.setCanceled(true);
+        if (ColonyScreen.getOpen() == null || event.type == RenderGameOverlayEvent.ElementType.ALL
+            || event.type == RenderGameOverlayEvent.ElementType.CHAT) {
+            return;
         }
+        event.setCanceled(true);
     }
 
     @SubscribeEvent

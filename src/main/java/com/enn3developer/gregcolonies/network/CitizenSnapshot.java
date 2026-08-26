@@ -6,7 +6,6 @@ import net.minecraft.entity.SharedMonsterAttributes;
 
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
-import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 
 import cpw.mods.fml.common.network.ByteBufUtils;
 import io.netty.buffer.ByteBuf;
@@ -54,17 +53,7 @@ public class CitizenSnapshot {
             .getFoodLevel();
         snapshot.pendingCount = citizen.getCommands()
             .getPendingCount();
-        CitizenCommand current = citizen.getCommands()
-            .getCurrent();
-        String livingTask = citizen.getLivingTask();
-        if (!livingTask.isEmpty()) {
-            snapshot.task = livingTask;
-        } else if (current != null) {
-            snapshot.task = current.describe();
-        } else {
-            String idle = citizen.getIdleTask();
-            snapshot.task = idle.isEmpty() ? "" : "idle " + idle;
-        }
+        snapshot.task = citizen.describeActivity();
         return snapshot;
     }
 

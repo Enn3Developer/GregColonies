@@ -22,7 +22,8 @@ public class RenderCitizen extends RenderVillager {
     @Override
     protected void rotateCorpse(EntityLivingBase entity, float partialAge, float bodyYaw, float partialTicks) {
         super.rotateCorpse(entity, partialAge, bodyYaw, partialTicks);
-        if (entity instanceof EntityCitizen && ((EntityCitizen) entity).isAsleep()) {
+        if (entity instanceof EntityCitizen && ((EntityCitizen) entity).isAsleep()
+            && !EntityCitizen.isPreviewRender()) {
             GL11.glTranslatef(0.0F, SLEEP_LIFT, 0.0F);
             GL11.glRotatef(SLEEP_TURN, 0.0F, 1.0F, 0.0F);
             GL11.glRotatef(SLEEP_TILT, 1.0F, 0.0F, 0.0F);
