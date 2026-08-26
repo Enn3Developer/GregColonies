@@ -51,6 +51,8 @@ public class ColonyWorldOverlay {
 
     private static final int MINE_COLOR = 0xB0FFB040;
 
+    private static final int FARM_COLOR = 0xB0D8E060;
+
     private static final int DROP_OFF_COLOR = 0xB0FF7CE0;
 
     private static final int DROP_OFF_MARK_COLOR = 0x70FF7CE0;
@@ -214,6 +216,9 @@ public class ColonyWorldOverlay {
     private static int targetColor(int targeting) {
         if (targeting == ColonyView.TARGET_MINE) {
             return MINE_COLOR;
+        }
+        if (targeting == ColonyView.TARGET_FARM) {
+            return FARM_COLOR;
         }
         if (targeting == ColonyView.TARGET_DROP_OFF) {
             return DROP_OFF_COLOR;

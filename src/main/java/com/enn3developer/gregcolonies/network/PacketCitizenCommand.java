@@ -13,6 +13,7 @@ import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandQueue;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandChop;
+import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandFarm;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandGuard;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandMine;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandMoveTo;
@@ -33,6 +34,8 @@ public class PacketCitizenCommand implements IMessage {
     public static final byte CHOP = 3;
 
     public static final byte MINE = 4;
+
+    public static final byte FARM = 5;
 
     private static final int MAX_CITIZENS = 512;
 
@@ -151,6 +154,8 @@ public class PacketCitizenCommand implements IMessage {
                     return new CitizenCommandChop(message.x, message.y, message.z, message.x2, message.y2, message.z2);
                 case MINE:
                     return new CitizenCommandMine(message.x, message.z);
+                case FARM:
+                    return new CitizenCommandFarm(message.x, message.y, message.z, message.x2, message.y2, message.z2);
                 default:
                     return null;
             }

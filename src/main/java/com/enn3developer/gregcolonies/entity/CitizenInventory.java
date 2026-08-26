@@ -3,6 +3,7 @@ package com.enn3developer.gregcolonies.entity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import net.minecraft.entity.Entity;
 import net.minecraft.inventory.IInventory;
@@ -138,9 +139,13 @@ public class CitizenInventory {
     }
 
     public ItemStack takeScaffold() {
+        return takeMain(WorkBlocks::isScaffold);
+    }
+
+    public ItemStack takeMain(Predicate<ItemStack> filter) {
         for (int i = 0; i < MAIN_SLOTS; i++) {
             ItemStack stack = main.getStackInSlot(i);
-            if (!WorkBlocks.isScaffold(stack)) {
+            if (!filter.test(stack)) {
                 continue;
             }
             ItemStack taken = main.extractItem(i, 1, false);
@@ -149,6 +154,26 @@ public class CitizenInventory {
             }
         }
         return null;
+    }
+
+    public int countMain(Predicate<ItemStack> filter) {
+        int count = 0;
+        for (int i = 0; i < MAIN_SLOTS; i++) {
+            ItemStack stack = main.getStackInSlot(i);
+            if (filter.test(stack)) {
+                count += stack.stackSize;
+            }
+        }
+        return count;
+    }
+
+    public boolean hasMain(Predicate<ItemStack> filter) {
+        for (int i = 0; i < MAIN_SLOTS; i++) {
+            if (filter.test(main.getStackInSlot(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public int countFood() {
@@ -223,6 +248,60 @@ public class CitizenInventory {
             target.markDirty();
         }
         return moved;
+    }
+
+    public int deposit(IInventory target, Predicate<ItemStack> keep, int reserve) {
+        int moved = 0;
+        for (int i = 0; i < MAIN_SLOTS; i++) {
+            ItemStack stack = main.getStackInSlot(i);
+            if (stack == null) {
+                continue;
+            }
+            int held = keep.test(stack) ? Math.min(Math.max(reserve - countBefore(i, stack), 0), stack.stackSize) : 0;
+            if (held >= stack.stackSize) {
+                continue;
+            }
+            int before = stack.stackSize;
+            int size = before - held;
+            ItemStack out = stack.copy();
+            out.stackSize = size;
+            ItemStack rest = Inventories.insert(target, out);
+            int sent = size - (rest == null ? 0 : rest.stackSize);
+            if (sent <= 0) {
+                continue;
+            }
+            moved += sent;
+            stack.stackSize = before - sent;
+            main.setStackInSlot(i, stack.stackSize <= 0 ? null : stack);
+        }
+        if (moved > 0) {
+            target.markDirty();
+        }
+        return moved;
+    }
+
+    public boolean hasExcess(Predicate<ItemStack> keep, int reserve) {
+        for (int i = 0; i < MAIN_SLOTS; i++) {
+            ItemStack stack = main.getStackInSlot(i);
+            if (stack == null) {
+                continue;
+            }
+            if (!keep.test(stack) || countBefore(i, stack) + stack.stackSize > reserve) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int countBefore(int slot, ItemStack like) {
+        int count = 0;
+        for (int i = 0; i < slot; i++) {
+            ItemStack stack = main.getStackInSlot(i);
+            if (stack != null && stack.getItem() == like.getItem() && stack.getItemDamage() == like.getItemDamage()) {
+                count += stack.stackSize;
+            }
+        }
+        return count;
     }
 
     public ItemStack store(ItemStack stack) {

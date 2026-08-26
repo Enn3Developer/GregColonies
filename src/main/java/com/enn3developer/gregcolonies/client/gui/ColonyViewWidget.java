@@ -19,6 +19,7 @@ import com.cleanroommc.modularui.theme.WidgetThemeEntry;
 import com.cleanroommc.modularui.widget.Widget;
 import com.enn3developer.gregcolonies.client.GCKeyBindings;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandChop;
+import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandFarm;
 import com.enn3developer.gregcolonies.network.CitizenSnapshot;
 import com.enn3developer.gregcolonies.network.GCNetwork;
 import com.enn3developer.gregcolonies.network.PacketCitizenCommand;
@@ -312,12 +313,14 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             Math.max(areaAnchorZ, z));
     }
 
-    private static int clampSide(int anchor, int value) {
-        if (value - anchor > CitizenCommandChop.MAX_SIDE - 1) {
-            return anchor + CitizenCommandChop.MAX_SIDE - 1;
+    private int clampSide(int anchor, int value) {
+        int side = view.getTargeting() == ColonyView.TARGET_FARM ? CitizenCommandFarm.MAX_SIDE
+            : CitizenCommandChop.MAX_SIDE;
+        if (value - anchor > side - 1) {
+            return anchor + side - 1;
         }
-        if (anchor - value > CitizenCommandChop.MAX_SIDE - 1) {
-            return anchor - CitizenCommandChop.MAX_SIDE + 1;
+        if (anchor - value > side - 1) {
+            return anchor - side + 1;
         }
         return value;
     }
@@ -337,10 +340,23 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             view.setTargeting(ColonyView.TARGET_NONE);
             return;
         }
-        byte action = view.getTargeting() == ColonyView.TARGET_MINE ? PacketCitizenCommand.MINE
-            : PacketCitizenCommand.CHOP;
-        view.sendArea(action, Interactable.hasShiftDown(), area[0], area[1], area[2], area[3], area[4], area[5]);
+        view.sendArea(
+            areaAction(view.getTargeting()),
+            Interactable.hasShiftDown(),
+            area[0],
+            area[1],
+            area[2],
+            area[3],
+            area[4],
+            area[5]);
         view.setTargeting(ColonyView.TARGET_NONE);
+    }
+
+    private static byte areaAction(int targeting) {
+        if (targeting == ColonyView.TARGET_MINE) {
+            return PacketCitizenCommand.MINE;
+        }
+        return targeting == ColonyView.TARGET_FARM ? PacketCitizenCommand.FARM : PacketCitizenCommand.CHOP;
     }
 
     private boolean projectCitizen(CitizenSnapshot citizen) {

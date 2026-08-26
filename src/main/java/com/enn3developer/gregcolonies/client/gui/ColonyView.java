@@ -46,9 +46,11 @@ public class ColonyView {
 
     public static final int TARGET_MINE = 2;
 
-    public static final int TARGET_DROP_OFF = 3;
+    public static final int TARGET_FARM = 3;
 
-    public static final int TARGET_PICK_UP = 4;
+    public static final int TARGET_DROP_OFF = 4;
+
+    public static final int TARGET_PICK_UP = 5;
 
     private static final int MAX_GROUP_ROWS = 10;
 
@@ -441,6 +443,7 @@ public class ColonyView {
                     .childPadding(3)
                     .child(modeButton("Chop", HALF_WIDTH, TARGET_CHOP))
                     .child(modeButton("Mine", HALF_WIDTH, TARGET_MINE)))
+            .child(modeButton("Farm", INNER_WIDTH, TARGET_FARM))
             .child(
                 button(
                     "Inventory",
@@ -529,7 +532,7 @@ public class ColonyView {
     }
 
     private String targetingLabel() {
-        if (targeting == TARGET_CHOP) {
+        if (targeting == TARGET_CHOP || targeting == TARGET_FARM) {
             return "drag a region, RMB cancels";
         }
         if (targeting == TARGET_MINE) {

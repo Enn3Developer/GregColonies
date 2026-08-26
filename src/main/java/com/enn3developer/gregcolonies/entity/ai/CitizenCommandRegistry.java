@@ -8,6 +8,7 @@ import net.minecraft.nbt.NBTTagCompound;
 
 import com.enn3developer.gregcolonies.GregColonies;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandChop;
+import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandFarm;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandGuard;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandMine;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandMoveTo;
@@ -29,6 +30,7 @@ public final class CitizenCommandRegistry {
         register(CitizenCommandGuard.ID, CitizenCommandGuard::new);
         register(CitizenCommandChop.ID, CitizenCommandChop::new);
         register(CitizenCommandMine.ID, CitizenCommandMine::new);
+        register(CitizenCommandFarm.ID, CitizenCommandFarm::new);
     }
 
     public static CitizenCommand create(String id) {
