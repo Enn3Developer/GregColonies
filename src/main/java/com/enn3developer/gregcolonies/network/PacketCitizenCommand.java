@@ -127,12 +127,12 @@ public class PacketCitizenCommand implements IMessage {
                 if (citizen == null) {
                     continue;
                 }
-                if (!citizen.canWork()) {
-                    continue;
-                }
                 CitizenCommandQueue commands = citizen.getCommands();
                 if (message.action == CANCEL) {
                     commands.clear(citizen);
+                    continue;
+                }
+                if (!citizen.canWork()) {
                     continue;
                 }
                 CitizenCommand command = build(message);

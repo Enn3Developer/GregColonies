@@ -868,12 +868,13 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     }
 
     private String groupLabel() {
-        return describeGender() + ", " + (group.isEmpty() ? "no group" : group);
+        String label = group.isEmpty() ? "no group" : group;
+        String gender = describeGender();
+        return gender.isEmpty() ? label : gender + ", " + label;
     }
 
     public String describeGender() {
-        String label = CitizenGender.labelOf(getGender());
-        return isChild() ? label + " child" : label;
+        return CitizenGender.describe(getGender(), isChild());
     }
 
     private String healthLabel() {

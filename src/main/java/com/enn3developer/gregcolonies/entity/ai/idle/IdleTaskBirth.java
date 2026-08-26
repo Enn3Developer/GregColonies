@@ -136,6 +136,8 @@ public class IdleTaskBirth extends AutoTask {
             && partner.getGender() == CitizenGender.MALE
             && !partner.isChild()
             && !partner.isViewed()
+            && partner.getLivingTask()
+                .isEmpty()
             && !partner.getCommands()
                 .hasWork();
     }

@@ -135,6 +135,8 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
                 .isEmpty() ? "no group" : citizen.getGroup();
             String name = citizen.getName()
                 .isEmpty() ? "Citizen" : citizen.getName();
+            String gender = citizen.describeGender();
+            String status = gender.isEmpty() ? group : gender + ", " + group;
             tooltip.add(
                 IKey.str(name)
                     .style(EnumChatFormatting.WHITE))
@@ -142,9 +144,7 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             tooltip
                 .add(
                     IKey.str(
-                        citizen.describeGender() + ", "
-                            + group
-                            + "   "
+                        status + "   "
                             + String.format("%.0f / %.0f / %.0f", citizen.getX(), citizen.getY(), citizen.getZ()))
                         .style(EnumChatFormatting.GRAY))
                 .newLine();

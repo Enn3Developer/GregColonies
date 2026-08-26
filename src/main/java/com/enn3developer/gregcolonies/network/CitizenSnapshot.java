@@ -93,8 +93,7 @@ public class CitizenSnapshot {
     }
 
     public String describeGender() {
-        String label = CitizenGender.labelOf(gender);
-        return child ? label + " child" : label;
+        return CitizenGender.describe(gender, child);
     }
 
     public double getX() {

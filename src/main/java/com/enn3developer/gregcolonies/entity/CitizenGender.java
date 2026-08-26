@@ -34,8 +34,11 @@ public enum CitizenGender {
         return gender == null ? 0 : gender.getId();
     }
 
-    public static String labelOf(CitizenGender gender) {
-        return gender == null ? "" : gender.getLabel();
+    public static String describe(CitizenGender gender, boolean child) {
+        if (gender == null) {
+            return child ? "child" : "";
+        }
+        return child ? gender.getLabel() + " child" : gender.getLabel();
     }
 
     public static CitizenGender random(Random random) {
