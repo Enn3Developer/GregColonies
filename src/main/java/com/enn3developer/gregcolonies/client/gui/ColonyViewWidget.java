@@ -139,10 +139,14 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
                 IKey.str(name)
                     .style(EnumChatFormatting.WHITE))
                 .newLine();
-            tooltip.add(
-                IKey.str(
-                    group + "   " + String.format("%.0f / %.0f / %.0f", citizen.getX(), citizen.getY(), citizen.getZ()))
-                    .style(EnumChatFormatting.GRAY))
+            tooltip
+                .add(
+                    IKey.str(
+                        citizen.describeGender() + ", "
+                            + group
+                            + "   "
+                            + String.format("%.0f / %.0f / %.0f", citizen.getX(), citizen.getY(), citizen.getZ()))
+                        .style(EnumChatFormatting.GRAY))
                 .newLine();
             if (!citizen.isLoaded()) {
                 tooltip.add(

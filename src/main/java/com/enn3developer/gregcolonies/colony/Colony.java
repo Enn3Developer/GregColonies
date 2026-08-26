@@ -188,6 +188,7 @@ public class Colony {
             citizens.put(entry.getId(), entry);
         } else {
             entry.setName(citizen.getCitizenName());
+            entry.updateState(citizen);
             entry.updatePosition(citizen);
         }
         return entry;

@@ -7,6 +7,7 @@ import java.util.Set;
 import net.minecraft.block.material.Material;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityAgeable;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.entity.ai.EntityAIOpenDoor;
@@ -47,6 +48,7 @@ import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.slot.ItemSlot;
 import com.cleanroommc.modularui.widgets.slot.ModularSlot;
 import com.cleanroommc.modularui.widgets.slot.SlotGroup;
+import com.enn3developer.gregcolonies.Config;
 import com.enn3developer.gregcolonies.GregColonies;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
@@ -100,6 +102,8 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     private static final double CLIMB_CENTERING = 0.1D;
 
     private static final int SLEEPING_WATCHER = 17;
+
+    private static final int GENDER_WATCHER = 18;
 
     private static final double LEAP_LIFT = 0.4D;
 
@@ -203,6 +207,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         for (int i = 0; i < equipmentDropChances.length; i++) {
             equipmentDropChances[i] = 0.0F;
         }
+        setGender(CitizenGender.random(rand));
     }
 
     @Override
@@ -225,6 +230,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     protected void entityInit() {
         super.entityInit();
         dataWatcher.addObject(SLEEPING_WATCHER, Byte.valueOf((byte) 0));
+        dataWatcher.addObject(GENDER_WATCHER, Byte.valueOf((byte) 0));
     }
 
     @Override
@@ -287,6 +293,35 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         return getCustomNameTag();
     }
 
+    public CitizenGender getGender() {
+        return CitizenGender.byId(dataWatcher.getWatchableObjectByte(GENDER_WATCHER));
+    }
+
+    public void setGender(CitizenGender gender) {
+        parameters.setGender(gender);
+        dataWatcher.updateObject(GENDER_WATCHER, Byte.valueOf(CitizenGender.idOf(gender)));
+    }
+
+    private CitizenGender readGender() {
+        CitizenGender gender = parameters.getGender();
+        if (gender == null) {
+            gender = CitizenNames.genderOf(getCitizenName());
+        }
+        return gender == null ? CitizenGender.random(rand) : gender;
+    }
+
+    public boolean canWork() {
+        return !isChild();
+    }
+
+    @Override
+    public EntityCitizen createChild(EntityAgeable mate) {
+        EntityCitizen child = new EntityCitizen(worldObj);
+        child.setColonyId(colonyId);
+        child.setGrowingAge(-Config.childGrowthTicks);
+        return child;
+    }
+
     public String getGroup() {
         return group;
     }
@@ -313,7 +348,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     }
 
     public boolean takeColonyOrder() {
-        if (colonyId == 0 || worldObj.isRemote) {
+        if (colonyId == 0 || worldObj.isRemote || !canWork()) {
             return false;
         }
         CitizenCommand order = ColonyManager.get(worldObj)
@@ -394,9 +429,10 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
             return;
         }
         Colony colony = getColony();
-        String name = CitizenNames.generate(rand);
+        CitizenGender gender = getGender();
+        String name = CitizenNames.generate(rand, gender);
         for (int i = 0; colony != null && i < NAME_ATTEMPTS && colony.hasCitizenNamed(name); i++) {
-            name = CitizenNames.generate(rand);
+            name = CitizenNames.generate(rand, gender);
         }
         setCustomNameTag(name);
     }
@@ -832,7 +868,12 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     }
 
     private String groupLabel() {
-        return group.isEmpty() ? "no group" : group;
+        return describeGender() + ", " + (group.isEmpty() ? "no group" : group);
+    }
+
+    public String describeGender() {
+        String label = CitizenGender.labelOf(getGender());
+        return isChild() ? label + " child" : label;
     }
 
     private String healthLabel() {
@@ -872,6 +913,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         inventory.readFromNBT(tag.getCompoundTag("inventory"));
         commands.readFromNBT(tag.getCompoundTag("commands"));
         parameters.readFromNBT(tag.getCompoundTag("parameters"));
+        setGender(readGender());
         diet.readFromNBT(tag.getCompoundTag("diet"));
     }
 

@@ -5,6 +5,7 @@ import java.util.UUID;
 import net.minecraft.entity.SharedMonsterAttributes;
 
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
+import com.enn3developer.gregcolonies.entity.CitizenGender;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 
 import cpw.mods.fml.common.network.ByteBufUtils;
@@ -17,6 +18,8 @@ public class CitizenSnapshot {
     private int entityId = -1;
     private String name = "";
     private String group = "";
+    private CitizenGender gender;
+    private boolean child;
     private double x;
     private double y;
     private double z;
@@ -33,6 +36,8 @@ public class CitizenSnapshot {
         snapshot.id = entry.getId();
         snapshot.name = entry.getName();
         snapshot.group = entry.getGroup();
+        snapshot.gender = entry.getGender();
+        snapshot.child = entry.isChild();
         if (citizen == null) {
             snapshot.x = entry.getX() + 0.5D;
             snapshot.y = entry.getY();
@@ -43,6 +48,8 @@ public class CitizenSnapshot {
         snapshot.entityId = citizen.getEntityId();
         snapshot.name = citizen.getCitizenName();
         snapshot.group = citizen.getGroup();
+        snapshot.gender = citizen.getGender();
+        snapshot.child = citizen.isChild();
         snapshot.x = citizen.posX;
         snapshot.y = citizen.posY;
         snapshot.z = citizen.posZ;
@@ -75,6 +82,19 @@ public class CitizenSnapshot {
 
     public String getGroup() {
         return group;
+    }
+
+    public CitizenGender getGender() {
+        return gender;
+    }
+
+    public boolean isChild() {
+        return child;
+    }
+
+    public String describeGender() {
+        String label = CitizenGender.labelOf(gender);
+        return child ? label + " child" : label;
     }
 
     public double getX() {
@@ -115,6 +135,8 @@ public class CitizenSnapshot {
         buf.writeInt(entityId);
         ByteBufUtils.writeUTF8String(buf, name);
         ByteBufUtils.writeUTF8String(buf, group);
+        buf.writeByte(CitizenGender.idOf(gender));
+        buf.writeBoolean(child);
         buf.writeDouble(x);
         buf.writeDouble(y);
         buf.writeDouble(z);
@@ -131,6 +153,8 @@ public class CitizenSnapshot {
         snapshot.entityId = buf.readInt();
         snapshot.name = ByteBufUtils.readUTF8String(buf);
         snapshot.group = ByteBufUtils.readUTF8String(buf);
+        snapshot.gender = CitizenGender.byId(buf.readByte());
+        snapshot.child = buf.readBoolean();
         snapshot.x = buf.readDouble();
         snapshot.y = buf.readDouble();
         snapshot.z = buf.readDouble();

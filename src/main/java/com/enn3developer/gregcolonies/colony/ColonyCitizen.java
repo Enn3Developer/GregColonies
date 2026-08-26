@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import net.minecraft.nbt.NBTTagCompound;
 
+import com.enn3developer.gregcolonies.entity.CitizenGender;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 
 public class ColonyCitizen {
@@ -11,6 +12,8 @@ public class ColonyCitizen {
     private UUID id;
     private String name = "";
     private String group = "";
+    private CitizenGender gender;
+    private boolean child;
     private int dimension;
     private int x;
     private int y;
@@ -26,6 +29,7 @@ public class ColonyCitizen {
         this.id = citizen.getUniqueID();
         this.name = citizen.getCitizenName();
         this.group = citizen.getGroup();
+        updateState(citizen);
         updatePosition(citizen);
     }
 
@@ -39,6 +43,19 @@ public class ColonyCitizen {
 
     public void setName(String name) {
         this.name = name == null ? "" : name;
+    }
+
+    public CitizenGender getGender() {
+        return gender;
+    }
+
+    public boolean isChild() {
+        return child;
+    }
+
+    public void updateState(EntityCitizen citizen) {
+        this.gender = citizen.getGender();
+        this.child = citizen.isChild();
     }
 
     public String getGroup() {
@@ -121,6 +138,8 @@ public class ColonyCitizen {
         tag.setLong("idLeast", id.getLeastSignificantBits());
         tag.setString("name", name);
         tag.setString("group", group);
+        tag.setByte("gender", CitizenGender.idOf(gender));
+        tag.setBoolean("child", child);
         tag.setInteger("dim", dimension);
         tag.setInteger("x", x);
         tag.setInteger("y", y);
@@ -139,6 +158,8 @@ public class ColonyCitizen {
         citizen.id = new UUID(tag.getLong("idMost"), tag.getLong("idLeast"));
         citizen.name = tag.getString("name");
         citizen.group = tag.getString("group");
+        citizen.gender = CitizenGender.byId(tag.getByte("gender"));
+        citizen.child = tag.getBoolean("child");
         citizen.dimension = tag.getInteger("dim");
         citizen.x = tag.getInteger("x");
         citizen.y = tag.getInteger("y");
