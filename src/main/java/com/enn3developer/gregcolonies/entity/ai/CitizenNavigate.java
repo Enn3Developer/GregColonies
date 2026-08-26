@@ -3,24 +3,28 @@ package com.enn3developer.gregcolonies.entity.ai;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.pathfinding.PathEntity;
-import net.minecraft.pathfinding.PathFinder;
 import net.minecraft.pathfinding.PathNavigate;
 import net.minecraft.pathfinding.PathPoint;
 import net.minecraft.util.MathHelper;
-import net.minecraft.world.ChunkCache;
 import net.minecraft.world.World;
+
+import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
 
 public class CitizenNavigate extends PathNavigate {
 
-    private static final int XYZ_MARGIN = 8;
-
-    private static final int ENTITY_MARGIN = 16;
+    private static final int FAILURE_COOLDOWN = 40;
 
     private final EntityLiving entity;
 
     private boolean canSwim;
 
     private boolean enterDoors = true;
+
+    private long failedFrom;
+
+    private long failedTo;
+
+    private long failedAt = Long.MIN_VALUE;
 
     public CitizenNavigate(EntityLiving entity, World world) {
         super(entity, world);
@@ -41,24 +45,12 @@ public class CitizenNavigate extends PathNavigate {
 
     @Override
     public PathEntity getPathToXYZ(double x, double y, double z) {
-        if (!canNavigate()) {
-            return null;
-        }
-
-        float range = getPathSearchRange();
-        int margin = (int) (range + XYZ_MARGIN);
-        return finder(margin)
-            .createEntityPathTo(entity, MathHelper.floor_double(x), (int) y, MathHelper.floor_double(z), range);
+        return findPath(MathHelper.floor_double(x) + 0.5D, (int) y + 0.5D, MathHelper.floor_double(z) + 0.5D);
     }
 
     @Override
     public PathEntity getPathToEntityLiving(Entity target) {
-        if (!canNavigate()) {
-            return null;
-        }
-
-        float range = getPathSearchRange();
-        return finder((int) (range + ENTITY_MARGIN)).createEntityPathTo(entity, target, range);
+        return findPath(target.posX, target.boundingBox.minY, target.posZ);
     }
 
     @Override
@@ -66,22 +58,41 @@ public class CitizenNavigate extends PathNavigate {
         return super.setPath(trim(path), speed);
     }
 
-    private PathFinder finder(int margin) {
+    private PathEntity findPath(double x, double y, double z) {
+        if (!canNavigate()) {
+            return null;
+        }
+
+        long from = packEntity();
+        long to = WorkBlocks.pack(MathHelper.floor_double(x), MathHelper.floor_double(y), MathHelper.floor_double(z));
+        long now = entity.worldObj.getTotalWorldTime();
+        if (from == failedFrom && to == failedTo && now - failedAt < FAILURE_COOLDOWN) {
+            return null;
+        }
+
+        PathEntity path = finder().createPath(x, y, z, getPathSearchRange());
+        if (path == null) {
+            failedFrom = from;
+            failedTo = to;
+            failedAt = now;
+        }
+        return path;
+    }
+
+    private long packEntity() {
+        return WorkBlocks.pack(
+            MathHelper.floor_double(entity.posX),
+            MathHelper.floor_double(entity.boundingBox.minY),
+            MathHelper.floor_double(entity.posZ));
+    }
+
+    private CitizenPathFinder finder() {
         World world = entity.worldObj;
         int x = MathHelper.floor_double(entity.posX);
         int y = MathHelper.floor_double(entity.posY);
         int z = MathHelper.floor_double(entity.posZ);
-        ChunkCache cache = new ChunkCache(
-            world,
-            x - margin,
-            y - margin,
-            z - margin,
-            x + margin,
-            y + margin,
-            z + margin,
-            0);
         boolean keepAway = !Hazards.isDeadlyStep(world, x, y, z) && !Hazards.isBesideDeadly(world, x, y, z);
-        return new CitizenPathFinder(cache, enterDoors, getCanBreakDoors(), getAvoidsWater(), canSwim, keepAway);
+        return new CitizenPathFinder(entity, enterDoors, getCanBreakDoors(), getAvoidsWater(), canSwim, keepAway);
     }
 
     private boolean canNavigate() {

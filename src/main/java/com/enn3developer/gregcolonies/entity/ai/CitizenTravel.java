@@ -9,8 +9,6 @@ import com.enn3developer.gregcolonies.entity.EntityCitizen;
 
 public class CitizenTravel {
 
-    private static final double HOP_DISTANCE = 12.0D;
-
     private static final double MIN_CLIMB = 5.0D;
 
     private static final double MIN_GAIN = 3.0D;
@@ -125,18 +123,7 @@ public class CitizenTravel {
     }
 
     private boolean path(double x, double y, double z, double speed) {
-        double dx = x - citizen.posX;
-        double dy = y - citizen.posY;
-        double dz = z - citizen.posZ;
-        double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-        if (distance <= HOP_DISTANCE) {
-            return citizen.getNavigator()
-                .tryMoveToXYZ(x, y, z, speed);
-        }
-
-        double scale = HOP_DISTANCE / distance;
         return citizen.getNavigator()
-            .tryMoveToXYZ(citizen.posX + dx * scale, citizen.posY + dy * scale, citizen.posZ + dz * scale, speed);
+            .tryMoveToXYZ(x, y, z, speed);
     }
 }
