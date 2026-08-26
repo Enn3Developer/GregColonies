@@ -107,7 +107,9 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             }
             String group = citizen.getGroup()
                 .isEmpty() ? "no group" : citizen.getGroup();
-            tooltip.add(IKey.str("Citizen (" + group + ")"))
+            String name = citizen.getName()
+                .isEmpty() ? "Citizen" : citizen.getName();
+            tooltip.add(IKey.str(name + " (" + group + ")"))
                 .newLine();
             tooltip.add(IKey.str(String.format("%.0f / %.0f / %.0f", citizen.getX(), citizen.getY(), citizen.getZ())))
                 .newLine();

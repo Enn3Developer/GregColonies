@@ -9,6 +9,7 @@ import com.enn3developer.gregcolonies.entity.EntityCitizen;
 public class ColonyCitizen {
 
     private UUID id;
+    private String name = "";
     private String group = "";
     private int dimension;
     private int x;
@@ -23,12 +24,21 @@ public class ColonyCitizen {
 
     public ColonyCitizen(EntityCitizen citizen) {
         this.id = citizen.getUniqueID();
+        this.name = citizen.getCitizenName();
         this.group = citizen.getGroup();
         updatePosition(citizen);
     }
 
     public UUID getId() {
         return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name == null ? "" : name;
     }
 
     public String getGroup() {
@@ -109,6 +119,7 @@ public class ColonyCitizen {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setLong("idMost", id.getMostSignificantBits());
         tag.setLong("idLeast", id.getLeastSignificantBits());
+        tag.setString("name", name);
         tag.setString("group", group);
         tag.setInteger("dim", dimension);
         tag.setInteger("x", x);
@@ -126,6 +137,7 @@ public class ColonyCitizen {
     public static ColonyCitizen readFromNBT(NBTTagCompound tag) {
         ColonyCitizen citizen = new ColonyCitizen();
         citizen.id = new UUID(tag.getLong("idMost"), tag.getLong("idLeast"));
+        citizen.name = tag.getString("name");
         citizen.group = tag.getString("group");
         citizen.dimension = tag.getInteger("dim");
         citizen.x = tag.getInteger("x");

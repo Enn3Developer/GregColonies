@@ -72,6 +72,8 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     private static final int ROSTER_REFRESH_TICKS = 100;
 
+    private static final int NAME_ATTEMPTS = 16;
+
     private static final int SLEEPING_WATCHER = 17;
 
     private static final double LEAP_LIFT = 0.4D;
@@ -176,6 +178,10 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         return colonyId;
     }
 
+    public String getCitizenName() {
+        return getCustomNameTag();
+    }
+
     public String getGroup() {
         return group;
     }
@@ -268,10 +274,23 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         super.onLivingUpdate();
 
         if (!worldObj.isRemote) {
+            ensureName();
             updateRoster();
             syncEquipment();
             diet.update(this);
         }
+    }
+
+    public void ensureName() {
+        if (hasCustomNameTag()) {
+            return;
+        }
+        Colony colony = getColony();
+        String name = CitizenNames.generate(rand);
+        for (int i = 0; colony != null && i < NAME_ATTEMPTS && colony.hasCitizenNamed(name); i++) {
+            name = CitizenNames.generate(rand);
+        }
+        setCustomNameTag(name);
     }
 
     private void updateRoster() {

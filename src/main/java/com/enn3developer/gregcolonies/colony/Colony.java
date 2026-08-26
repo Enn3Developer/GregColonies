@@ -187,9 +187,20 @@ public class Colony {
             entry = new ColonyCitizen(citizen);
             citizens.put(entry.getId(), entry);
         } else {
+            entry.setName(citizen.getCitizenName());
             entry.updatePosition(citizen);
         }
         return entry;
+    }
+
+    public boolean hasCitizenNamed(String name) {
+        for (ColonyCitizen citizen : citizens.values()) {
+            if (citizen.getName()
+                .equalsIgnoreCase(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public ColonyCitizen getCitizen(UUID id) {

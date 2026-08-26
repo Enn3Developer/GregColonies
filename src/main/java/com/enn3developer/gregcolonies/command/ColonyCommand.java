@@ -144,11 +144,13 @@ public class ColonyCommand extends CommandBase {
             EntityCitizen citizen = new EntityCitizen(world);
             citizen.setLocationAndAngles(x + 0.5D, y, z + 0.5D, 0.0F, 0.0F);
             citizen.setColonyId(colony.getId());
+            citizen.ensureName();
             world.spawnEntityInWorld(citizen);
 
             sender.addChatMessage(
                 new ChatComponentText(
-                    "Spawned citizen at " + x + "/" + y + "/" + z + " for colony #" + colony.getId()));
+                    "Spawned " + citizen
+                        .getCitizenName() + " at " + x + "/" + y + "/" + z + " for colony #" + colony.getId()));
             return;
         }
 

@@ -16,6 +16,7 @@ public class CitizenSnapshot {
     private UUID id;
 
     private int entityId = -1;
+    private String name = "";
     private String group = "";
     private double x;
     private double y;
@@ -31,6 +32,7 @@ public class CitizenSnapshot {
     public static CitizenSnapshot of(ColonyCitizen entry, EntityCitizen citizen) {
         CitizenSnapshot snapshot = new CitizenSnapshot();
         snapshot.id = entry.getId();
+        snapshot.name = entry.getName();
         snapshot.group = entry.getGroup();
         if (citizen == null) {
             snapshot.x = entry.getX() + 0.5D;
@@ -40,6 +42,7 @@ public class CitizenSnapshot {
         }
 
         snapshot.entityId = citizen.getEntityId();
+        snapshot.name = citizen.getCitizenName();
         snapshot.group = citizen.getGroup();
         snapshot.x = citizen.posX;
         snapshot.y = citizen.posY;
@@ -75,6 +78,10 @@ public class CitizenSnapshot {
 
     public int getEntityId() {
         return entityId;
+    }
+
+    public String getName() {
+        return name;
     }
 
     public String getGroup() {
@@ -117,6 +124,7 @@ public class CitizenSnapshot {
         buf.writeLong(id.getMostSignificantBits());
         buf.writeLong(id.getLeastSignificantBits());
         buf.writeInt(entityId);
+        ByteBufUtils.writeUTF8String(buf, name);
         ByteBufUtils.writeUTF8String(buf, group);
         buf.writeDouble(x);
         buf.writeDouble(y);
@@ -132,6 +140,7 @@ public class CitizenSnapshot {
         CitizenSnapshot snapshot = new CitizenSnapshot();
         snapshot.id = new UUID(buf.readLong(), buf.readLong());
         snapshot.entityId = buf.readInt();
+        snapshot.name = ByteBufUtils.readUTF8String(buf);
         snapshot.group = ByteBufUtils.readUTF8String(buf);
         snapshot.x = buf.readDouble();
         snapshot.y = buf.readDouble();
