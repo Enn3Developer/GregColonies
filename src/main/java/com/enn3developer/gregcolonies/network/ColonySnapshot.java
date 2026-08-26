@@ -31,6 +31,10 @@ public class ColonySnapshot {
     private int dropOffX;
     private int dropOffY;
     private int dropOffZ;
+    private boolean hasPickUp;
+    private int pickUpX;
+    private int pickUpY;
+    private int pickUpZ;
     private final List<CitizenSnapshot> citizens = new ArrayList<>();
 
     private ColonySnapshot() {}
@@ -50,6 +54,10 @@ public class ColonySnapshot {
         snapshot.dropOffX = colony.getDropOffX();
         snapshot.dropOffY = colony.getDropOffY();
         snapshot.dropOffZ = colony.getDropOffZ();
+        snapshot.hasPickUp = colony.hasPickUp();
+        snapshot.pickUpX = colony.getPickUpX();
+        snapshot.pickUpY = colony.getPickUpY();
+        snapshot.pickUpZ = colony.getPickUpZ();
 
         Map<UUID, EntityCitizen> loaded = new HashMap<>();
         for (Object object : world.loadedEntityList) {
@@ -123,6 +131,26 @@ public class ColonySnapshot {
         return hasDropOff && dropOffX == x && dropOffY == y && dropOffZ == z;
     }
 
+    public boolean hasPickUp() {
+        return hasPickUp;
+    }
+
+    public int getPickUpX() {
+        return pickUpX;
+    }
+
+    public int getPickUpY() {
+        return pickUpY;
+    }
+
+    public int getPickUpZ() {
+        return pickUpZ;
+    }
+
+    public boolean isPickUpAt(int x, int y, int z) {
+        return hasPickUp && pickUpX == x && pickUpY == y && pickUpZ == z;
+    }
+
     public List<CitizenSnapshot> getCitizens() {
         return citizens;
     }
@@ -141,6 +169,10 @@ public class ColonySnapshot {
         buf.writeInt(dropOffX);
         buf.writeInt(dropOffY);
         buf.writeInt(dropOffZ);
+        buf.writeBoolean(hasPickUp);
+        buf.writeInt(pickUpX);
+        buf.writeInt(pickUpY);
+        buf.writeInt(pickUpZ);
         buf.writeInt(citizens.size());
         for (CitizenSnapshot citizen : citizens) {
             citizen.write(buf);
@@ -162,6 +194,10 @@ public class ColonySnapshot {
         snapshot.dropOffX = buf.readInt();
         snapshot.dropOffY = buf.readInt();
         snapshot.dropOffZ = buf.readInt();
+        snapshot.hasPickUp = buf.readBoolean();
+        snapshot.pickUpX = buf.readInt();
+        snapshot.pickUpY = buf.readInt();
+        snapshot.pickUpZ = buf.readInt();
         int count = buf.readInt();
         for (int i = 0; i < count; i++) {
             snapshot.citizens.add(CitizenSnapshot.read(buf));

@@ -31,6 +31,10 @@ public class Colony {
     private int dropOffX;
     private int dropOffY;
     private int dropOffZ;
+    private boolean hasPickUp;
+    private int pickUpX;
+    private int pickUpY;
+    private int pickUpZ;
     private final Deque<CitizenCommand> orders = new ArrayDeque<>();
     private final Map<UUID, ColonyCitizen> citizens = new LinkedHashMap<>();
 
@@ -115,6 +119,40 @@ public class Colony {
         dropOffX = 0;
         dropOffY = 0;
         dropOffZ = 0;
+    }
+
+    public boolean hasPickUp() {
+        return hasPickUp;
+    }
+
+    public int getPickUpX() {
+        return pickUpX;
+    }
+
+    public int getPickUpY() {
+        return pickUpY;
+    }
+
+    public int getPickUpZ() {
+        return pickUpZ;
+    }
+
+    public boolean isPickUpAt(int x, int y, int z) {
+        return hasPickUp && pickUpX == x && pickUpY == y && pickUpZ == z;
+    }
+
+    public void setPickUp(int x, int y, int z) {
+        hasPickUp = true;
+        pickUpX = x;
+        pickUpY = y;
+        pickUpZ = z;
+    }
+
+    public void clearPickUp() {
+        hasPickUp = false;
+        pickUpX = 0;
+        pickUpY = 0;
+        pickUpZ = 0;
     }
 
     public ColonyCitizen registerCitizen(EntityCitizen citizen) {
@@ -244,6 +282,12 @@ public class Colony {
             tag.setInteger("dropOffY", dropOffY);
             tag.setInteger("dropOffZ", dropOffZ);
         }
+        tag.setBoolean("hasPickUp", hasPickUp);
+        if (hasPickUp) {
+            tag.setInteger("pickUpX", pickUpX);
+            tag.setInteger("pickUpY", pickUpY);
+            tag.setInteger("pickUpZ", pickUpZ);
+        }
 
         NBTTagList orderList = new NBTTagList();
         for (CitizenCommand order : orders) {
@@ -274,6 +318,12 @@ public class Colony {
             colony.dropOffX = tag.getInteger("dropOffX");
             colony.dropOffY = tag.getInteger("dropOffY");
             colony.dropOffZ = tag.getInteger("dropOffZ");
+        }
+        colony.hasPickUp = tag.getBoolean("hasPickUp");
+        if (colony.hasPickUp) {
+            colony.pickUpX = tag.getInteger("pickUpX");
+            colony.pickUpY = tag.getInteger("pickUpY");
+            colony.pickUpZ = tag.getInteger("pickUpZ");
         }
 
         NBTTagList orderList = tag.getTagList("orders", 10);

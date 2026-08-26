@@ -181,7 +181,7 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             pickChunk();
             return;
         }
-        if (mode == ColonyView.TARGET_DROP_OFF) {
+        if (mode == ColonyView.TARGET_DROP_OFF || mode == ColonyView.TARGET_PICK_UP) {
             pickBlock();
             return;
         }
@@ -257,6 +257,11 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
         int[] area = view.getPending();
         if (view.getTargeting() == ColonyView.TARGET_DROP_OFF) {
             view.sendDropOff(area[0], area[1], area[2]);
+            view.setTargeting(ColonyView.TARGET_NONE);
+            return;
+        }
+        if (view.getTargeting() == ColonyView.TARGET_PICK_UP) {
+            view.sendPickUp(area[0], area[1], area[2]);
             view.setTargeting(ColonyView.TARGET_NONE);
             return;
         }
@@ -432,7 +437,7 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             int mode = view.getTargeting();
             if (mode == ColonyView.TARGET_MINE) {
                 pickChunk();
-            } else if (mode == ColonyView.TARGET_DROP_OFF) {
+            } else if (mode == ColonyView.TARGET_DROP_OFF || mode == ColonyView.TARGET_PICK_UP) {
                 pickBlock();
             } else {
                 updateDragArea(true);

@@ -55,6 +55,10 @@ public class ColonyWorldOverlay {
 
     private static final int DROP_OFF_MARK_COLOR = 0x70FF7CE0;
 
+    private static final int PICK_UP_COLOR = 0xB07CE0FF;
+
+    private static final int PICK_UP_MARK_COLOR = 0x707CE0FF;
+
     private static final double AREA_HEIGHT = 4.0D;
 
     private static final double AREA_EDGE = 0.3D;
@@ -179,6 +183,16 @@ public class ColonyWorldOverlay {
                 DROP_OFF_MARK_COLOR);
         }
 
+        if (colony.hasPickUp()) {
+            drawArea(
+                colony.getPickUpX(),
+                colony.getPickUpY(),
+                colony.getPickUpZ(),
+                colony.getPickUpX() + 1,
+                colony.getPickUpZ() + 1,
+                PICK_UP_MARK_COLOR);
+        }
+
         ColonyView view = screen.getView();
         if (view.hasPending()) {
             int[] area = view.getPending();
@@ -199,7 +213,10 @@ public class ColonyWorldOverlay {
         if (targeting == ColonyView.TARGET_MINE) {
             return MINE_COLOR;
         }
-        return targeting == ColonyView.TARGET_DROP_OFF ? DROP_OFF_COLOR : CHOP_COLOR;
+        if (targeting == ColonyView.TARGET_DROP_OFF) {
+            return DROP_OFF_COLOR;
+        }
+        return targeting == ColonyView.TARGET_PICK_UP ? PICK_UP_COLOR : CHOP_COLOR;
     }
 
     public static Entity liveEntity(CitizenSnapshot citizen) {

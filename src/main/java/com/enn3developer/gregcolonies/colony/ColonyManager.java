@@ -150,6 +150,26 @@ public class ColonyManager extends WorldSavedData {
         return true;
     }
 
+    public boolean setPickUp(int colonyId, int x, int y, int z) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null) {
+            return false;
+        }
+        colony.setPickUp(x, y, z);
+        markDirty();
+        return true;
+    }
+
+    public boolean clearPickUp(int colonyId) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null || !colony.hasPickUp()) {
+            return false;
+        }
+        colony.clearPickUp();
+        markDirty();
+        return true;
+    }
+
     public boolean enqueueOrder(int colonyId, CitizenCommand command) {
         Colony colony = colonies.get(colonyId);
         if (colony == null) {
