@@ -10,7 +10,6 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.entity.ai.EntityAIOpenDoor;
-import net.minecraft.entity.ai.EntityAISwimming;
 import net.minecraft.entity.ai.EntityAIWatchClosest;
 import net.minecraft.entity.ai.attributes.AttributeModifier;
 import net.minecraft.entity.passive.EntityVillager;
@@ -19,6 +18,7 @@ import net.minecraft.init.Items;
 import net.minecraft.item.ItemArmor;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.pathfinding.PathNavigate;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumChatFormatting;
@@ -55,10 +55,14 @@ import com.enn3developer.gregcolonies.compat.Mods;
 import com.enn3developer.gregcolonies.compat.TinkersTools;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandQueue;
+import com.enn3developer.gregcolonies.entity.ai.CitizenNavigate;
 import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenCommands;
+import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenDanger;
 import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenFlee;
 import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenIdle;
 import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenLiving;
+import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenSwim;
+import com.enn3developer.gregcolonies.entity.ai.Hazards;
 import com.enn3developer.gregcolonies.entity.diet.CitizenDiet;
 import com.enn3developer.gregcolonies.network.PacketOpenCitizen;
 
@@ -87,6 +91,8 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     private static final double VIEW_RANGE_SQ = PacketOpenCitizen.OPEN_RANGE * PacketOpenCitizen.OPEN_RANGE;
 
     private static final int NAME_ATTEMPTS = 16;
+
+    private static final float PATH_HAZARD_WEIGHT = 50.0F;
 
     private static final int SLEEPING_WATCHER = 17;
 
@@ -173,21 +179,40 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     private String group = "";
     private boolean rosterRegistered;
     private int rosterTicks;
+    private boolean wantsWater;
+    private CitizenNavigate navigator;
 
     public EntityCitizen(World world) {
         super(world);
         tasks.taskEntries.clear();
         targetTasks.taskEntries.clear();
-        tasks.addTask(0, new EntityAISwimming(this));
-        tasks.addTask(1, new EntityAICitizenFlee(this));
-        tasks.addTask(2, living);
-        tasks.addTask(3, new EntityAICitizenCommands(this));
-        tasks.addTask(4, new EntityAIOpenDoor(this, true));
-        tasks.addTask(5, new EntityAIWatchClosest(this, EntityPlayer.class, 6.0F));
-        tasks.addTask(6, idle);
+        tasks.addTask(0, new EntityAICitizenDanger(this));
+        tasks.addTask(1, new EntityAICitizenSwim(this));
+        tasks.addTask(2, new EntityAICitizenFlee(this));
+        tasks.addTask(3, living);
+        tasks.addTask(4, new EntityAICitizenCommands(this));
+        tasks.addTask(5, new EntityAIOpenDoor(this, true));
+        tasks.addTask(6, new EntityAIWatchClosest(this, EntityPlayer.class, 6.0F));
+        tasks.addTask(7, idle);
         for (int i = 0; i < equipmentDropChances.length; i++) {
             equipmentDropChances[i] = 0.0F;
         }
+    }
+
+    @Override
+    public PathNavigate getNavigator() {
+        if (navigator == null) {
+            navigator = new CitizenNavigate(this, worldObj);
+        }
+        return navigator;
+    }
+
+    @Override
+    public float getBlockPathWeight(int x, int y, int z) {
+        if (Hazards.isNearDeadly(worldObj, x, y, z)) {
+            return -PATH_HAZARD_WEIGHT;
+        }
+        return super.getBlockPathWeight(x, y, z);
     }
 
     @Override
@@ -218,6 +243,14 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     public CitizenDiet getDiet() {
         return diet;
+    }
+
+    public boolean wantsWater() {
+        return wantsWater;
+    }
+
+    public void setWantsWater(boolean wantsWater) {
+        this.wantsWater = wantsWater;
     }
 
     public static boolean isPreviewRender() {
@@ -500,6 +533,36 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     }
 
     @Override
+    public void moveEntity(double dx, double dy, double dz) {
+        if (!worldObj.isRemote && !Hazards.isInDanger(this) && burnsAt(posX + dx, posZ + dz)) {
+            if (!burnsAt(posX + dx, posZ)) {
+                dz = 0.0D;
+            } else if (!burnsAt(posX, posZ + dz)) {
+                dx = 0.0D;
+            } else {
+                dx = 0.0D;
+                dz = 0.0D;
+            }
+        }
+        super.moveEntity(dx, dy, dz);
+    }
+
+    private boolean burnsAt(double x, double z) {
+        double reach = width / 2.0D;
+        int y = MathHelper.floor_double(boundingBox.minY);
+        int maxX = MathHelper.floor_double(x + reach);
+        int maxZ = MathHelper.floor_double(z + reach);
+        for (int bx = MathHelper.floor_double(x - reach); bx <= maxX; bx++) {
+            for (int bz = MathHelper.floor_double(z - reach); bz <= maxZ; bz++) {
+                if (Hazards.isDeadlyStep(worldObj, bx, y, bz)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
     public void moveEntityWithHeading(float strafe, float forward) {
         double x = posX;
         double y = posY;
@@ -552,7 +615,9 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     }
 
     @Override
-    protected void updateAITick() {}
+    protected void updateAITick() {
+        getNavigator().onUpdateNavigation();
+    }
 
     @Override
     public boolean interact(EntityPlayer player) {

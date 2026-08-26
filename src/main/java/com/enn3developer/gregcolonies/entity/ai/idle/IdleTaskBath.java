@@ -101,6 +101,7 @@ public class IdleTaskBath extends AutoTask {
         avoidedWater = citizen.getNavigator()
             .getAvoidsWater();
         navigatorAdjusted = true;
+        citizen.setWantsWater(true);
         citizen.getNavigator()
             .setAvoidsWater(false);
         pathTowards(citizen, spotX + 0.5D, spotY, spotZ + 0.5D, SPEED);
@@ -149,6 +150,7 @@ public class IdleTaskBath extends AutoTask {
 
     @Override
     public void finish(EntityCitizen citizen) {
+        citizen.setWantsWater(false);
         if (navigatorAdjusted) {
             navigatorAdjusted = false;
             citizen.getNavigator()
