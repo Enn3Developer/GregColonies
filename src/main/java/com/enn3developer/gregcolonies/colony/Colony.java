@@ -136,20 +136,18 @@ public class Colony {
         return orders.size();
     }
 
-    public void clearOrders() {
+    public int clearOrders() {
+        int cleared = orders.size();
         orders.clear();
+        return cleared;
     }
 
     public int clearOrders(String group) {
-        if (group == null || group.isEmpty()) {
-            int cleared = orders.size();
-            orders.clear();
-            return cleared;
-        }
+        String target = group == null ? "" : group;
         int cleared = 0;
         Iterator<CitizenCommand> iterator = orders.iterator();
         while (iterator.hasNext()) {
-            if (group.equals(
+            if (target.equals(
                 iterator.next()
                     .getTargetGroup())) {
                 iterator.remove();
@@ -160,12 +158,10 @@ public class Colony {
     }
 
     public int getOrderCount(String group) {
-        if (group == null || group.isEmpty()) {
-            return orders.size();
-        }
+        String target = group == null ? "" : group;
         int count = 0;
         for (CitizenCommand order : orders) {
-            if (group.equals(order.getTargetGroup())) {
+            if (target.equals(order.getTargetGroup())) {
                 count++;
             }
         }
