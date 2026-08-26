@@ -53,7 +53,12 @@ public class CitizenSnapshot {
             .getPendingCount();
         CitizenCommand current = citizen.getCommands()
             .getCurrent();
-        snapshot.task = current == null ? "" : current.describe();
+        if (current != null) {
+            snapshot.task = current.describe();
+        } else {
+            String idle = citizen.getIdleTask();
+            snapshot.task = idle.isEmpty() ? "" : "idle " + idle;
+        }
         return snapshot;
     }
 

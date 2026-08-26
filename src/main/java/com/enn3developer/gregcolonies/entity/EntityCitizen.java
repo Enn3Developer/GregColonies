@@ -46,6 +46,7 @@ import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandQueue;
 import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenCommands;
 import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenFlee;
+import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenIdle;
 import com.enn3developer.gregcolonies.entity.diet.CitizenDiet;
 
 public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGuiData> {
@@ -102,6 +103,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     private final CitizenParameters parameters = new CitizenParameters();
     private final CitizenInventory inventory = new CitizenInventory(this);
     private final CitizenDiet diet = new CitizenDiet();
+    private final EntityAICitizenIdle idle = new EntityAICitizenIdle(this);
     private final Set<EntityPlayer> viewers = new HashSet<>();
     private int colonyId;
     private String group = "";
@@ -117,6 +119,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         tasks.addTask(2, new EntityAICitizenCommands(this));
         tasks.addTask(3, new EntityAIOpenDoor(this, true));
         tasks.addTask(4, new EntityAIWatchClosest(this, EntityPlayer.class, 6.0F));
+        tasks.addTask(5, idle);
         for (int i = 0; i < equipmentDropChances.length; i++) {
             equipmentDropChances[i] = 0.0F;
         }
@@ -144,6 +147,10 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     public CitizenDiet getDiet() {
         return diet;
+    }
+
+    public String getIdleTask() {
+        return idle.describeActive();
     }
 
     public int getColonyId() {
