@@ -229,7 +229,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     }
 
     private void updateRoster() {
-        if (colonyId == 0) {
+        if (colonyId == 0 || !isEntityAlive()) {
             return;
         }
         ColonyManager manager = ColonyManager.get(worldObj);
