@@ -14,6 +14,12 @@ public class CitizenNavigate extends PathNavigate {
 
     private static final int FAILURE_COOLDOWN = 40;
 
+    private static final int CLIMB_UP = 1;
+
+    private static final int CLIMB_DOWN = -1;
+
+    private static final int CLIMB_NONE = 0;
+
     private final EntityLiving entity;
 
     private boolean canSwim;
@@ -41,6 +47,44 @@ public class CitizenNavigate extends PathNavigate {
     public void setEnterDoors(boolean enterDoors) {
         super.setEnterDoors(enterDoors);
         this.enterDoors = enterDoors;
+    }
+
+    @Override
+    public void onUpdateNavigation() {
+        boolean ground = entity.onGround;
+        entity.onGround = ground || onClimbable(0);
+        super.onUpdateNavigation();
+        entity.onGround = ground;
+    }
+
+    public int getClimbDirection() {
+        if (noPath()) {
+            return CLIMB_NONE;
+        }
+        PathEntity path = getPath();
+        int index = path.getCurrentPathIndex();
+        if (index >= path.getCurrentPathLength()) {
+            return CLIMB_NONE;
+        }
+
+        int y = MathHelper.floor_double(entity.boundingBox.minY);
+        int wanted = path.getPathPointFromIndex(index).yCoord;
+        if (wanted > y) {
+            return onClimbable(0) ? CLIMB_UP : CLIMB_NONE;
+        }
+        if (wanted < y) {
+            return onClimbable(0) || onClimbable(-1) ? CLIMB_DOWN : CLIMB_NONE;
+        }
+        return CLIMB_NONE;
+    }
+
+    private boolean onClimbable(int offset) {
+        return CitizenPathFinder.isClimbable(
+            entity.worldObj,
+            MathHelper.floor_double(entity.posX),
+            MathHelper.floor_double(entity.boundingBox.minY) + offset,
+            MathHelper.floor_double(entity.posZ),
+            entity);
     }
 
     @Override
@@ -96,7 +140,7 @@ public class CitizenNavigate extends PathNavigate {
     }
 
     private boolean canNavigate() {
-        return entity.onGround || canSwim && (entity.isInWater() || entity.handleLavaMovement());
+        return entity.onGround || onClimbable(0) || canSwim && (entity.isInWater() || entity.handleLavaMovement());
     }
 
     private PathEntity trim(PathEntity path) {

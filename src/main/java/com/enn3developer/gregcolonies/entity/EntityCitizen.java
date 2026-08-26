@@ -95,6 +95,10 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     private static final float PATH_HAZARD_WEIGHT = 50.0F;
 
+    private static final double CLIMB_SPEED = 0.15D;
+
+    private static final double CLIMB_CENTERING = 0.1D;
+
     private static final int SLEEPING_WATCHER = 17;
 
     private static final double LEAP_LIFT = 0.4D;
@@ -576,10 +580,28 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         double x = posX;
         double y = posY;
         double z = posZ;
-        super.moveEntityWithHeading(strafe, forward);
+        int climb = climbDirection();
+        if (climb == 0) {
+            super.moveEntityWithHeading(strafe, forward);
+        } else {
+            motionY = climb > 0 ? CLIMB_SPEED : -CLIMB_SPEED;
+            motionX = centering(posX);
+            motionZ = centering(posZ);
+            fallDistance = 0.0F;
+            super.moveEntityWithHeading(0.0F, 0.0F);
+        }
         if (!worldObj.isRemote) {
             addMovementExhaustion(posX - x, posY - y, posZ - z);
         }
+    }
+
+    private int climbDirection() {
+        return worldObj.isRemote ? 0 : ((CitizenNavigate) getNavigator()).getClimbDirection();
+    }
+
+    private static double centering(double position) {
+        return MathHelper
+            .clamp_double(MathHelper.floor_double(position) + 0.5D - position, -CLIMB_CENTERING, CLIMB_CENTERING);
     }
 
     private void addMovementExhaustion(double dx, double dy, double dz) {

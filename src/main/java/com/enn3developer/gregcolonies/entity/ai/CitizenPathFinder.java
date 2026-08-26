@@ -4,12 +4,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 import net.minecraft.block.Block;
-import net.minecraft.entity.Entity;
+import net.minecraft.block.material.Material;
+import net.minecraft.entity.EntityLiving;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.init.Blocks;
 import net.minecraft.pathfinding.PathEntity;
-import net.minecraft.pathfinding.PathFinder;
 import net.minecraft.pathfinding.PathPoint;
 import net.minecraft.util.MathHelper;
+import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
@@ -19,6 +21,8 @@ public class CitizenPathFinder {
     private static final int MAX_NODES = 3000;
 
     private static final float HEURISTIC_WEIGHT = 1.25F;
+
+    private static final int BLOCKED = 0;
 
     private static final int CLEAR = 1;
 
@@ -32,13 +36,19 @@ public class CitizenPathFinder {
 
     private static final int TRAPDOOR = -4;
 
+    private static final int RENDER_FENCE = 11;
+
+    private static final int RENDER_WALL = 32;
+
     private static final int MAX_FALL = 3;
 
     private static final int SWIM_SCAN = 16;
 
     private static final int HEAP_CAPACITY = 512;
 
-    private final Entity entity;
+    private static final int MAX_OPTIONS = 6;
+
+    private final EntityLiving entity;
 
     private final boolean enterDoors;
 
@@ -52,7 +62,7 @@ public class CitizenPathFinder {
 
     private final Map<Long, Node> nodes = new HashMap<>();
 
-    private final Node[] options = new Node[4];
+    private final Node[] options = new Node[MAX_OPTIONS];
 
     private Node[] heap = new Node[HEAP_CAPACITY];
 
@@ -60,7 +70,7 @@ public class CitizenPathFinder {
 
     private boolean avoidsWater;
 
-    public CitizenPathFinder(Entity entity, boolean enterDoors, boolean breakDoors, boolean avoidsWater,
+    public CitizenPathFinder(EntityLiving entity, boolean enterDoors, boolean breakDoors, boolean avoidsWater,
         boolean canSwim, boolean keepAway) {
         this.entity = entity;
         this.enterDoors = enterDoors;
@@ -72,6 +82,11 @@ public class CitizenPathFinder {
             MathHelper.floor_float(entity.width + 1.0F),
             MathHelper.floor_float(entity.height + 1.0F),
             MathHelper.floor_float(entity.width + 1.0F));
+    }
+
+    public static boolean isClimbable(IBlockAccess world, int x, int y, int z, EntityLivingBase entity) {
+        return world.getBlock(x, y, z)
+            .isLadder(world, x, y, z, entity);
     }
 
     public PathEntity createPath(double x, double y, double z, float range) {
@@ -162,6 +177,8 @@ public class CitizenPathFinder {
         found = collect(found, safePoint(from.x - 1, from.y, from.z, jump), start, range);
         found = collect(found, safePoint(from.x + 1, from.y, from.z, jump), start, range);
         found = collect(found, safePoint(from.x, from.y, from.z - 1, jump), start, range);
+        found = collect(found, climbPoint(from, 1), start, range);
+        found = collect(found, climbPoint(from, -1), start, range);
         return found;
     }
 
@@ -171,6 +188,17 @@ public class CitizenPathFinder {
         }
         options[found] = node;
         return found + 1;
+    }
+
+    private Node climbPoint(Node from, int step) {
+        int y = from.y + step;
+        if (step > 0 && !isClimbable(from.x, from.y, from.z)) {
+            return null;
+        }
+        if (!isClimbable(from.x, y, from.z)) {
+            return null;
+        }
+        return offset(from.x, y, from.z) == CLEAR ? node(from.x, y, from.z) : null;
     }
 
     private Node safePoint(int x, int y, int z, int jump) {
@@ -189,8 +217,11 @@ public class CitizenPathFinder {
         }
 
         int drops = 0;
-        int below = 0;
+        int below = BLOCKED;
         while (y > 0) {
+            if (isClimbable(x, y - 1, z)) {
+                break;
+            }
             below = offset(x, y - 1, z);
             if (avoidsWater && below == AVOIDED_WATER) {
                 return null;
@@ -209,13 +240,21 @@ public class CitizenPathFinder {
         return below == DEADLY ? null : found;
     }
 
+    private boolean isClimbable(int x, int y, int z) {
+        return isClimbable(entity.worldObj, x, y, z, entity);
+    }
+
     private int offset(int x, int y, int z) {
         World world = entity.worldObj;
+        boolean soft = false;
         for (int bx = x; bx < x + size.xCoord; bx++) {
             for (int by = y; by < y + size.yCoord; by++) {
                 for (int bz = z; bz < z + size.zCoord; bz++) {
-                    if (Hazards.isDeadly(world, bx, by, bz)) {
-                        return DEADLY;
+                    int code = classify(world, bx, by, bz);
+                    if (code == OPEN_WATER) {
+                        soft = true;
+                    } else if (code != CLEAR) {
+                        return code;
                     }
                 }
             }
@@ -223,7 +262,41 @@ public class CitizenPathFinder {
         if (keepAway && Hazards.isBesideDeadly(world, x, y, z)) {
             return DEADLY;
         }
-        return PathFinder.func_82565_a(entity, x, y, z, size, avoidsWater, breakDoors, enterDoors);
+        return soft ? OPEN_WATER : CLEAR;
+    }
+
+    private int classify(World world, int x, int y, int z) {
+        Block block = world.getBlock(x, y, z);
+        if (block.getMaterial() == Material.air) {
+            return CLEAR;
+        }
+        if (Hazards.isDeadly(world, x, y, z)) {
+            return DEADLY;
+        }
+
+        boolean soft = false;
+        if (block == Blocks.trapdoor) {
+            soft = true;
+        } else if (block == Blocks.flowing_water || block == Blocks.water) {
+            if (avoidsWater) {
+                return AVOIDED_WATER;
+            }
+            soft = true;
+        } else if (!enterDoors && block == Blocks.wooden_door) {
+            return BLOCKED;
+        }
+
+        if (!block.getBlocksMovement(world, x, y, z) && (!breakDoors || block != Blocks.wooden_door)) {
+            int render = block.getRenderType();
+            if (render == RENDER_FENCE || render == RENDER_WALL || block == Blocks.fence_gate) {
+                return FENCE;
+            }
+            if (block == Blocks.trapdoor) {
+                return TRAPDOOR;
+            }
+            return BLOCKED;
+        }
+        return soft ? OPEN_WATER : CLEAR;
     }
 
     private Node node(int x, int y, int z) {
