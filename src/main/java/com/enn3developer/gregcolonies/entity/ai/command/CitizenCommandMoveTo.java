@@ -14,8 +14,6 @@ public class CitizenCommandMoveTo extends CitizenCommand {
 
     private static final int MAX_PATH_FAILURES = 20;
 
-    private static final double HOP_DISTANCE = 12.0D;
-
     private static final double ARRIVED_DISTANCE_SQ = 4.0D;
 
     private static final double PROGRESS_EPSILON = 1.0D;
@@ -86,19 +84,7 @@ public class CitizenCommandMoveTo extends CitizenCommand {
     }
 
     private boolean pathTowards(EntityCitizen citizen) {
-        double dx = x + 0.5D - citizen.posX;
-        double dy = y - citizen.posY;
-        double dz = z + 0.5D - citizen.posZ;
-        double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-        if (distance <= HOP_DISTANCE) {
-            return citizen.getNavigator()
-                .tryMoveToXYZ(x + 0.5D, y, z + 0.5D, speed);
-        }
-
-        double scale = HOP_DISTANCE / distance;
-        return citizen.getNavigator()
-            .tryMoveToXYZ(citizen.posX + dx * scale, citizen.posY + dy * scale, citizen.posZ + dz * scale, speed);
+        return citizen.travelTo(x + 0.5D, y, z + 0.5D, speed);
     }
 
     @Override

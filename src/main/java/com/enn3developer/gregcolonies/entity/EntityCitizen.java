@@ -56,6 +56,7 @@ import com.enn3developer.gregcolonies.compat.TinkersTools;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandQueue;
 import com.enn3developer.gregcolonies.entity.ai.CitizenNavigate;
+import com.enn3developer.gregcolonies.entity.ai.CitizenTravel;
 import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenCommands;
 import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenDanger;
 import com.enn3developer.gregcolonies.entity.ai.EntityAICitizenFlee;
@@ -174,6 +175,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     private final CitizenDiet diet = new CitizenDiet();
     private final EntityAICitizenIdle idle = new EntityAICitizenIdle(this);
     private final EntityAICitizenLiving living = new EntityAICitizenLiving(this);
+    private final CitizenTravel travel = new CitizenTravel(this);
     private final Set<EntityPlayer> viewers = new HashSet<>();
     private int colonyId;
     private String group = "";
@@ -243,6 +245,10 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     public CitizenDiet getDiet() {
         return diet;
+    }
+
+    public boolean travelTo(double x, double y, double z, double speed) {
+        return travel.moveTo(x, y, z, speed);
     }
 
     public boolean wantsWater() {
@@ -372,6 +378,9 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
             ensureName();
             updateRoster();
             syncEquipment();
+            if (!isMovementBlocked()) {
+                travel.update();
+            }
             diet.update(this);
         }
     }

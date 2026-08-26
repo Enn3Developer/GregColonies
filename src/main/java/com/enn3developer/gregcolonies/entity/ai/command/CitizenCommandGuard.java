@@ -20,8 +20,6 @@ public class CitizenCommandGuard extends CitizenCommand {
 
     private static final double CHASE_SPEED = 1.3D;
 
-    private static final double HOP_DISTANCE = 12.0D;
-
     private static final double ARRIVED_DISTANCE_SQ = 4.0D;
 
     private static final double SEARCH_RANGE = 24.0D;
@@ -197,23 +195,7 @@ public class CitizenCommandGuard extends CitizenCommand {
     }
 
     private boolean pathTowards(EntityCitizen citizen) {
-        double dx = patrolX + 0.5D - citizen.posX;
-        double dy = patrolY - citizen.posY;
-        double dz = patrolZ + 0.5D - citizen.posZ;
-        double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-        if (distance <= HOP_DISTANCE) {
-            return citizen.getNavigator()
-                .tryMoveToXYZ(patrolX + 0.5D, patrolY, patrolZ + 0.5D, PATROL_SPEED);
-        }
-
-        double scale = HOP_DISTANCE / distance;
-        return citizen.getNavigator()
-            .tryMoveToXYZ(
-                citizen.posX + dx * scale,
-                citizen.posY + dy * scale,
-                citizen.posZ + dz * scale,
-                PATROL_SPEED);
+        return citizen.travelTo(patrolX + 0.5D, patrolY, patrolZ + 0.5D, PATROL_SPEED);
     }
 
     @Override
