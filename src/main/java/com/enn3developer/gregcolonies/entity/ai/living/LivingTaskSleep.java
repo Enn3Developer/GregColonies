@@ -35,6 +35,10 @@ public class LivingTaskSleep extends AutoTask {
 
     private static final int RETRY_DELAY = 600;
 
+    private static final double BED_HEIGHT = 0.5625D;
+
+    private static final double BODY_INSET = 0.4D;
+
     private long nextAttempt;
 
     private int travelTicks;
@@ -44,6 +48,14 @@ public class LivingTaskSleep extends AutoTask {
     private int bedY;
 
     private int bedZ;
+
+    private double sleepX;
+
+    private double sleepY;
+
+    private double sleepZ;
+
+    private float sleepYaw;
 
     @Override
     public String getId() {
@@ -100,9 +112,12 @@ public class LivingTaskSleep extends AutoTask {
             return false;
         }
 
+        if (citizen.isAsleep()) {
+            keepInBed(citizen);
+            return true;
+        }
         if (citizen.getDistanceSq(bedX + 0.5D, bedY, bedZ + 0.5D) <= REACH_SQ) {
-            citizen.getNavigator()
-                .clearPathEntity();
+            lieDown(citizen, world);
             return true;
         }
 
@@ -119,8 +134,36 @@ public class LivingTaskSleep extends AutoTask {
 
     @Override
     public void finish(EntityCitizen citizen) {
+        citizen.setAsleep(false);
         citizen.getNavigator()
             .clearPathEntity();
+    }
+
+    private void lieDown(EntityCitizen citizen, World world) {
+        int[] offset = BlockBed.field_149981_a[world.getBlockMetadata(bedX, bedY, bedZ) & 3];
+        sleepX = bedX - offset[0] + 0.5D - offset[0] * BODY_INSET;
+        sleepY = bedY + BED_HEIGHT;
+        sleepZ = bedZ - offset[1] + 0.5D - offset[1] * BODY_INSET;
+        sleepYaw = (float) (Math.atan2(-offset[0], offset[1]) * 180.0D / Math.PI);
+
+        citizen.getNavigator()
+            .clearPathEntity();
+        citizen.setPositionAndRotation(sleepX, sleepY, sleepZ, sleepYaw, 0.0F);
+        citizen.setAsleep(true);
+        keepInBed(citizen);
+    }
+
+    private void keepInBed(EntityCitizen citizen) {
+        citizen.setPosition(sleepX, sleepY, sleepZ);
+        citizen.motionX = 0.0D;
+        citizen.motionY = 0.0D;
+        citizen.motionZ = 0.0D;
+        citizen.rotationYaw = sleepYaw;
+        citizen.renderYawOffset = sleepYaw;
+        citizen.rotationYawHead = sleepYaw;
+        citizen.prevRenderYawOffset = sleepYaw;
+        citizen.prevRotationYawHead = sleepYaw;
+        citizen.rotationPitch = 0.0F;
     }
 
     private boolean claimBed(EntityCitizen citizen, Colony colony, int dimension) {

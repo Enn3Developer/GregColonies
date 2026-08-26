@@ -1,11 +1,11 @@
 package com.enn3developer.gregcolonies;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.entity.RenderVillager;
 import net.minecraftforge.common.MinecraftForge;
 
 import com.enn3developer.gregcolonies.client.GCClientEvents;
 import com.enn3developer.gregcolonies.client.GCKeyBindings;
+import com.enn3developer.gregcolonies.client.RenderCitizen;
 import com.enn3developer.gregcolonies.client.gui.ColonyScreen;
 import com.enn3developer.gregcolonies.client.gui.ColonyWorldOverlay;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
@@ -21,7 +21,7 @@ public class ClientProxy extends CommonProxy {
     @Override
     public void preInit(FMLPreInitializationEvent event) {
         super.preInit(event);
-        RenderingRegistry.registerEntityRenderingHandler(EntityCitizen.class, new RenderVillager());
+        RenderingRegistry.registerEntityRenderingHandler(EntityCitizen.class, new RenderCitizen());
         GCKeyBindings.register();
     }
 

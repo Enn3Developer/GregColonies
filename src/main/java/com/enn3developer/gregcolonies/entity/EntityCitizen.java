@@ -72,6 +72,8 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     private static final int ROSTER_REFRESH_TICKS = 100;
 
+    private static final int SLEEPING_WATCHER = 17;
+
     private static final double LEAP_LIFT = 0.4D;
 
     private static final double LEAP_PUSH = 0.4D;
@@ -126,6 +128,12 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         for (int i = 0; i < equipmentDropChances.length; i++) {
             equipmentDropChances[i] = 0.0F;
         }
+    }
+
+    @Override
+    protected void entityInit() {
+        super.entityInit();
+        dataWatcher.addObject(SLEEPING_WATCHER, Byte.valueOf((byte) 0));
     }
 
     @Override
@@ -217,6 +225,26 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     public boolean isViewed() {
         return !viewers.isEmpty();
+    }
+
+    public boolean isAsleep() {
+        return dataWatcher.getWatchableObjectByte(SLEEPING_WATCHER) != 0;
+    }
+
+    public void setAsleep(boolean asleep) {
+        dataWatcher.updateObject(SLEEPING_WATCHER, Byte.valueOf((byte) (asleep ? 1 : 0)));
+    }
+
+    @Override
+    public boolean canBePushed() {
+        return !isAsleep() && super.canBePushed();
+    }
+
+    @Override
+    public void applyEntityCollision(Entity entity) {
+        if (!isAsleep()) {
+            super.applyEntityCollision(entity);
+        }
     }
 
     @Override
