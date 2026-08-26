@@ -1,5 +1,10 @@
 package com.enn3developer.gregcolonies;
 
+import java.util.function.BooleanSupplier;
+
+import net.minecraft.item.Item;
+
+import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.enn3developer.gregcolonies.block.GCBlocks;
 import com.enn3developer.gregcolonies.command.ColonyCommand;
 import com.enn3developer.gregcolonies.entity.GCEntities;
@@ -27,6 +32,14 @@ public class CommonProxy {
     }
 
     public void openColonyScreen(ColonySnapshot colony) {}
+
+    public IDrawable armorSlotIcon(int armorType, BooleanSupplier visible) {
+        return IDrawable.EMPTY;
+    }
+
+    public IDrawable itemSlotIcon(Item item, BooleanSupplier visible) {
+        return IDrawable.EMPTY;
+    }
 
     // load "Do your mod setup. Build whatever data structures you care about. Register recipes." (Remove if not needed)
     public void init(FMLInitializationEvent event) {}

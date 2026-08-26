@@ -708,6 +708,6 @@ public class ColonyView {
     }
 
     private String keyHint() {
-        return "R recenter   ctrl+A all   G guard   C cancel";
+        return "R recenter   ctrl+A all   G guard   C cancel   I inventory";
     }
 }

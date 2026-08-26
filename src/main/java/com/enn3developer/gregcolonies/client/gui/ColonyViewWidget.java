@@ -599,6 +599,10 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             camera.reset(view.getColony());
             return Result.SUCCESS;
         }
+        if (keyCode == Keyboard.KEY_I) {
+            view.openCitizen(view.getSingleSelected());
+            return Result.SUCCESS;
+        }
         if (keyCode == Keyboard.KEY_H) {
             view.toggleHelp();
             return Result.SUCCESS;

@@ -1,11 +1,16 @@
 package com.enn3developer.gregcolonies;
 
+import java.util.function.BooleanSupplier;
+
 import net.minecraft.client.Minecraft;
+import net.minecraft.item.Item;
 import net.minecraftforge.common.MinecraftForge;
 
+import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.enn3developer.gregcolonies.client.GCClientEvents;
 import com.enn3developer.gregcolonies.client.GCKeyBindings;
 import com.enn3developer.gregcolonies.client.RenderCitizen;
+import com.enn3developer.gregcolonies.client.gui.CitizenIcons;
 import com.enn3developer.gregcolonies.client.gui.ColonyScreen;
 import com.enn3developer.gregcolonies.client.gui.ColonyWorldOverlay;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
@@ -34,6 +39,16 @@ public class ClientProxy extends CommonProxy {
             .register(events);
         MinecraftForge.EVENT_BUS.register(events);
         MinecraftForge.EVENT_BUS.register(new ColonyWorldOverlay());
+    }
+
+    @Override
+    public IDrawable armorSlotIcon(int armorType, BooleanSupplier visible) {
+        return CitizenIcons.armor(armorType, visible);
+    }
+
+    @Override
+    public IDrawable itemSlotIcon(Item item, BooleanSupplier visible) {
+        return CitizenIcons.item(item, visible);
     }
 
     @Override
