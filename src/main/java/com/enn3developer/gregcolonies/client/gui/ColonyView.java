@@ -22,6 +22,7 @@ import com.enn3developer.gregcolonies.network.ColonySnapshot;
 import com.enn3developer.gregcolonies.network.GCNetwork;
 import com.enn3developer.gregcolonies.network.PacketCitizenCommand;
 import com.enn3developer.gregcolonies.network.PacketCitizenGroup;
+import com.enn3developer.gregcolonies.network.PacketColonyDropOff;
 
 public class ColonyView {
 
@@ -32,6 +33,8 @@ public class ColonyView {
     public static final int TARGET_CHOP = 1;
 
     public static final int TARGET_MINE = 2;
+
+    public static final int TARGET_DROP_OFF = 3;
 
     private static final int MAX_GROUP_ROWS = 10;
 
@@ -194,6 +197,11 @@ public class ColonyView {
             .sendToServer(new PacketCitizenCommand(colony.getId(), action, append, x1, y1, z1, x2, y2, z2, selection));
     }
 
+    public void sendDropOff(int x, int y, int z) {
+        boolean clear = colony.isDropOffAt(x, y, z);
+        GCNetwork.CHANNEL.sendToServer(new PacketColonyDropOff(colony.getId(), x, y, z, clear));
+    }
+
     public void sendGroup(String group) {
         if (selection.isEmpty()) {
             return;
@@ -304,6 +312,17 @@ public class ColonyView {
                     .child(modeButton("Chop", 66, TARGET_CHOP))
                     .child(modeButton("Mine", 66, TARGET_MINE)))
             .child(
+                Flow.row()
+                    .widthRel(1.0F)
+                    .height(BUTTON_HEIGHT)
+                    .childPadding(3)
+                    .child(modeButton("Drop-off", 136, TARGET_DROP_OFF)))
+            .child(
+                IKey.dynamic(this::dropOffLabel)
+                    .asWidget()
+                    .color(TEXT_COLOR)
+                    .shadow(true))
+            .child(
                 IKey.dynamic(this::targetingLabel)
                     .asWidget()
                     .color(HINT_COLOR)
@@ -332,7 +351,17 @@ public class ColonyView {
         if (targeting == TARGET_MINE) {
             return "click a chunk, RMB cancels";
         }
+        if (targeting == TARGET_DROP_OFF) {
+            return "click a chest, click it again to clear";
+        }
         return "";
+    }
+
+    private String dropOffLabel() {
+        if (!colony.hasDropOff()) {
+            return "drop-off none";
+        }
+        return "drop-off " + colony.getDropOffX() + "/" + colony.getDropOffY() + "/" + colony.getDropOffZ();
     }
 
     private TextFieldWidget groupField() {

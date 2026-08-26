@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import net.minecraft.block.Block;
+import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.MathHelper;
@@ -15,6 +16,7 @@ import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandResult;
 import com.enn3developer.gregcolonies.entity.ai.work.BlockBreaker;
 import com.enn3developer.gregcolonies.entity.ai.work.DigResult;
+import com.enn3developer.gregcolonies.entity.ai.work.Inventories;
 import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
 
 public abstract class CitizenCommandHarvest extends CitizenCommand {
@@ -38,6 +40,8 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
     private static final int MAX_SKIPS = 24;
 
     private static final double HOME_REACH_SQ = 9.0D;
+
+    private static final double DROP_OFF_REACH_SQ = 16.0D;
 
     private static final int HOME_TIMEOUT = 6000;
 
@@ -74,6 +78,8 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
     private boolean hasTarget;
 
     private boolean hadTool;
+
+    private boolean resumeAfterDropOff;
 
     private int targetX;
 
@@ -151,6 +157,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
         homeTicks = 0;
         pillarCooldown = 0;
         hadTool = false;
+        resumeAfterDropOff = false;
         skipped.clear();
         breaker.clear(citizen);
         resetWork();
@@ -368,6 +375,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
                     return CitizenCommandResult.RUNNING;
                 }
                 reason = "inventory full";
+                resumeAfterDropOff = true;
                 return startReturn(citizen);
             case TOOL_BROKEN:
                 if (phase == PHASE_RETURN) {
@@ -431,11 +439,19 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
         if (colony == null) {
             return CitizenCommandResult.DONE;
         }
-        anchorX = colony.getX();
-        anchorY = colony.getY() + 1;
-        anchorZ = colony.getZ();
-        if (citizen.getDistanceSq(anchorX + 0.5D, anchorY, anchorZ + 0.5D) <= HOME_REACH_SQ) {
-            return CitizenCommandResult.DONE;
+        boolean dropOff = colony.hasDropOff() && colony.getDimension() == citizen.worldObj.provider.dimensionId;
+        if (dropOff) {
+            anchorX = colony.getDropOffX();
+            anchorY = colony.getDropOffY();
+            anchorZ = colony.getDropOffZ();
+        } else {
+            anchorX = colony.getX();
+            anchorY = colony.getY() + 1;
+            anchorZ = colony.getZ();
+        }
+        if (citizen.getDistanceSq(anchorX + 0.5D, anchorY, anchorZ + 0.5D)
+            <= (dropOff ? DROP_OFF_REACH_SQ : HOME_REACH_SQ)) {
+            return arrive(citizen, dropOff);
         }
         if (++homeTicks > HOME_TIMEOUT) {
             return CitizenCommandResult.DONE;
@@ -453,10 +469,48 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
             leg.finish(citizen);
             leg = null;
             if (result == CitizenCommandResult.DONE) {
-                return CitizenCommandResult.DONE;
+                return arrive(citizen, dropOff);
             }
         }
         return move(citizen, true);
+    }
+
+    private CitizenCommandResult arrive(EntityCitizen citizen, boolean dropOff) {
+        if (leg != null) {
+            leg.finish(citizen);
+            leg = null;
+        }
+        citizen.getNavigator()
+            .clearPathEntity();
+        return dropOff ? deposit(citizen) : CitizenCommandResult.DONE;
+    }
+
+    private CitizenCommandResult deposit(EntityCitizen citizen) {
+        citizen.getLookHelper()
+            .setLookPosition(anchorX + 0.5D, anchorY + 0.5D, anchorZ + 0.5D, LOOK_SPEED, LOOK_SPEED);
+        IInventory target = Inventories.at(citizen.worldObj, anchorX, anchorY, anchorZ);
+        if (target == null) {
+            reason = "drop-off gone";
+            return CitizenCommandResult.DONE;
+        }
+        int moved = citizen.getInventory()
+            .deposit(target);
+        if (moved > 0) {
+            citizen.swingItem();
+        }
+        if (!resumeAfterDropOff) {
+            return CitizenCommandResult.DONE;
+        }
+        resumeAfterDropOff = false;
+        if (moved <= 0 || !citizen.getInventory()
+            .hasFreeMainSlot()) {
+            reason = "drop-off full";
+            return CitizenCommandResult.DONE;
+        }
+        reason = "";
+        homeTicks = 0;
+        phase = PHASE_TRAVEL;
+        return CitizenCommandResult.RUNNING;
     }
 
     @Override
@@ -481,6 +535,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
         phase = tag.getInteger("phase");
         harvested = tag.getInteger("harvested");
         reason = tag.getString("reason");
+        resumeAfterDropOff = tag.getBoolean("resume");
     }
 
     @Override
@@ -494,6 +549,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
         tag.setInteger("phase", phase);
         tag.setInteger("harvested", harvested);
         tag.setString("reason", reason);
+        tag.setBoolean("resume", resumeAfterDropOff);
     }
 
     @Override

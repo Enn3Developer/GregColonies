@@ -27,6 +27,10 @@ public class Colony {
     private int x;
     private int y;
     private int z;
+    private boolean hasDropOff;
+    private int dropOffX;
+    private int dropOffY;
+    private int dropOffZ;
     private final Deque<CitizenCommand> orders = new ArrayDeque<>();
     private final Map<UUID, ColonyCitizen> citizens = new LinkedHashMap<>();
 
@@ -77,6 +81,40 @@ public class Colony {
 
     public int getZ() {
         return z;
+    }
+
+    public boolean hasDropOff() {
+        return hasDropOff;
+    }
+
+    public int getDropOffX() {
+        return dropOffX;
+    }
+
+    public int getDropOffY() {
+        return dropOffY;
+    }
+
+    public int getDropOffZ() {
+        return dropOffZ;
+    }
+
+    public boolean isDropOffAt(int x, int y, int z) {
+        return hasDropOff && dropOffX == x && dropOffY == y && dropOffZ == z;
+    }
+
+    public void setDropOff(int x, int y, int z) {
+        hasDropOff = true;
+        dropOffX = x;
+        dropOffY = y;
+        dropOffZ = z;
+    }
+
+    public void clearDropOff() {
+        hasDropOff = false;
+        dropOffX = 0;
+        dropOffY = 0;
+        dropOffZ = 0;
     }
 
     public ColonyCitizen registerCitizen(EntityCitizen citizen) {
@@ -200,6 +238,12 @@ public class Colony {
         tag.setInteger("x", x);
         tag.setInteger("y", y);
         tag.setInteger("z", z);
+        tag.setBoolean("hasDropOff", hasDropOff);
+        if (hasDropOff) {
+            tag.setInteger("dropOffX", dropOffX);
+            tag.setInteger("dropOffY", dropOffY);
+            tag.setInteger("dropOffZ", dropOffZ);
+        }
 
         NBTTagList orderList = new NBTTagList();
         for (CitizenCommand order : orders) {
@@ -225,6 +269,12 @@ public class Colony {
         colony.x = tag.getInteger("x");
         colony.y = tag.getInteger("y");
         colony.z = tag.getInteger("z");
+        colony.hasDropOff = tag.getBoolean("hasDropOff");
+        if (colony.hasDropOff) {
+            colony.dropOffX = tag.getInteger("dropOffX");
+            colony.dropOffY = tag.getInteger("dropOffY");
+            colony.dropOffZ = tag.getInteger("dropOffZ");
+        }
 
         NBTTagList orderList = tag.getTagList("orders", 10);
         for (int i = 0; i < orderList.tagCount(); i++) {

@@ -51,6 +51,10 @@ public class ColonyWorldOverlay {
 
     private static final int MINE_COLOR = 0xB0FFB040;
 
+    private static final int DROP_OFF_COLOR = 0xB0FF7CE0;
+
+    private static final int DROP_OFF_MARK_COLOR = 0x70FF7CE0;
+
     private static final double AREA_HEIGHT = 4.0D;
 
     private static final double AREA_EDGE = 0.3D;
@@ -165,16 +169,20 @@ public class ColonyWorldOverlay {
             }
         }
 
+        if (colony.hasDropOff()) {
+            drawArea(
+                colony.getDropOffX(),
+                colony.getDropOffY(),
+                colony.getDropOffZ(),
+                colony.getDropOffX() + 1,
+                colony.getDropOffZ() + 1,
+                DROP_OFF_MARK_COLOR);
+        }
+
         ColonyView view = screen.getView();
         if (view.hasPending()) {
             int[] area = view.getPending();
-            drawArea(
-                area[0],
-                area[1],
-                area[2],
-                area[3] + 1,
-                area[5] + 1,
-                view.getTargeting() == ColonyView.TARGET_MINE ? MINE_COLOR : CHOP_COLOR);
+            drawArea(area[0], area[1], area[2], area[3] + 1, area[5] + 1, targetColor(view.getTargeting()));
         }
 
         GL11.glEnable(GL11.GL_CULL_FACE);
@@ -185,6 +193,13 @@ public class ColonyWorldOverlay {
         GL11.glEnable(GL11.GL_TEXTURE_2D);
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         GL11.glPopMatrix();
+    }
+
+    private static int targetColor(int targeting) {
+        if (targeting == ColonyView.TARGET_MINE) {
+            return MINE_COLOR;
+        }
+        return targeting == ColonyView.TARGET_DROP_OFF ? DROP_OFF_COLOR : CHOP_COLOR;
     }
 
     public static Entity liveEntity(CitizenSnapshot citizen) {

@@ -181,10 +181,18 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             pickChunk();
             return;
         }
+        if (mode == ColonyView.TARGET_DROP_OFF) {
+            pickBlock();
+            return;
+        }
         if (areaDragging) {
             updateDragArea(false);
             return;
         }
+        pickBlock();
+    }
+
+    private void pickBlock() {
         MovingObjectPosition hit = ColonyWorldOverlay.pick(getContext().getMouseX(), getContext().getMouseY());
         if (hit == null || hit.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK) {
             view.clearPending();
@@ -247,6 +255,11 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             return;
         }
         int[] area = view.getPending();
+        if (view.getTargeting() == ColonyView.TARGET_DROP_OFF) {
+            view.sendDropOff(area[0], area[1], area[2]);
+            view.setTargeting(ColonyView.TARGET_NONE);
+            return;
+        }
         byte action = view.getTargeting() == ColonyView.TARGET_MINE ? PacketCitizenCommand.MINE
             : PacketCitizenCommand.CHOP;
         view.sendArea(action, Interactable.hasShiftDown(), area[0], area[1], area[2], area[3], area[4], area[5]);
@@ -416,8 +429,11 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
     @Override
     public boolean onMouseRelease(int mouseButton) {
         if (mouseButton == 0 && areaDragging) {
-            if (view.getTargeting() == ColonyView.TARGET_MINE) {
+            int mode = view.getTargeting();
+            if (mode == ColonyView.TARGET_MINE) {
                 pickChunk();
+            } else if (mode == ColonyView.TARGET_DROP_OFF) {
+                pickBlock();
             } else {
                 updateDragArea(true);
             }

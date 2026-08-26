@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Set;
 
 import net.minecraft.entity.Entity;
+import net.minecraft.inventory.IInventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemArmor;
 import net.minecraft.item.ItemFood;
@@ -17,6 +18,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import com.cleanroommc.modularui.utils.item.ItemStackHandler;
 import com.enn3developer.gregcolonies.compat.Mods;
 import com.enn3developer.gregcolonies.compat.TinkersTools;
+import com.enn3developer.gregcolonies.entity.ai.work.Inventories;
 import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
 
 public class CitizenInventory {
@@ -147,6 +149,38 @@ public class CitizenInventory {
             }
         }
         return null;
+    }
+
+    public boolean hasFreeMainSlot() {
+        for (int i = 0; i < MAIN_SLOTS; i++) {
+            if (main.getStackInSlot(i) == null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public int deposit(IInventory target) {
+        int moved = 0;
+        for (int i = 0; i < MAIN_SLOTS; i++) {
+            ItemStack stack = main.getStackInSlot(i);
+            if (stack == null) {
+                continue;
+            }
+            int before = stack.stackSize;
+            ItemStack rest = Inventories.insert(target, stack);
+            if (rest == null) {
+                main.setStackInSlot(i, null);
+                moved += before;
+            } else {
+                main.setStackInSlot(i, rest);
+                moved += before - rest.stackSize;
+            }
+        }
+        if (moved > 0) {
+            target.markDirty();
+        }
+        return moved;
     }
 
     public ItemStack store(ItemStack stack) {

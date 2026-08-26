@@ -36,6 +36,7 @@ public final class GCNetwork {
         CHANNEL.registerMessage(PacketColonyData.Handler.class, PacketColonyData.class, 1, Side.CLIENT);
         CHANNEL.registerMessage(PacketCitizenCommand.Handler.class, PacketCitizenCommand.class, 2, Side.SERVER);
         CHANNEL.registerMessage(PacketCitizenGroup.Handler.class, PacketCitizenGroup.class, 3, Side.SERVER);
+        CHANNEL.registerMessage(PacketColonyDropOff.Handler.class, PacketColonyDropOff.class, 4, Side.SERVER);
         FMLCommonHandler.instance()
             .bus()
             .register(new GCNetwork());
