@@ -155,6 +155,32 @@ public class Colony {
         pickUpZ = 0;
     }
 
+    public boolean isBedFree(UUID id, int x, int y, int z) {
+        for (ColonyCitizen citizen : citizens.values()) {
+            if (!citizen.getId()
+                .equals(id) && citizen.isBedAt(x, y, z)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public boolean claimBed(UUID id, int x, int y, int z) {
+        ColonyCitizen owner = citizens.get(id);
+        if (owner == null || !isBedFree(id, x, y, z)) {
+            return false;
+        }
+        owner.setBed(x, y, z);
+        return true;
+    }
+
+    public void releaseBed(UUID id) {
+        ColonyCitizen owner = citizens.get(id);
+        if (owner != null) {
+            owner.clearBed();
+        }
+    }
+
     public ColonyCitizen registerCitizen(EntityCitizen citizen) {
         ColonyCitizen entry = citizens.get(citizen.getUniqueID());
         if (entry == null) {

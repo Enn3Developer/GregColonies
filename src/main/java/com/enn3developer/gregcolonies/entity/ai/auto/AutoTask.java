@@ -1,9 +1,9 @@
-package com.enn3developer.gregcolonies.entity.ai.idle;
+package com.enn3developer.gregcolonies.entity.ai.auto;
 
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 
-public abstract class IdleTask {
+public abstract class AutoTask {
 
     private static final double HOP_DISTANCE = 12.0D;
 

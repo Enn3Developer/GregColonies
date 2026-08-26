@@ -170,6 +170,24 @@ public class ColonyManager extends WorldSavedData {
         return true;
     }
 
+    public boolean claimBed(int colonyId, UUID id, int x, int y, int z) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null || !colony.claimBed(id, x, y, z)) {
+            return false;
+        }
+        markDirty();
+        return true;
+    }
+
+    public void releaseBed(int colonyId, UUID id) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null) {
+            return;
+        }
+        colony.releaseBed(id);
+        markDirty();
+    }
+
     public boolean enqueueOrder(int colonyId, CitizenCommand command) {
         Colony colony = colonies.get(colonyId);
         if (colony == null) {

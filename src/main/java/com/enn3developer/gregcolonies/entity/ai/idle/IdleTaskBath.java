@@ -6,8 +6,9 @@ import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
+import com.enn3developer.gregcolonies.entity.ai.auto.AutoTask;
 
-public class IdleTaskBath extends IdleTask {
+public class IdleTaskBath extends AutoTask {
 
     public static final String ID = "bath";
 

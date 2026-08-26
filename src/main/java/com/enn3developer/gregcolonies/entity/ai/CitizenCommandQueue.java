@@ -38,6 +38,14 @@ public class CitizenCommandQueue {
         return next == null || next.fearsEnemies();
     }
 
+    public boolean allowsSleep() {
+        if (current != null) {
+            return current.allowsSleep();
+        }
+        CitizenCommand next = pending.peekFirst();
+        return next == null || next.allowsSleep();
+    }
+
     public boolean hasWork() {
         return current != null || !pending.isEmpty();
     }

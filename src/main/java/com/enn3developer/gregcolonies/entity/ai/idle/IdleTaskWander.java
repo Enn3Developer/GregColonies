@@ -7,8 +7,9 @@ import net.minecraft.util.Vec3;
 import com.enn3developer.gregcolonies.Config;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
+import com.enn3developer.gregcolonies.entity.ai.auto.AutoTask;
 
-public class IdleTaskWander extends IdleTask {
+public class IdleTaskWander extends AutoTask {
 
     public static final String ID = "wander";
 

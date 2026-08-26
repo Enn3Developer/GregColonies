@@ -14,6 +14,10 @@ public class ColonyCitizen {
     private int x;
     private int y;
     private int z;
+    private boolean hasBed;
+    private int bedX;
+    private int bedY;
+    private int bedZ;
 
     private ColonyCitizen() {}
 
@@ -33,6 +37,40 @@ public class ColonyCitizen {
 
     public void setGroup(String group) {
         this.group = group == null ? "" : group;
+    }
+
+    public boolean hasBed() {
+        return hasBed;
+    }
+
+    public int getBedX() {
+        return bedX;
+    }
+
+    public int getBedY() {
+        return bedY;
+    }
+
+    public int getBedZ() {
+        return bedZ;
+    }
+
+    public boolean isBedAt(int x, int y, int z) {
+        return hasBed && bedX == x && bedY == y && bedZ == z;
+    }
+
+    public void setBed(int x, int y, int z) {
+        hasBed = true;
+        bedX = x;
+        bedY = y;
+        bedZ = z;
+    }
+
+    public void clearBed() {
+        hasBed = false;
+        bedX = 0;
+        bedY = 0;
+        bedZ = 0;
     }
 
     public int getDimension() {
@@ -76,6 +114,12 @@ public class ColonyCitizen {
         tag.setInteger("x", x);
         tag.setInteger("y", y);
         tag.setInteger("z", z);
+        tag.setBoolean("hasBed", hasBed);
+        if (hasBed) {
+            tag.setInteger("bedX", bedX);
+            tag.setInteger("bedY", bedY);
+            tag.setInteger("bedZ", bedZ);
+        }
         return tag;
     }
 
@@ -87,6 +131,12 @@ public class ColonyCitizen {
         citizen.x = tag.getInteger("x");
         citizen.y = tag.getInteger("y");
         citizen.z = tag.getInteger("z");
+        citizen.hasBed = tag.getBoolean("hasBed");
+        if (citizen.hasBed) {
+            citizen.bedX = tag.getInteger("bedX");
+            citizen.bedY = tag.getInteger("bedY");
+            citizen.bedZ = tag.getInteger("bedZ");
+        }
         return citizen;
     }
 }

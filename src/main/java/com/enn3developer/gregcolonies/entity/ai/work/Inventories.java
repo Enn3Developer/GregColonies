@@ -1,5 +1,7 @@
 package com.enn3developer.gregcolonies.entity.ai.work;
 
+import java.util.function.Predicate;
+
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockChest;
 import net.minecraft.inventory.IInventory;
@@ -27,6 +29,52 @@ public final class Inventories {
         }
         TileEntity tile = world.getTileEntity(x, y, z);
         return tile instanceof IInventory ? (IInventory) tile : null;
+    }
+
+    public static ItemStack extract(IInventory inventory, Predicate<ItemStack> filter, int amount) {
+        if (inventory == null || amount <= 0) {
+            return null;
+        }
+        if (inventory instanceof ISidedInventory) {
+            return extractSided((ISidedInventory) inventory, filter, amount);
+        }
+        int size = inventory.getSizeInventory();
+        for (int slot = 0; slot < size; slot++) {
+            ItemStack taken = extractFrom(inventory, slot, filter, amount);
+            if (taken != null) {
+                return taken;
+            }
+        }
+        return null;
+    }
+
+    private static ItemStack extractSided(ISidedInventory inventory, Predicate<ItemStack> filter, int amount) {
+        for (int side = 0; side < SIDES; side++) {
+            int[] slots = inventory.getAccessibleSlotsFromSide(side);
+            if (slots == null) {
+                continue;
+            }
+            for (int slot : slots) {
+                ItemStack stack = inventory.getStackInSlot(slot);
+                if (stack == null || !inventory.canExtractItem(slot, stack, side)) {
+                    continue;
+                }
+                ItemStack taken = extractFrom(inventory, slot, filter, amount);
+                if (taken != null) {
+                    return taken;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static ItemStack extractFrom(IInventory inventory, int slot, Predicate<ItemStack> filter, int amount) {
+        ItemStack stack = inventory.getStackInSlot(slot);
+        if (stack == null || stack.stackSize <= 0 || !filter.test(stack)) {
+            return null;
+        }
+        ItemStack taken = inventory.decrStackSize(slot, Math.min(amount, stack.stackSize));
+        return taken == null || taken.stackSize <= 0 ? null : taken;
     }
 
     public static ItemStack insert(IInventory inventory, ItemStack stack) {

@@ -63,6 +63,11 @@ public class CitizenCommandGuard extends CitizenCommand {
     }
 
     @Override
+    public boolean allowsSleep() {
+        return false;
+    }
+
+    @Override
     public boolean canBeTakenBy(EntityCitizen citizen) {
         return citizen.getColony() != null;
     }

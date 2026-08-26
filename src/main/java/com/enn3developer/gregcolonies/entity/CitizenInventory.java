@@ -151,6 +151,48 @@ public class CitizenInventory {
         return null;
     }
 
+    public int countFood() {
+        int count = 0;
+        for (int i = 0; i < FOOD_SLOTS; i++) {
+            ItemStack stack = food.getStackInSlot(i);
+            if (stack != null) {
+                count += stack.stackSize;
+            }
+        }
+        return count;
+    }
+
+    public int stockFood(IInventory source, int target) {
+        int moved = 0;
+        for (int pull = 0; pull < FOOD_SLOTS * 2; pull++) {
+            int missing = target - countFood();
+            if (missing <= 0) {
+                break;
+            }
+            ItemStack taken = Inventories.extract(source, CitizenInventory::isFood, missing);
+            if (taken == null) {
+                break;
+            }
+            int size = taken.stackSize;
+            ItemStack rest = taken;
+            for (int i = 0; i < FOOD_SLOTS && rest != null; i++) {
+                rest = food.insertItem(i, rest, false);
+            }
+            moved += size - (rest == null ? 0 : rest.stackSize);
+            if (rest != null) {
+                rest = Inventories.insert(source, rest);
+                if (rest != null) {
+                    owner.entityDropItem(rest, 0.0F);
+                }
+                break;
+            }
+        }
+        if (moved > 0) {
+            source.markDirty();
+        }
+        return moved;
+    }
+
     public boolean hasFreeMainSlot() {
         for (int i = 0; i < MAIN_SLOTS; i++) {
             if (main.getStackInSlot(i) == null) {
