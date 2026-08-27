@@ -23,8 +23,12 @@ public class EntityAICitizenFlee extends EntityAIBase {
 
     private static final int ESCAPE_HEIGHT = 7;
 
+    private static final int MAX_STUCK = 5;
+
     private final EntityCitizen citizen;
     private EntityLivingBase threat;
+
+    private int stuck;
 
     public EntityAICitizenFlee(EntityCitizen citizen) {
         this.citizen = citizen;
@@ -44,13 +48,13 @@ public class EntityAICitizenFlee extends EntityAIBase {
     public boolean continueExecuting() {
         return threat != null && threat.isEntityAlive()
             && citizen.isAfraid()
-            && citizen.getDistanceSqToEntity(threat) < SAFE_DISTANCE_SQ
-            && !citizen.getNavigator()
-                .noPath();
+            && stuck < MAX_STUCK
+            && citizen.getDistanceSqToEntity(threat) < SAFE_DISTANCE_SQ;
     }
 
     @Override
     public void startExecuting() {
+        stuck = 0;
         citizen.setSprinting(true);
     }
 
@@ -60,7 +64,7 @@ public class EntityAICitizenFlee extends EntityAIBase {
             .setLookPositionWithEntity(threat, 30.0F, 30.0F);
         if (citizen.getNavigator()
             .noPath()) {
-            flee();
+            stuck = flee() ? 0 : stuck + 1;
         }
     }
 
