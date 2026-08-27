@@ -89,6 +89,8 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     private static final double BASE_ATTACK_DAMAGE = 1.0D;
 
+    private static final double PLAYER_SPRINT_SPEED = 0.13D;
+
     private static final int ROSTER_REFRESH_TICKS = 100;
 
     private static final double VIEW_RANGE_SQ = PacketOpenCitizen.OPEN_RANGE * PacketOpenCitizen.OPEN_RANGE;
@@ -399,6 +401,11 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     public boolean isAfraid() {
         return commands.fearsEnemies();
+    }
+
+    public double panicSpeed() {
+        double movement = getEntityAttribute(SharedMonsterAttributes.movementSpeed).getAttributeValue();
+        return movement <= 0.0D ? 0.0D : Math.sqrt(PLAYER_SPRINT_SPEED) / movement;
     }
 
     public boolean canAccessInventory(EntityPlayer player) {

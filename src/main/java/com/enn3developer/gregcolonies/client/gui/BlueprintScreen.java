@@ -1,5 +1,7 @@
 package com.enn3developer.gregcolonies.client.gui;
 
+import net.minecraft.client.Minecraft;
+
 import com.cleanroommc.modularui.factory.ClientGUI;
 import com.cleanroommc.modularui.screen.ModularScreen;
 import com.enn3developer.gregcolonies.GregColonies;
@@ -31,13 +33,22 @@ public class BlueprintScreen extends ModularScreen {
 
     public static void open(ColonyView colonyView) {
         returning = false;
-        ClientGUI.open(new BlueprintScreen(new BlueprintView(colonyView)));
+        Minecraft.getMinecraft()
+            .func_152344_a(() -> ClientGUI.open(new BlueprintScreen(new BlueprintView(colonyView))));
     }
 
     public static void back() {
+        BlueprintScreen screen = getOpen();
         returning = true;
-        ClientGUI.close();
-        GCNetwork.CHANNEL.sendToServer(new PacketRequestColony());
+        ColonyScreen.restore(
+            screen == null ? null
+                : screen.view.getColonyView()
+                    .getSelection());
+        Minecraft.getMinecraft()
+            .func_152344_a(() -> {
+                ClientGUI.close();
+                GCNetwork.CHANNEL.sendToServer(new PacketRequestColony());
+            });
     }
 
     public static void accept(PacketBlueprintData data) {

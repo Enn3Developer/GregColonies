@@ -1,23 +1,15 @@
 package com.enn3developer.gregcolonies.entity.ai;
 
-import java.util.List;
-
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.ai.EntityAIBase;
 import net.minecraft.entity.ai.RandomPositionGenerator;
-import net.minecraft.entity.monster.IMob;
-import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.Vec3;
 
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 
 public class EntityAICitizenFlee extends EntityAIBase {
 
-    private static final double FEAR_RANGE = 12.0D;
-
     private static final double SAFE_DISTANCE_SQ = 18.0D * 18.0D;
-
-    private static final double FLEE_SPEED = 1.3D;
 
     private static final int ESCAPE_RANGE = 16;
 
@@ -56,6 +48,8 @@ public class EntityAICitizenFlee extends EntityAIBase {
     public void startExecuting() {
         stuck = 0;
         citizen.setSprinting(true);
+        citizen.getNavigator()
+            .setSpeed(citizen.panicSpeed());
     }
 
     @Override
@@ -86,29 +80,10 @@ public class EntityAICitizenFlee extends EntityAIBase {
             return false;
         }
         return citizen.getNavigator()
-            .tryMoveToXYZ(escape.xCoord, escape.yCoord, escape.zCoord, FLEE_SPEED);
+            .tryMoveToXYZ(escape.xCoord, escape.yCoord, escape.zCoord, citizen.panicSpeed());
     }
 
     private EntityLivingBase findThreat() {
-        AxisAlignedBB box = citizen.boundingBox.expand(FEAR_RANGE, FEAR_RANGE * 0.5D, FEAR_RANGE);
-        List<?> candidates = citizen.worldObj.getEntitiesWithinAABB(EntityLivingBase.class, box);
-
-        EntityLivingBase best = null;
-        double bestDistance = Double.MAX_VALUE;
-        for (Object candidate : candidates) {
-            if (!(candidate instanceof IMob)) {
-                continue;
-            }
-            EntityLivingBase mob = (EntityLivingBase) candidate;
-            if (!mob.isEntityAlive()) {
-                continue;
-            }
-            double distance = citizen.getDistanceSqToEntity(mob);
-            if (distance < bestDistance) {
-                bestDistance = distance;
-                best = mob;
-            }
-        }
-        return best;
+        return Hazards.findThreat(citizen, Hazards.FEAR_RANGE);
     }
 }

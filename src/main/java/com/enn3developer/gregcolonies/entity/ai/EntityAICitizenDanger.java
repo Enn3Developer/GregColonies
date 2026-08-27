@@ -6,8 +6,6 @@ import com.enn3developer.gregcolonies.entity.EntityCitizen;
 
 public class EntityAICitizenDanger extends EntityAIBase {
 
-    private static final double ESCAPE_SPEED = 1.3D;
-
     private static final int ESCAPE_RADIUS = 12;
 
     private static final int SEARCH_HEIGHT = 4;
@@ -101,10 +99,10 @@ public class EntityAICitizenDanger extends EntityAIBase {
 
     private void escape() {
         if (citizen.getNavigator()
-            .tryMoveToXYZ(x + 0.5D, y, z + 0.5D, ESCAPE_SPEED)) {
+            .tryMoveToXYZ(x + 0.5D, y, z + 0.5D, citizen.panicSpeed())) {
             return;
         }
         citizen.getMoveHelper()
-            .setMoveTo(x + 0.5D, y, z + 0.5D, ESCAPE_SPEED);
+            .setMoveTo(x + 0.5D, y, z + 0.5D, citizen.panicSpeed());
     }
 }

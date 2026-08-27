@@ -9,6 +9,7 @@ import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
+import com.enn3developer.gregcolonies.entity.ai.Hazards;
 import com.enn3developer.gregcolonies.entity.ai.auto.AutoTask;
 
 public class LivingTaskSleep extends AutoTask {
@@ -68,6 +69,9 @@ public class LivingTaskSleep extends AutoTask {
         if (!isNight(world) || world.getTotalWorldTime() < nextAttempt || !citizen.allowsSleep()) {
             return false;
         }
+        if (isThreatened(citizen)) {
+            return false;
+        }
         int dimension = world.provider.dimensionId;
         if (dimension != colony.getDimension()) {
             return false;
@@ -103,7 +107,7 @@ public class LivingTaskSleep extends AutoTask {
     @Override
     public boolean update(EntityCitizen citizen, Colony colony) {
         World world = citizen.worldObj;
-        if (!isNight(world)) {
+        if (!isNight(world) || isThreatened(citizen)) {
             return false;
         }
         if (!isBed(world, bedX, bedY, bedZ)) {
@@ -213,6 +217,10 @@ public class LivingTaskSleep extends AutoTask {
 
     private void delay(EntityCitizen citizen) {
         nextAttempt = citizen.worldObj.getTotalWorldTime() + RETRY_DELAY;
+    }
+
+    private static boolean isThreatened(EntityCitizen citizen) {
+        return citizen.isAfraid() && Hazards.findThreat(citizen, Hazards.FEAR_RANGE) != null;
     }
 
     private static boolean isNight(World world) {

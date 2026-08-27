@@ -1,12 +1,18 @@
 package com.enn3developer.gregcolonies.entity.ai;
 
+import java.util.List;
+
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.monster.IMob;
+import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 
 public final class Hazards {
+
+    public static final double FEAR_RANGE = 12.0D;
 
     private static final int MARGIN = 1;
 
@@ -76,6 +82,29 @@ public final class Hazards {
             MathHelper.floor_double(entity.posX),
             MathHelper.floor_double(entity.boundingBox.minY),
             MathHelper.floor_double(entity.posZ));
+    }
+
+    public static EntityLivingBase findThreat(EntityLivingBase entity, double range) {
+        AxisAlignedBB box = entity.boundingBox.expand(range, range * 0.5D, range);
+        List<?> candidates = entity.worldObj.getEntitiesWithinAABB(EntityLivingBase.class, box);
+
+        EntityLivingBase best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (Object candidate : candidates) {
+            if (!(candidate instanceof IMob)) {
+                continue;
+            }
+            EntityLivingBase mob = (EntityLivingBase) candidate;
+            if (!mob.isEntityAlive()) {
+                continue;
+            }
+            double distance = entity.getDistanceSqToEntity(mob);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = mob;
+            }
+        }
+        return best;
     }
 
     public static int[] findWater(EntityLivingBase entity, int radius, int height) {

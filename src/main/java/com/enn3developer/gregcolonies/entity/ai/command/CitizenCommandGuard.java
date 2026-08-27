@@ -18,8 +18,6 @@ public class CitizenCommandGuard extends CitizenCommand {
 
     private static final double PATROL_SPEED = 0.6D;
 
-    private static final double CHASE_SPEED = 1.3D;
-
     private static final double ARRIVED_DISTANCE_SQ = 4.0D;
 
     private static final double SEARCH_RANGE = 24.0D;
@@ -139,7 +137,7 @@ public class CitizenCommandGuard extends CitizenCommand {
             .noPath()) {
             repathTicks = REPATH_INTERVAL;
             citizen.getNavigator()
-                .tryMoveToEntityLiving(target, CHASE_SPEED);
+                .tryMoveToEntityLiving(target, citizen.panicSpeed());
         }
 
         if (leapCooldown <= 0 && citizen.onGround

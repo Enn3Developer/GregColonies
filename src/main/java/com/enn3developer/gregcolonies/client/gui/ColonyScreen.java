@@ -44,6 +44,10 @@ public class ColonyScreen extends ModularScreen {
         saved = screen == null ? null : new LinkedHashSet<>(screen.view.getSelection());
     }
 
+    public static void restore(Set<UUID> selection) {
+        saved = selection == null || selection.isEmpty() ? null : new LinkedHashSet<>(selection);
+    }
+
     public static void onGuiChanged(boolean opened) {
         if (armed) {
             armed = false;
