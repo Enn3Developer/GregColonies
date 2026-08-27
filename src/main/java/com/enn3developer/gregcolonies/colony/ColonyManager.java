@@ -170,6 +170,26 @@ public class ColonyManager extends WorldSavedData {
         return true;
     }
 
+    public boolean setMaterials(int colonyId, int x, int y, int z) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null) {
+            return false;
+        }
+        colony.setMaterials(x, y, z);
+        markDirty();
+        return true;
+    }
+
+    public boolean clearMaterials(int colonyId) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null || !colony.hasMaterials()) {
+            return false;
+        }
+        colony.clearMaterials();
+        markDirty();
+        return true;
+    }
+
     public boolean claimBed(int colonyId, UUID id, int x, int y, int z) {
         Colony colony = colonies.get(colonyId);
         if (colony == null || !colony.claimBed(id, x, y, z)) {

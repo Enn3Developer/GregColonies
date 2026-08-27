@@ -35,6 +35,10 @@ public class ColonySnapshot {
     private int pickUpX;
     private int pickUpY;
     private int pickUpZ;
+    private boolean hasMaterials;
+    private int materialsX;
+    private int materialsY;
+    private int materialsZ;
     private final List<CitizenSnapshot> citizens = new ArrayList<>();
 
     private ColonySnapshot() {}
@@ -58,6 +62,10 @@ public class ColonySnapshot {
         snapshot.pickUpX = colony.getPickUpX();
         snapshot.pickUpY = colony.getPickUpY();
         snapshot.pickUpZ = colony.getPickUpZ();
+        snapshot.hasMaterials = colony.hasMaterials();
+        snapshot.materialsX = colony.getMaterialsX();
+        snapshot.materialsY = colony.getMaterialsY();
+        snapshot.materialsZ = colony.getMaterialsZ();
 
         Map<UUID, EntityCitizen> loaded = new HashMap<>();
         for (Object object : world.loadedEntityList) {
@@ -151,6 +159,26 @@ public class ColonySnapshot {
         return hasPickUp && pickUpX == x && pickUpY == y && pickUpZ == z;
     }
 
+    public boolean hasMaterials() {
+        return hasMaterials;
+    }
+
+    public int getMaterialsX() {
+        return materialsX;
+    }
+
+    public int getMaterialsY() {
+        return materialsY;
+    }
+
+    public int getMaterialsZ() {
+        return materialsZ;
+    }
+
+    public boolean isMaterialsAt(int x, int y, int z) {
+        return hasMaterials && materialsX == x && materialsY == y && materialsZ == z;
+    }
+
     public List<CitizenSnapshot> getCitizens() {
         return citizens;
     }
@@ -173,6 +201,10 @@ public class ColonySnapshot {
         buf.writeInt(pickUpX);
         buf.writeInt(pickUpY);
         buf.writeInt(pickUpZ);
+        buf.writeBoolean(hasMaterials);
+        buf.writeInt(materialsX);
+        buf.writeInt(materialsY);
+        buf.writeInt(materialsZ);
         buf.writeInt(citizens.size());
         for (CitizenSnapshot citizen : citizens) {
             citizen.write(buf);
@@ -198,6 +230,10 @@ public class ColonySnapshot {
         snapshot.pickUpX = buf.readInt();
         snapshot.pickUpY = buf.readInt();
         snapshot.pickUpZ = buf.readInt();
+        snapshot.hasMaterials = buf.readBoolean();
+        snapshot.materialsX = buf.readInt();
+        snapshot.materialsY = buf.readInt();
+        snapshot.materialsZ = buf.readInt();
         int count = buf.readInt();
         for (int i = 0; i < count; i++) {
             snapshot.citizens.add(CitizenSnapshot.read(buf));

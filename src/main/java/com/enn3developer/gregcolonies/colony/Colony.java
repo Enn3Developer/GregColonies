@@ -35,6 +35,10 @@ public class Colony {
     private int pickUpX;
     private int pickUpY;
     private int pickUpZ;
+    private boolean hasMaterials;
+    private int materialsX;
+    private int materialsY;
+    private int materialsZ;
     private final Deque<CitizenCommand> orders = new ArrayDeque<>();
     private final Map<UUID, ColonyCitizen> citizens = new LinkedHashMap<>();
 
@@ -153,6 +157,40 @@ public class Colony {
         pickUpX = 0;
         pickUpY = 0;
         pickUpZ = 0;
+    }
+
+    public boolean hasMaterials() {
+        return hasMaterials;
+    }
+
+    public int getMaterialsX() {
+        return materialsX;
+    }
+
+    public int getMaterialsY() {
+        return materialsY;
+    }
+
+    public int getMaterialsZ() {
+        return materialsZ;
+    }
+
+    public boolean isMaterialsAt(int x, int y, int z) {
+        return hasMaterials && materialsX == x && materialsY == y && materialsZ == z;
+    }
+
+    public void setMaterials(int x, int y, int z) {
+        hasMaterials = true;
+        materialsX = x;
+        materialsY = y;
+        materialsZ = z;
+    }
+
+    public void clearMaterials() {
+        hasMaterials = false;
+        materialsX = 0;
+        materialsY = 0;
+        materialsZ = 0;
     }
 
     public boolean isBedFree(UUID id, int x, int y, int z) {
@@ -326,6 +364,12 @@ public class Colony {
             tag.setInteger("pickUpY", pickUpY);
             tag.setInteger("pickUpZ", pickUpZ);
         }
+        tag.setBoolean("hasMaterials", hasMaterials);
+        if (hasMaterials) {
+            tag.setInteger("materialsX", materialsX);
+            tag.setInteger("materialsY", materialsY);
+            tag.setInteger("materialsZ", materialsZ);
+        }
 
         NBTTagList orderList = new NBTTagList();
         for (CitizenCommand order : orders) {
@@ -362,6 +406,12 @@ public class Colony {
             colony.pickUpX = tag.getInteger("pickUpX");
             colony.pickUpY = tag.getInteger("pickUpY");
             colony.pickUpZ = tag.getInteger("pickUpZ");
+        }
+        colony.hasMaterials = tag.getBoolean("hasMaterials");
+        if (colony.hasMaterials) {
+            colony.materialsX = tag.getInteger("materialsX");
+            colony.materialsY = tag.getInteger("materialsY");
+            colony.materialsZ = tag.getInteger("materialsZ");
         }
 
         NBTTagList orderList = tag.getTagList("orders", 10);

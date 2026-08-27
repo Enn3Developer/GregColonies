@@ -61,6 +61,10 @@ public class ColonyWorldOverlay {
 
     private static final int PICK_UP_MARK_COLOR = 0x707CE0FF;
 
+    private static final int MATERIALS_COLOR = 0xB0FFC46B;
+
+    private static final int MATERIALS_MARK_COLOR = 0x70FFC46B;
+
     private static final double AREA_HEIGHT = 4.0D;
 
     private static final double AREA_EDGE = 0.3D;
@@ -205,6 +209,16 @@ public class ColonyWorldOverlay {
                 PICK_UP_MARK_COLOR);
         }
 
+        if (colony.hasMaterials()) {
+            drawArea(
+                colony.getMaterialsX(),
+                colony.getMaterialsY(),
+                colony.getMaterialsZ(),
+                colony.getMaterialsX() + 1,
+                colony.getMaterialsZ() + 1,
+                MATERIALS_MARK_COLOR);
+        }
+
         ColonyView view = screen.getView();
         if (view.hasPending()) {
             int[] area = view.getPending();
@@ -230,6 +244,9 @@ public class ColonyWorldOverlay {
         }
         if (targeting == ColonyView.TARGET_DROP_OFF) {
             return DROP_OFF_COLOR;
+        }
+        if (targeting == ColonyView.TARGET_MATERIALS) {
+            return MATERIALS_COLOR;
         }
         return targeting == ColonyView.TARGET_PICK_UP ? PICK_UP_COLOR : CHOP_COLOR;
     }

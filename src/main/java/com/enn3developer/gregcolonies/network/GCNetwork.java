@@ -39,6 +39,7 @@ public final class GCNetwork {
         CHANNEL.registerMessage(PacketColonyDropOff.Handler.class, PacketColonyDropOff.class, 4, Side.SERVER);
         CHANNEL.registerMessage(PacketColonyPickUp.Handler.class, PacketColonyPickUp.class, 5, Side.SERVER);
         CHANNEL.registerMessage(PacketOpenCitizen.Handler.class, PacketOpenCitizen.class, 6, Side.SERVER);
+        CHANNEL.registerMessage(PacketColonyMaterials.Handler.class, PacketColonyMaterials.class, 7, Side.SERVER);
         FMLCommonHandler.instance()
             .bus()
             .register(new GCNetwork());

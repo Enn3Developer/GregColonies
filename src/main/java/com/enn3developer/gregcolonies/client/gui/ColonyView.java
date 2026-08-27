@@ -39,6 +39,7 @@ import com.enn3developer.gregcolonies.network.GCNetwork;
 import com.enn3developer.gregcolonies.network.PacketCitizenCommand;
 import com.enn3developer.gregcolonies.network.PacketCitizenGroup;
 import com.enn3developer.gregcolonies.network.PacketColonyDropOff;
+import com.enn3developer.gregcolonies.network.PacketColonyMaterials;
 import com.enn3developer.gregcolonies.network.PacketColonyPickUp;
 import com.enn3developer.gregcolonies.network.PacketOpenCitizen;
 
@@ -57,6 +58,8 @@ public class ColonyView {
     public static final int TARGET_DROP_OFF = 4;
 
     public static final int TARGET_PICK_UP = 5;
+
+    public static final int TARGET_MATERIALS = 6;
 
     private static final int MAX_GROUP_ROWS = 32;
 
@@ -131,6 +134,8 @@ public class ColonyView {
     private static final int DROP_OFF_COLOR = 0xFFFF7CE0;
 
     private static final int PICK_UP_COLOR = 0xFF7CE0FF;
+
+    private static final int MATERIALS_COLOR = 0xFFFFC46B;
 
     private static final String SELECT_HINT = "LMB select   LMB drag box   shift add   LMB twice opens";
 
@@ -307,6 +312,11 @@ public class ColonyView {
         GCNetwork.CHANNEL.sendToServer(new PacketColonyPickUp(colony.getId(), x, y, z, clear));
     }
 
+    public void sendMaterials(int x, int y, int z) {
+        boolean clear = colony.isMaterialsAt(x, y, z);
+        GCNetwork.CHANNEL.sendToServer(new PacketColonyMaterials(colony.getId(), x, y, z, clear));
+    }
+
     public CitizenSnapshot getSingleSelected() {
         if (selection.size() != 1) {
             return null;
@@ -477,8 +487,10 @@ public class ColonyView {
         list.child(
             row().child(modeButton("Drop-off", EXPAND, TARGET_DROP_OFF))
                 .child(modeButton("Pick-up", EXPAND, TARGET_PICK_UP)));
+        list.child(row().child(modeButton("Materials", EXPAND, TARGET_MATERIALS)));
         list.child(entry("drop-off", this::dropOffValue, DROP_OFF_COLOR));
         list.child(entry("pick-up", this::pickUpValue, PICK_UP_COLOR));
+        list.child(entry("materials", this::materialsValue, MATERIALS_COLOR));
 
         TextWidget<?> targetHint = label(IKey.dynamic(this::targetingLabel), HINT_COLOR);
         targetHint.widthRel(1.0F);
@@ -635,7 +647,7 @@ public class ColonyView {
         if (targeting == TARGET_MINE) {
             return "click a chunk, RMB cancels";
         }
-        if (targeting == TARGET_DROP_OFF || targeting == TARGET_PICK_UP) {
+        if (targeting == TARGET_DROP_OFF || targeting == TARGET_PICK_UP || targeting == TARGET_MATERIALS) {
             return "click a chest, again to clear";
         }
         return "";
@@ -653,6 +665,13 @@ public class ColonyView {
             return "not set";
         }
         return colony.getPickUpX() + "/" + colony.getPickUpY() + "/" + colony.getPickUpZ();
+    }
+
+    private String materialsValue() {
+        if (!colony.hasMaterials()) {
+            return "not set";
+        }
+        return colony.getMaterialsX() + "/" + colony.getMaterialsY() + "/" + colony.getMaterialsZ();
     }
 
     private TextFieldWidget groupField() {
