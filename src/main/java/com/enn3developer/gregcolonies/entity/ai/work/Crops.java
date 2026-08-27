@@ -65,7 +65,7 @@ public final class Crops {
 
     public static boolean isCrop(World world, int x, int y, int z) {
         Block block = world.getBlock(x, y, z);
-        return block instanceof IGrowable && !(block instanceof BlockStem);
+        return block instanceof IGrowable && !(block instanceof BlockStem) && isSoil(world, x, y - 1, z);
     }
 
     public static boolean isMature(World world, int x, int y, int z) {
