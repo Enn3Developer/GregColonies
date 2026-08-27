@@ -38,6 +38,8 @@ public class CitizenCommandGuard extends CitizenCommand {
 
     private static final int PATROL_PAUSE = 40;
 
+    private static final int SURFACE_PROBE_Y = 64;
+
     private static final int PATROL_TIMEOUT = 600;
 
     private int patrolX;
@@ -186,8 +188,14 @@ public class CitizenCommandGuard extends CitizenCommand {
         double radius = Config.colonyRadius * Math.sqrt(
             citizen.getRNG()
                 .nextDouble());
-        patrolX = (int) Math.round(colony.getX() + Math.cos(angle) * radius);
-        patrolZ = (int) Math.round(colony.getZ() + Math.sin(angle) * radius);
+        int x = (int) Math.round(colony.getX() + Math.cos(angle) * radius);
+        int z = (int) Math.round(colony.getZ() + Math.sin(angle) * radius);
+        if (!citizen.worldObj.blockExists(x, SURFACE_PROBE_Y, z)) {
+            patrolPause = PATROL_PAUSE;
+            return;
+        }
+        patrolX = x;
+        patrolZ = z;
         patrolY = citizen.worldObj.getTopSolidOrLiquidBlock(patrolX, patrolZ);
         hasPatrolTarget = true;
         patrolTicks = 0;
