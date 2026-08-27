@@ -10,6 +10,8 @@ public final class Hazards {
 
     private static final int MARGIN = 1;
 
+    private static final int DROP_SCAN = 8;
+
     private Hazards() {}
 
     public static boolean isDeadly(World world, int x, int y, int z) {
@@ -20,6 +22,24 @@ public final class Hazards {
 
     public static boolean isDeadlyStep(World world, int x, int y, int z) {
         return isDeadly(world, x, y, z) || isDeadly(world, x, y + 1, z) || isDeadly(world, x, y - 1, z);
+    }
+
+    public static boolean isDeadlyDrop(World world, int x, int y, int z) {
+        for (int depth = 1; depth <= DROP_SCAN; depth++) {
+            int below = y - depth;
+            if (below < 1) {
+                return false;
+            }
+            Material material = world.getBlock(x, below, z)
+                .getMaterial();
+            if (material == Material.lava || material == Material.fire) {
+                return true;
+            }
+            if (material.isSolid() || material.isLiquid()) {
+                return false;
+            }
+        }
+        return false;
     }
 
     public static boolean isNearDeadly(World world, int x, int y, int z) {

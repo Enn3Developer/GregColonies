@@ -609,7 +609,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         int maxZ = MathHelper.floor_double(z + reach);
         for (int bx = MathHelper.floor_double(x - reach); bx <= maxX; bx++) {
             for (int bz = MathHelper.floor_double(z - reach); bz <= maxZ; bz++) {
-                if (Hazards.isDeadlyStep(worldObj, bx, y, bz)) {
+                if (Hazards.isDeadlyStep(worldObj, bx, y, bz) || Hazards.isDeadlyDrop(worldObj, bx, y, bz)) {
                     return true;
                 }
             }
