@@ -48,6 +48,8 @@ public class CitizenPathFinder {
 
     private static final int MAX_OPTIONS = 6;
 
+    private static final int RELAX_RADIUS = 4;
+
     private final EntityLiving entity;
 
     private final boolean enterDoors;
@@ -57,6 +59,12 @@ public class CitizenPathFinder {
     private final boolean canSwim;
 
     private final boolean keepAway;
+
+    private final int originX;
+
+    private final int originY;
+
+    private final int originZ;
 
     private final PathPoint size;
 
@@ -78,6 +86,9 @@ public class CitizenPathFinder {
         this.avoidsWater = avoidsWater;
         this.canSwim = canSwim;
         this.keepAway = keepAway;
+        this.originX = MathHelper.floor_double(entity.posX);
+        this.originY = MathHelper.floor_double(entity.boundingBox.minY);
+        this.originZ = MathHelper.floor_double(entity.posZ);
         this.size = new PathPoint(
             MathHelper.floor_float(entity.width + 1.0F),
             MathHelper.floor_float(entity.height + 1.0F),
@@ -244,6 +255,16 @@ public class CitizenPathFinder {
         return isClimbable(entity.worldObj, x, y, z, entity);
     }
 
+    private boolean avoidsEdge(int x, int y, int z) {
+        if (keepAway) {
+            return true;
+        }
+        int dx = x - originX;
+        int dy = y - originY;
+        int dz = z - originZ;
+        return dx * dx + dy * dy + dz * dz > RELAX_RADIUS * RELAX_RADIUS;
+    }
+
     private int offset(int x, int y, int z) {
         World world = entity.worldObj;
         boolean soft = false;
@@ -259,7 +280,7 @@ public class CitizenPathFinder {
                 }
             }
         }
-        if (keepAway && Hazards.isBesideDeadly(world, x, y, z)) {
+        if (avoidsEdge(x, y, z) && Hazards.isBesideDeadly(world, x, y, z)) {
             return DEADLY;
         }
         return soft ? OPEN_WATER : CLEAR;
