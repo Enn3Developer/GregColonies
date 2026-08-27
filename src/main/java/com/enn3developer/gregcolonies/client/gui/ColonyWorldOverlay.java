@@ -91,6 +91,14 @@ public class ColonyWorldOverlay {
 
     private static boolean matricesValid;
 
+    private static int scaleWidth;
+
+    private static int scaleHeight;
+
+    private static int scaleOption = -1;
+
+    private static int scaleFactor = 1;
+
     private static double cameraX;
 
     private static double cameraY;
@@ -259,8 +267,7 @@ public class ColonyWorldOverlay {
             return false;
         }
         Minecraft minecraft = Minecraft.getMinecraft();
-        ScaledResolution resolution = new ScaledResolution(minecraft, minecraft.displayWidth, minecraft.displayHeight);
-        double scale = resolution.getScaleFactor();
+        double scale = scaleFactor(minecraft);
         out[0] = PROJECTED.get(0) / scale;
         out[1] = (minecraft.displayHeight - PROJECTED.get(1)) / scale;
         out[2] = PROJECTED.get(2);
@@ -269,6 +276,17 @@ public class ColonyWorldOverlay {
 
     public static void invalidate() {
         matricesValid = false;
+    }
+
+    private static int scaleFactor(Minecraft minecraft) {
+        int option = minecraft.gameSettings.guiScale;
+        if (minecraft.displayWidth != scaleWidth || minecraft.displayHeight != scaleHeight || option != scaleOption) {
+            scaleWidth = minecraft.displayWidth;
+            scaleHeight = minecraft.displayHeight;
+            scaleOption = option;
+            scaleFactor = new ScaledResolution(minecraft, scaleWidth, scaleHeight).getScaleFactor();
+        }
+        return scaleFactor;
     }
 
     public static MovingObjectPosition pick(double guiX, double guiY) {
@@ -331,8 +349,7 @@ public class ColonyWorldOverlay {
             return null;
         }
         Minecraft minecraft = Minecraft.getMinecraft();
-        ScaledResolution resolution = new ScaledResolution(minecraft, minecraft.displayWidth, minecraft.displayHeight);
-        float scale = resolution.getScaleFactor();
+        float scale = scaleFactor(minecraft);
         UNPROJECTED.clear();
         if (!GLU.gluUnProject(
             (float) (guiX * scale),
