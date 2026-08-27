@@ -211,6 +211,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     private final Set<EntityPlayer> viewers = new HashSet<>();
     private int colonyId;
     private String group = "";
+    private CitizenJob job = CitizenJob.NONE;
     private boolean rosterRegistered;
     private int rosterTicks;
     private boolean wantsWater;
@@ -358,6 +359,18 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         }
     }
 
+    public CitizenJob getJob() {
+        return job;
+    }
+
+    public void setJob(CitizenJob job) {
+        this.job = job == null ? CitizenJob.NONE : job;
+        if (colonyId != 0 && worldObj != null && !worldObj.isRemote) {
+            ColonyManager.get(worldObj)
+                .setCitizenJob(colonyId, getUniqueID(), this.job);
+        }
+    }
+
     public void setColonyId(int colonyId) {
         this.colonyId = colonyId;
         this.rosterRegistered = false;
@@ -472,6 +485,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
                 return;
             }
             group = entry.getGroup();
+            job = entry.getJob();
             rosterRegistered = true;
             return;
         }
@@ -902,7 +916,10 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     }
 
     private String groupLabel() {
-        String label = group.isEmpty() ? "no group" : group;
+        String label = job == CitizenJob.NONE ? group : job.getLabel();
+        if (label.isEmpty()) {
+            label = "no group";
+        }
         String gender = describeGender();
         return gender.isEmpty() ? label : gender + ", " + label;
     }
@@ -932,6 +949,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         super.writeEntityToNBT(tag);
         tag.setInteger("colonyId", colonyId);
         tag.setString("group", group);
+        tag.setString("job", job.name());
         NBTTagCompound inventoryTag = new NBTTagCompound();
         inventory.writeToNBT(inventoryTag);
         tag.setTag("inventory", inventoryTag);
@@ -954,6 +972,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         super.readEntityFromNBT(tag);
         colonyId = tag.getInteger("colonyId");
         group = tag.getString("group");
+        job = CitizenJob.byName(tag.getString("job"));
         inventory.readFromNBT(tag.getCompoundTag("inventory"));
         commands.readFromNBT(tag.getCompoundTag("commands"));
         parameters.readFromNBT(tag.getCompoundTag("parameters"));

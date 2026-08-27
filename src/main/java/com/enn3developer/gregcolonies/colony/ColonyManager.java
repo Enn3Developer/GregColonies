@@ -12,6 +12,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldSavedData;
 import net.minecraft.world.storage.MapStorage;
 
+import com.enn3developer.gregcolonies.entity.CitizenJob;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 
@@ -126,6 +127,20 @@ public class ColonyManager extends WorldSavedData {
             return false;
         }
         entry.setGroup(group);
+        markDirty();
+        return true;
+    }
+
+    public boolean setCitizenJob(int colonyId, UUID id, CitizenJob job) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null) {
+            return false;
+        }
+        ColonyCitizen entry = colony.getCitizen(id);
+        if (entry == null) {
+            return false;
+        }
+        entry.setJob(job);
         markDirty();
         return true;
     }

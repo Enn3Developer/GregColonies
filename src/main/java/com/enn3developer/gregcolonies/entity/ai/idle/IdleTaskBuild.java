@@ -16,6 +16,7 @@ import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.colony.BuildSite;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.entity.CitizenJob;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.auto.AutoTask;
 import com.enn3developer.gregcolonies.entity.ai.work.Inventories;
@@ -96,6 +97,9 @@ public class IdleTaskBuild extends AutoTask {
         }
         if (world.provider.dimensionId != colony.getDimension()) {
             return false;
+        }
+        if (citizen.getJob() != CitizenJob.BUILDER) {
+            return fetched != null && colony.hasMaterials();
         }
         if (colony.getBuildSite() == null) {
             return fetched != null && colony.hasMaterials();

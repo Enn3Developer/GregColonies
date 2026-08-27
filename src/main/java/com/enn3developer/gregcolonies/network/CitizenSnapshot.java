@@ -6,6 +6,7 @@ import net.minecraft.entity.SharedMonsterAttributes;
 
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
 import com.enn3developer.gregcolonies.entity.CitizenGender;
+import com.enn3developer.gregcolonies.entity.CitizenJob;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 
 import cpw.mods.fml.common.network.ByteBufUtils;
@@ -18,6 +19,7 @@ public class CitizenSnapshot {
     private int entityId = -1;
     private String name = "";
     private String group = "";
+    private CitizenJob job = CitizenJob.NONE;
     private CitizenGender gender;
     private boolean child;
     private double x;
@@ -36,6 +38,7 @@ public class CitizenSnapshot {
         snapshot.id = entry.getId();
         snapshot.name = entry.getName();
         snapshot.group = entry.getGroup();
+        snapshot.job = entry.getJob();
         snapshot.gender = entry.getGender();
         snapshot.child = entry.isChild();
         if (citizen == null) {
@@ -48,6 +51,7 @@ public class CitizenSnapshot {
         snapshot.entityId = citizen.getEntityId();
         snapshot.name = citizen.getCitizenName();
         snapshot.group = citizen.getGroup();
+        snapshot.job = citizen.getJob();
         snapshot.gender = citizen.getGender();
         snapshot.child = citizen.isChild();
         snapshot.x = citizen.posX;
@@ -82,6 +86,10 @@ public class CitizenSnapshot {
 
     public String getGroup() {
         return group;
+    }
+
+    public CitizenJob getJob() {
+        return job;
     }
 
     public CitizenGender getGender() {
@@ -134,6 +142,7 @@ public class CitizenSnapshot {
         buf.writeInt(entityId);
         ByteBufUtils.writeUTF8String(buf, name);
         ByteBufUtils.writeUTF8String(buf, group);
+        buf.writeByte(CitizenJob.idOf(job));
         buf.writeByte(CitizenGender.idOf(gender));
         buf.writeBoolean(child);
         buf.writeDouble(x);
@@ -152,6 +161,7 @@ public class CitizenSnapshot {
         snapshot.entityId = buf.readInt();
         snapshot.name = ByteBufUtils.readUTF8String(buf);
         snapshot.group = ByteBufUtils.readUTF8String(buf);
+        snapshot.job = CitizenJob.byId(buf.readByte());
         snapshot.gender = CitizenGender.byId(buf.readByte());
         snapshot.child = buf.readBoolean();
         snapshot.x = buf.readDouble();

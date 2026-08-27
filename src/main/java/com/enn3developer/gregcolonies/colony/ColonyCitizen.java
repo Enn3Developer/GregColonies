@@ -5,6 +5,7 @@ import java.util.UUID;
 import net.minecraft.nbt.NBTTagCompound;
 
 import com.enn3developer.gregcolonies.entity.CitizenGender;
+import com.enn3developer.gregcolonies.entity.CitizenJob;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 
 public class ColonyCitizen {
@@ -12,6 +13,7 @@ public class ColonyCitizen {
     private UUID id;
     private String name = "";
     private String group = "";
+    private CitizenJob job = CitizenJob.NONE;
     private CitizenGender gender;
     private boolean child;
     private int dimension;
@@ -33,6 +35,7 @@ public class ColonyCitizen {
         this.id = citizen.getUniqueID();
         this.name = citizen.getCitizenName();
         this.group = citizen.getGroup();
+        this.job = citizen.getJob();
         updateState(citizen);
         updatePosition(citizen);
     }
@@ -68,6 +71,14 @@ public class ColonyCitizen {
 
     public void setGroup(String group) {
         this.group = group == null ? "" : group;
+    }
+
+    public CitizenJob getJob() {
+        return job;
+    }
+
+    public void setJob(CitizenJob job) {
+        this.job = job == null ? CitizenJob.NONE : job;
     }
 
     public boolean hasBed() {
@@ -164,6 +175,7 @@ public class ColonyCitizen {
         tag.setLong("idLeast", id.getLeastSignificantBits());
         tag.setString("name", name);
         tag.setString("group", group);
+        tag.setByte("job", CitizenJob.idOf(job));
         tag.setByte("gender", CitizenGender.idOf(gender));
         tag.setBoolean("child", child);
         tag.setInteger("dim", dimension);
@@ -184,6 +196,7 @@ public class ColonyCitizen {
         citizen.id = new UUID(tag.getLong("idMost"), tag.getLong("idLeast"));
         citizen.name = tag.getString("name");
         citizen.group = tag.getString("group");
+        citizen.job = CitizenJob.byId(tag.getByte("job"));
         citizen.gender = CitizenGender.byId(tag.getByte("gender"));
         citizen.child = tag.getBoolean("child");
         citizen.dimension = tag.getInteger("dim");

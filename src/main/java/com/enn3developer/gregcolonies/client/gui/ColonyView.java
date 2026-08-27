@@ -29,11 +29,13 @@ import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
 import com.enn3developer.gregcolonies.client.ControllingCompat;
 import com.enn3developer.gregcolonies.client.GCKeyBindings;
+import com.enn3developer.gregcolonies.entity.CitizenJob;
 import com.enn3developer.gregcolonies.network.CitizenSnapshot;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
 import com.enn3developer.gregcolonies.network.GCNetwork;
 import com.enn3developer.gregcolonies.network.PacketCitizenCommand;
 import com.enn3developer.gregcolonies.network.PacketCitizenGroup;
+import com.enn3developer.gregcolonies.network.PacketCitizenJob;
 import com.enn3developer.gregcolonies.network.PacketColonyBuild;
 import com.enn3developer.gregcolonies.network.PacketColonyDropOff;
 import com.enn3developer.gregcolonies.network.PacketColonyMaterials;
@@ -350,6 +352,13 @@ public class ColonyView {
         GCNetwork.CHANNEL.sendToServer(new PacketCitizenGroup(colony.getId(), group, selection));
     }
 
+    public void sendJob(CitizenJob job) {
+        if (selection.isEmpty()) {
+            return;
+        }
+        GCNetwork.CHANNEL.sendToServer(new PacketCitizenJob(colony.getId(), job, selection));
+    }
+
     public ModularPanel buildPanel() {
         panel = new ModularPanel("colony_view").fullScreenInvisible();
         panel.child(map.full());
@@ -508,7 +517,13 @@ public class ColonyView {
         list.child(
             GuiStyle.row()
                 .child(GuiStyle.button("Blueprints", GuiStyle.EXPAND, () -> true, this::openBlueprints)));
+        list.child(
+            GuiStyle.row()
+                .child(
+                    GuiStyle.button("Builder", GuiStyle.EXPAND, this::hasSelection, () -> sendJob(CitizenJob.BUILDER)))
+                .child(GuiStyle.button("No job", GuiStyle.EXPAND, this::hasSelection, () -> sendJob(CitizenJob.NONE))));
         list.child(entry("blueprint", this::blueprintValue, BUILD_COLOR));
+        list.child(entry("builders", this::buildersValue, BUILD_COLOR));
         list.child(entry("site", this::buildSiteValue, BUILD_COLOR));
 
         TextWidget<?> targetHint = GuiStyle.label(IKey.dynamic(this::targetingLabel), GuiStyle.HINT_COLOR);
@@ -533,6 +548,16 @@ public class ColonyView {
 
     private String entryValue(String name, Supplier<String> value) {
         return GuiText.trim(value.get(), innerWidth() - GuiText.width(name) - GuiStyle.ROW_TEXT_PADDING);
+    }
+
+    private String buildersValue() {
+        int builders = 0;
+        for (CitizenSnapshot citizen : colony.getCitizens()) {
+            if (citizen.getJob() == CitizenJob.BUILDER) {
+                builders++;
+            }
+        }
+        return builders == 0 ? "none" : String.valueOf(builders);
     }
 
     private boolean hasSelection() {
