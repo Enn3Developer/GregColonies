@@ -60,6 +60,12 @@ public class ColonyScreen extends ModularScreen {
     }
 
     public static void open(ColonySnapshot colony) {
+        BlueprintScreen blueprints = BlueprintScreen.getOpen();
+        if (blueprints != null) {
+            blueprints.getView()
+                .setColony(colony);
+            return;
+        }
         ColonyScreen current = getOpen();
         if (current != null) {
             current.view.setColony(colony);

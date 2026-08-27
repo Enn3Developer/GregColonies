@@ -41,17 +41,55 @@ public class ColonySnapshot {
     private int materialsX;
     private int materialsY;
     private int materialsZ;
-    private int blueprintX;
-    private int blueprintY;
-    private int blueprintZ;
-    private int blueprintBlocks;
+    private final List<BlueprintEntry> blueprints = new ArrayList<>();
+    private int activeBlueprint = -1;
+    private int placeRotation;
+    private boolean placeMirror;
     private boolean hasBuildSite;
+    private String buildName = "";
     private int buildX;
     private int buildY;
     private int buildZ;
     private int buildRemaining;
     private int buildTotal;
     private final List<CitizenSnapshot> citizens = new ArrayList<>();
+
+    public static class BlueprintEntry {
+
+        private String name = "";
+        private int sizeX;
+        private int sizeY;
+        private int sizeZ;
+        private int blocks;
+
+        public String getName() {
+            return name;
+        }
+
+        public String getLabel(int index) {
+            return name.isEmpty() ? "blueprint " + (index + 1) : name;
+        }
+
+        public int getSizeX() {
+            return sizeX;
+        }
+
+        public int getSizeY() {
+            return sizeY;
+        }
+
+        public int getSizeZ() {
+            return sizeZ;
+        }
+
+        public int getBlocks() {
+            return blocks;
+        }
+
+        public String getSizeLabel() {
+            return sizeX + "x" + sizeY + "x" + sizeZ;
+        }
+    }
 
     private ColonySnapshot() {}
 
@@ -78,16 +116,23 @@ public class ColonySnapshot {
         snapshot.materialsX = colony.getMaterialsX();
         snapshot.materialsY = colony.getMaterialsY();
         snapshot.materialsZ = colony.getMaterialsZ();
-        Blueprint blueprint = colony.getBlueprint();
-        if (blueprint != null) {
-            snapshot.blueprintX = blueprint.getSizeX();
-            snapshot.blueprintY = blueprint.getSizeY();
-            snapshot.blueprintZ = blueprint.getSizeZ();
-            snapshot.blueprintBlocks = blueprint.blockCount();
+        for (Blueprint blueprint : colony.getBlueprints()) {
+            BlueprintEntry entry = new BlueprintEntry();
+            entry.name = blueprint.getName();
+            entry.sizeX = blueprint.getSizeX();
+            entry.sizeY = blueprint.getSizeY();
+            entry.sizeZ = blueprint.getSizeZ();
+            entry.blocks = blueprint.blockCount();
+            snapshot.blueprints.add(entry);
         }
+        snapshot.activeBlueprint = colony.getActiveBlueprintIndex();
+        snapshot.placeRotation = colony.getPlaceRotation();
+        snapshot.placeMirror = colony.isPlaceMirror();
         BuildSite site = colony.getBuildSite();
         if (site != null) {
             snapshot.hasBuildSite = true;
+            snapshot.buildName = site.getBlueprint()
+                .getName();
             snapshot.buildX = site.getX();
             snapshot.buildY = site.getY();
             snapshot.buildZ = site.getZ();
@@ -207,24 +252,32 @@ public class ColonySnapshot {
         return hasMaterials && materialsX == x && materialsY == y && materialsZ == z;
     }
 
+    public List<BlueprintEntry> getBlueprints() {
+        return blueprints;
+    }
+
+    public int getActiveBlueprint() {
+        return activeBlueprint >= 0 && activeBlueprint < blueprints.size() ? activeBlueprint : -1;
+    }
+
+    public BlueprintEntry getBlueprint(int index) {
+        return index >= 0 && index < blueprints.size() ? blueprints.get(index) : null;
+    }
+
+    public int getPlaceRotation() {
+        return placeRotation;
+    }
+
+    public boolean isPlaceMirror() {
+        return placeMirror;
+    }
+
     public boolean hasBlueprint() {
-        return blueprintBlocks > 0;
+        return getActiveBlueprint() >= 0;
     }
 
-    public int getBlueprintX() {
-        return blueprintX;
-    }
-
-    public int getBlueprintY() {
-        return blueprintY;
-    }
-
-    public int getBlueprintZ() {
-        return blueprintZ;
-    }
-
-    public int getBlueprintBlocks() {
-        return blueprintBlocks;
+    public String getBuildName() {
+        return buildName;
     }
 
     public boolean hasBuildSite() {
@@ -281,11 +334,19 @@ public class ColonySnapshot {
         buf.writeInt(materialsX);
         buf.writeInt(materialsY);
         buf.writeInt(materialsZ);
-        buf.writeInt(blueprintX);
-        buf.writeInt(blueprintY);
-        buf.writeInt(blueprintZ);
-        buf.writeInt(blueprintBlocks);
+        buf.writeInt(blueprints.size());
+        for (BlueprintEntry entry : blueprints) {
+            ByteBufUtils.writeUTF8String(buf, entry.name);
+            buf.writeShort(entry.sizeX);
+            buf.writeShort(entry.sizeY);
+            buf.writeShort(entry.sizeZ);
+            buf.writeInt(entry.blocks);
+        }
+        buf.writeInt(activeBlueprint);
+        buf.writeByte(placeRotation);
+        buf.writeBoolean(placeMirror);
         buf.writeBoolean(hasBuildSite);
+        ByteBufUtils.writeUTF8String(buf, buildName);
         buf.writeInt(buildX);
         buf.writeInt(buildY);
         buf.writeInt(buildZ);
@@ -320,11 +381,21 @@ public class ColonySnapshot {
         snapshot.materialsX = buf.readInt();
         snapshot.materialsY = buf.readInt();
         snapshot.materialsZ = buf.readInt();
-        snapshot.blueprintX = buf.readInt();
-        snapshot.blueprintY = buf.readInt();
-        snapshot.blueprintZ = buf.readInt();
-        snapshot.blueprintBlocks = buf.readInt();
+        int blueprintCount = buf.readInt();
+        for (int i = 0; i < blueprintCount; i++) {
+            BlueprintEntry entry = new BlueprintEntry();
+            entry.name = ByteBufUtils.readUTF8String(buf);
+            entry.sizeX = buf.readShort();
+            entry.sizeY = buf.readShort();
+            entry.sizeZ = buf.readShort();
+            entry.blocks = buf.readInt();
+            snapshot.blueprints.add(entry);
+        }
+        snapshot.activeBlueprint = buf.readInt();
+        snapshot.placeRotation = buf.readByte();
+        snapshot.placeMirror = buf.readBoolean();
         snapshot.hasBuildSite = buf.readBoolean();
+        snapshot.buildName = ByteBufUtils.readUTF8String(buf);
         snapshot.buildX = buf.readInt();
         snapshot.buildY = buf.readInt();
         snapshot.buildZ = buf.readInt();

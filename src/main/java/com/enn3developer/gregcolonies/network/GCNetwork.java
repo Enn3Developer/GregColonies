@@ -1,20 +1,25 @@
 package com.enn3developer.gregcolonies.network;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.inventory.IInventory;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.GregColonies;
+import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
+import com.enn3developer.gregcolonies.entity.ai.work.Inventories;
 
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -42,6 +47,8 @@ public final class GCNetwork {
         CHANNEL.registerMessage(PacketColonyMaterials.Handler.class, PacketColonyMaterials.class, 7, Side.SERVER);
         CHANNEL.registerMessage(PacketColonyBlueprint.Handler.class, PacketColonyBlueprint.class, 8, Side.SERVER);
         CHANNEL.registerMessage(PacketColonyBuild.Handler.class, PacketColonyBuild.class, 9, Side.SERVER);
+        CHANNEL.registerMessage(PacketBlueprintAction.Handler.class, PacketBlueprintAction.class, 10, Side.SERVER);
+        CHANNEL.registerMessage(PacketBlueprintData.Handler.class, PacketBlueprintData.class, 11, Side.CLIENT);
         FMLCommonHandler.instance()
             .bus()
             .register(new GCNetwork());
@@ -104,5 +111,39 @@ public final class GCNetwork {
 
     static void sendColony(EntityPlayerMP player, Colony colony) {
         CHANNEL.sendTo(new PacketColonyData(ColonySnapshot.of(colony, player.worldObj)), player);
+    }
+
+    static void sendBlueprint(EntityPlayerMP player, Colony colony, int index) {
+        Blueprint blueprint = colony.getBlueprint(index);
+        if (blueprint == null) {
+            return;
+        }
+        CHANNEL.sendTo(
+            new PacketBlueprintData(colony.getId(), index, blueprint, stock(player.worldObj, colony, blueprint)),
+            player);
+    }
+
+    private static Map<Integer, Integer> stock(World world, Colony colony, Blueprint blueprint) {
+        Map<Integer, Integer> stock = new LinkedHashMap<>();
+        if (!colony.hasMaterials()) {
+            return stock;
+        }
+        IInventory inventory = Inventories
+            .at(world, colony.getMaterialsX(), colony.getMaterialsY(), colony.getMaterialsZ());
+        if (inventory == null) {
+            return stock;
+        }
+        for (int cell : blueprint.materials()
+            .keySet()) {
+            int held = 0;
+            for (int slot = 0; slot < inventory.getSizeInventory(); slot++) {
+                ItemStack stack = inventory.getStackInSlot(slot);
+                if (stack != null && blueprint.matches(cell, stack)) {
+                    held += stack.stackSize;
+                }
+            }
+            stock.put(cell, held);
+        }
+        return stock;
     }
 }

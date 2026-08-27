@@ -9,6 +9,7 @@ import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
 
+import cpw.mods.fml.common.network.ByteBufUtils;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -18,44 +19,48 @@ public class PacketColonyBlueprint implements IMessage {
 
     private int colonyId;
     private int x1;
-    private int y1;
     private int z1;
     private int x2;
-    private int y2;
     private int z2;
+    private int baseY;
+    private int height;
+    private String name = "";
 
     public PacketColonyBlueprint() {}
 
-    public PacketColonyBlueprint(int colonyId, int x1, int y1, int z1, int x2, int y2, int z2) {
+    public PacketColonyBlueprint(int colonyId, int x1, int z1, int x2, int z2, int baseY, int height, String name) {
         this.colonyId = colonyId;
         this.x1 = x1;
-        this.y1 = y1;
         this.z1 = z1;
         this.x2 = x2;
-        this.y2 = y2;
         this.z2 = z2;
+        this.baseY = baseY;
+        this.height = height;
+        this.name = name;
     }
 
     @Override
     public void fromBytes(ByteBuf buf) {
         colonyId = buf.readInt();
         x1 = buf.readInt();
-        y1 = buf.readInt();
         z1 = buf.readInt();
         x2 = buf.readInt();
-        y2 = buf.readInt();
         z2 = buf.readInt();
+        baseY = buf.readInt();
+        height = buf.readInt();
+        name = ByteBufUtils.readUTF8String(buf);
     }
 
     @Override
     public void toBytes(ByteBuf buf) {
         buf.writeInt(colonyId);
         buf.writeInt(x1);
-        buf.writeInt(y1);
         buf.writeInt(z1);
         buf.writeInt(x2);
-        buf.writeInt(y2);
         buf.writeInt(z2);
+        buf.writeInt(baseY);
+        buf.writeInt(height);
+        ByteBufUtils.writeUTF8String(buf, name);
     }
 
     public static class Handler implements IMessageHandler<PacketColonyBlueprint, IMessage> {
@@ -78,20 +83,38 @@ public class PacketColonyBlueprint implements IMessage {
                     new ChatComponentText(EnumChatFormatting.RED + "The blueprint must be in the colony dimension"));
                 return;
             }
-
-            Blueprint blueprint = Blueprint
-                .capture(world, message.x1, message.y1, message.z1, message.x2, message.y2, message.z2);
-            if (blueprint == null) {
+            if (colony.getBlueprints()
+                .size() >= Colony.MAX_BLUEPRINTS) {
                 player.addChatMessage(
                     new ChatComponentText(
-                        EnumChatFormatting.RED + "That region holds no buildable blocks, or is over "
-                            + Blueprint.MAX_VOLUME
-                            + " blocks"));
+                        EnumChatFormatting.RED + "The blueprint library is full ("
+                            + Colony.MAX_BLUEPRINTS
+                            + "), delete one first"));
                 return;
             }
 
-            ColonyManager.get(world)
-                .setBlueprint(colony.getId(), blueprint);
+            int height = Math.max(1, Math.min(Blueprint.MAX_SIDE, message.height));
+            int baseY = Math.max(0, Math.min(world.getHeight() - 1, message.baseY));
+            Blueprint blueprint = Blueprint.capture(
+                world,
+                message.name,
+                message.x1,
+                baseY,
+                message.z1,
+                message.x2,
+                baseY + height - 1,
+                message.z2);
+            if (blueprint == null) {
+                player.addChatMessage(
+                    new ChatComponentText(EnumChatFormatting.RED + "That region holds no buildable blocks"));
+                return;
+            }
+
+            int index = ColonyManager.get(world)
+                .addBlueprint(colony.getId(), blueprint);
+            if (index < 0) {
+                return;
+            }
             player.addChatMessage(
                 new ChatComponentText(
                     "Blueprint captured: " + blueprint.getSizeX()
@@ -103,6 +126,7 @@ public class PacketColonyBlueprint implements IMessage {
                         + blueprint.blockCount()
                         + " blocks"));
             GCNetwork.sendColony(player, colony);
+            GCNetwork.sendBlueprint(player, colony, index);
         }
     }
 }

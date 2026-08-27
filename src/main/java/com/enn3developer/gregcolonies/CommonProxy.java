@@ -10,6 +10,7 @@ import com.enn3developer.gregcolonies.command.ColonyCommand;
 import com.enn3developer.gregcolonies.entity.GCEntities;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
 import com.enn3developer.gregcolonies.network.GCNetwork;
+import com.enn3developer.gregcolonies.network.PacketBlueprintData;
 
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
@@ -32,6 +33,8 @@ public class CommonProxy {
     }
 
     public void openColonyScreen(ColonySnapshot colony) {}
+
+    public void showBlueprint(PacketBlueprintData data) {}
 
     public String trimText(String text, int width) {
         return text;

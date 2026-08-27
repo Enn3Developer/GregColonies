@@ -79,7 +79,7 @@ public class PacketColonyBuild implements IMessage {
                     new ChatComponentText(EnumChatFormatting.RED + "The build site must be in the colony dimension"));
                 return;
             }
-            Blueprint blueprint = colony.getBlueprint();
+            Blueprint blueprint = colony.getActiveBlueprint();
             if (blueprint == null) {
                 player.addChatMessage(
                     new ChatComponentText(EnumChatFormatting.RED + "Capture a blueprint before starting a build"));
@@ -92,7 +92,13 @@ public class PacketColonyBuild implements IMessage {
             }
 
             int y = message.y + 1;
-            BuildSite site = new BuildSite(message.x, y, message.z, blueprint);
+            BuildSite site = new BuildSite(
+                message.x,
+                y,
+                message.z,
+                blueprint,
+                colony.getPlaceRotation(),
+                colony.isPlaceMirror());
             manager.setBuildSite(colony.getId(), site);
             player.addChatMessage(
                 new ChatComponentText(

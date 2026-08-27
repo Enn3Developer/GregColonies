@@ -1,10 +1,12 @@
 package com.enn3developer.gregcolonies.colony;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -18,6 +20,8 @@ import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandRegistry;
 
 public class Colony {
+
+    public static final int MAX_BLUEPRINTS = 16;
 
     private int id;
     private String name;
@@ -39,7 +43,10 @@ public class Colony {
     private int materialsX;
     private int materialsY;
     private int materialsZ;
-    private Blueprint blueprint;
+    private final List<Blueprint> blueprints = new ArrayList<>();
+    private int activeBlueprint = -1;
+    private int placeRotation;
+    private boolean placeMirror;
     private BuildSite buildSite;
     private final Deque<CitizenCommand> orders = new ArrayDeque<>();
     private final Map<UUID, ColonyCitizen> citizens = new LinkedHashMap<>();
@@ -195,12 +202,75 @@ public class Colony {
         materialsZ = 0;
     }
 
-    public Blueprint getBlueprint() {
-        return blueprint;
+    public List<Blueprint> getBlueprints() {
+        return blueprints;
     }
 
-    public void setBlueprint(Blueprint blueprint) {
-        this.blueprint = blueprint;
+    public Blueprint getBlueprint(int index) {
+        return index >= 0 && index < blueprints.size() ? blueprints.get(index) : null;
+    }
+
+    public int getActiveBlueprintIndex() {
+        return activeBlueprint >= 0 && activeBlueprint < blueprints.size() ? activeBlueprint : -1;
+    }
+
+    public Blueprint getActiveBlueprint() {
+        return getBlueprint(getActiveBlueprintIndex());
+    }
+
+    public int addBlueprint(Blueprint blueprint) {
+        if (blueprint == null || blueprints.size() >= MAX_BLUEPRINTS) {
+            return -1;
+        }
+        blueprints.add(blueprint);
+        activeBlueprint = blueprints.size() - 1;
+        return activeBlueprint;
+    }
+
+    public boolean removeBlueprint(int index) {
+        if (index < 0 || index >= blueprints.size()) {
+            return false;
+        }
+        blueprints.remove(index);
+        if (activeBlueprint > index) {
+            activeBlueprint--;
+        } else if (activeBlueprint == index) {
+            activeBlueprint = blueprints.isEmpty() ? -1 : Math.min(index, blueprints.size() - 1);
+        }
+        return true;
+    }
+
+    public boolean renameBlueprint(int index, String name) {
+        Blueprint blueprint = getBlueprint(index);
+        if (blueprint == null) {
+            return false;
+        }
+        blueprint.setName(name);
+        return true;
+    }
+
+    public boolean setActiveBlueprint(int index) {
+        if (index < 0 || index >= blueprints.size()) {
+            return false;
+        }
+        activeBlueprint = index;
+        return true;
+    }
+
+    public int getPlaceRotation() {
+        return placeRotation;
+    }
+
+    public void setPlaceRotation(int rotation) {
+        placeRotation = ((rotation % Blueprint.ROTATIONS) + Blueprint.ROTATIONS) % Blueprint.ROTATIONS;
+    }
+
+    public boolean isPlaceMirror() {
+        return placeMirror;
+    }
+
+    public void setPlaceMirror(boolean mirror) {
+        placeMirror = mirror;
     }
 
     public BuildSite getBuildSite() {
@@ -422,9 +492,14 @@ public class Colony {
             tag.setInteger("materialsZ", materialsZ);
         }
 
-        if (blueprint != null) {
-            tag.setTag("blueprint", blueprint.writeToNBT());
+        NBTTagList blueprintList = new NBTTagList();
+        for (Blueprint entry : blueprints) {
+            blueprintList.appendTag(entry.writeToNBT());
         }
+        tag.setTag("blueprints", blueprintList);
+        tag.setInteger("activeBlueprint", activeBlueprint);
+        tag.setInteger("placeRotation", placeRotation);
+        tag.setBoolean("placeMirror", placeMirror);
         if (buildSite != null) {
             tag.setTag("buildSite", buildSite.writeToNBT());
         }
@@ -473,8 +548,23 @@ public class Colony {
         }
 
         if (tag.hasKey("blueprint", 10)) {
-            colony.blueprint = Blueprint.readFromNBT(tag.getCompoundTag("blueprint"));
+            Blueprint legacy = Blueprint.readFromNBT(tag.getCompoundTag("blueprint"));
+            if (legacy != null) {
+                legacy.setName("blueprint");
+                colony.blueprints.add(legacy);
+            }
         }
+        NBTTagList blueprintList = tag.getTagList("blueprints", 10);
+        for (int i = 0; i < blueprintList.tagCount() && colony.blueprints.size() < MAX_BLUEPRINTS; i++) {
+            Blueprint entry = Blueprint.readFromNBT(blueprintList.getCompoundTagAt(i));
+            if (entry != null) {
+                colony.blueprints.add(entry);
+            }
+        }
+        colony.activeBlueprint = tag.hasKey("activeBlueprint") ? tag.getInteger("activeBlueprint")
+            : colony.blueprints.isEmpty() ? -1 : 0;
+        colony.placeRotation = tag.getInteger("placeRotation");
+        colony.placeMirror = tag.getBoolean("placeMirror");
         if (tag.hasKey("buildSite", 10)) {
             colony.buildSite = BuildSite.readFromNBT(tag.getCompoundTag("buildSite"));
         }

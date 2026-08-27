@@ -10,15 +10,27 @@ public class BuildSite {
     private int x;
     private int y;
     private int z;
+    private int rotation;
+    private boolean mirror;
     private Blueprint blueprint;
 
     private BuildSite() {}
 
-    public BuildSite(int x, int y, int z, Blueprint blueprint) {
+    public BuildSite(int x, int y, int z, Blueprint blueprint, int rotation, boolean mirror) {
         this.x = x;
         this.y = y;
         this.z = z;
-        this.blueprint = blueprint;
+        this.rotation = ((rotation % Blueprint.ROTATIONS) + Blueprint.ROTATIONS) % Blueprint.ROTATIONS;
+        this.mirror = mirror;
+        this.blueprint = blueprint.transformed(this.rotation, mirror);
+    }
+
+    public int getRotation() {
+        return rotation;
+    }
+
+    public boolean isMirrored() {
+        return mirror;
     }
 
     public int getX() {
@@ -91,6 +103,8 @@ public class BuildSite {
         tag.setInteger("x", x);
         tag.setInteger("y", y);
         tag.setInteger("z", z);
+        tag.setInteger("rotation", rotation);
+        tag.setBoolean("mirror", mirror);
         tag.setTag("blueprint", blueprint.writeToNBT());
         return tag;
     }
@@ -104,6 +118,8 @@ public class BuildSite {
         site.x = tag.getInteger("x");
         site.y = tag.getInteger("y");
         site.z = tag.getInteger("z");
+        site.rotation = tag.getInteger("rotation");
+        site.mirror = tag.getBoolean("mirror");
         site.blueprint = blueprint;
         return site;
     }

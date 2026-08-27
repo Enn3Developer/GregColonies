@@ -7,8 +7,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.function.BooleanSupplier;
-import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
 import net.minecraft.client.Minecraft;
@@ -19,10 +17,8 @@ import com.cleanroommc.modularui.api.drawable.IKey;
 import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.api.widget.Interactable;
 import com.cleanroommc.modularui.drawable.GuiDraw;
-import com.cleanroommc.modularui.drawable.Rectangle;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.utils.Alignment;
-import com.cleanroommc.modularui.widget.Widget;
 import com.cleanroommc.modularui.widget.scroll.VerticalScrollData;
 import com.cleanroommc.modularui.widget.sizer.Area;
 import com.cleanroommc.modularui.widget.sizer.Unit;
@@ -33,13 +29,11 @@ import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
 import com.enn3developer.gregcolonies.client.ControllingCompat;
 import com.enn3developer.gregcolonies.client.GCKeyBindings;
-import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.network.CitizenSnapshot;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
 import com.enn3developer.gregcolonies.network.GCNetwork;
 import com.enn3developer.gregcolonies.network.PacketCitizenCommand;
 import com.enn3developer.gregcolonies.network.PacketCitizenGroup;
-import com.enn3developer.gregcolonies.network.PacketColonyBlueprint;
 import com.enn3developer.gregcolonies.network.PacketColonyBuild;
 import com.enn3developer.gregcolonies.network.PacketColonyDropOff;
 import com.enn3developer.gregcolonies.network.PacketColonyMaterials;
@@ -76,67 +70,7 @@ public class ColonyView {
 
     private static final float SIDE_MAX_FRACTION = 0.38F;
 
-    private static final int SIDE_PADDING = 6;
-
-    private static final int SCREEN_MARGIN = 6;
-
     private static final int ASSIGN_WIDTH = 46;
-
-    private static final int EXPAND = -1;
-
-    private static final int SWATCH_WIDTH = 3;
-
-    private static final int SCROLL_THICKNESS = 4;
-
-    private static final int ROW_TEXT_PADDING = 4;
-
-    private static final int ROW_HEIGHT = 13;
-
-    private static final int BUTTON_HEIGHT = 15;
-
-    private static final int ROW_GAP = 3;
-
-    private static final int SECTION_GAP = 5;
-
-    private static final int TITLE_COLOR = 0xFFFFD060;
-
-    private static final int TEXT_COLOR = 0xFFC6CEDC;
-
-    private static final int HINT_COLOR = 0xFF8A93A6;
-
-    private static final int DISABLED_COLOR = 0xFF5F6878;
-
-    private static final int PANEL_BACKGROUND = 0xFF0E1220;
-
-    private static final int PANEL_BORDER = 0xFF33405C;
-
-    private static final int SECTION_LINE = 0xFF2A3448;
-
-    private static final int BUTTON_BACKGROUND = 0xFF1E2637;
-
-    private static final int BUTTON_BORDER = 0xFF39455E;
-
-    private static final int BUTTON_HOVER = 0xFF2E3A54;
-
-    private static final int DISABLED_BACKGROUND = 0xFF161C2A;
-
-    private static final int DISABLED_BORDER = 0xFF262F43;
-
-    private static final int ROW_BACKGROUND = 0xFF1B2233;
-
-    private static final int ROW_SELECTED = 0xFF243352;
-
-    private static final int ROW_SELECTED_HOVER = 0xFF2F4067;
-
-    private static final int SCROLL_TRACK = 0xFF141A28;
-
-    private static final int SCROLL_HANDLE = 0xFF3C4A66;
-
-    private static final int ACTIVE_BACKGROUND = 0xFF27543A;
-
-    private static final int ACTIVE_BORDER = 0xFF4FA05F;
-
-    private static final int ACTIVE_COLOR = 0xFFA8F0A8;
 
     private static final int DROP_OFF_COLOR = 0xFFFF7CE0;
 
@@ -155,6 +89,10 @@ public class ColonyView {
     private static final String GROUP_HINT = "click a group to select it   shift adds";
 
     private static final int MARKER_MARGIN = 7;
+
+    private static final int[] REGION = new int[5];
+
+    private static boolean hasRegion;
 
     private final ColonyViewWidget map = new ColonyViewWidget(this);
 
@@ -326,9 +264,49 @@ public class ColonyView {
         GCNetwork.CHANNEL.sendToServer(new PacketColonyMaterials(colony.getId(), x, y, z, clear));
     }
 
-    public void sendBlueprint(int x1, int y1, int z1, int x2, int y2, int z2) {
-        int top = Math.max(y1, y2) + Blueprint.MAX_SIDE - 1;
-        GCNetwork.CHANNEL.sendToServer(new PacketColonyBlueprint(colony.getId(), x1, y1, z1, x2, top, z2));
+    public void setRegion(int x1, int y, int z1, int x2, int z2) {
+        REGION[0] = Math.min(x1, x2);
+        REGION[1] = Math.min(z1, z2);
+        REGION[2] = Math.max(x1, x2);
+        REGION[3] = Math.max(z1, z2);
+        REGION[4] = y;
+        hasRegion = true;
+    }
+
+    public boolean hasRegion() {
+        return hasRegion;
+    }
+
+    public int getRegionX1() {
+        return REGION[0];
+    }
+
+    public int getRegionZ1() {
+        return REGION[1];
+    }
+
+    public int getRegionX2() {
+        return REGION[2];
+    }
+
+    public int getRegionZ2() {
+        return REGION[3];
+    }
+
+    public int getRegionY() {
+        return hasRegion ? REGION[4] : colony.getY();
+    }
+
+    public int getRegionWidth() {
+        return REGION[2] - REGION[0] + 1;
+    }
+
+    public int getRegionDepth() {
+        return REGION[3] - REGION[1] + 1;
+    }
+
+    public void openBlueprints() {
+        BlueprintScreen.open(this);
     }
 
     public void sendBuild(int x, int y, int z) {
@@ -408,13 +386,13 @@ public class ColonyView {
         header = Flow.column()
             .coverChildren()
             .childPadding(2)
-            .padding(SIDE_PADDING)
-            .pos(SCREEN_MARGIN, SCREEN_MARGIN)
+            .padding(GuiStyle.PADDING)
+            .pos(GuiStyle.SCREEN_MARGIN, GuiStyle.SCREEN_MARGIN)
             .crossAxisAlignment(Alignment.CrossAxis.START)
-            .background(skin(PANEL_BACKGROUND, PANEL_BORDER))
-            .child(label(IKey.dynamic(this::title), TITLE_COLOR))
-            .child(label(IKey.dynamic(this::census), TEXT_COLOR))
-            .child(label(IKey.dynamic(this::status), HINT_COLOR));
+            .background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER))
+            .child(GuiStyle.label(IKey.dynamic(this::title), GuiStyle.TITLE_COLOR))
+            .child(GuiStyle.label(IKey.dynamic(this::census), GuiStyle.TEXT_COLOR))
+            .child(GuiStyle.label(IKey.dynamic(this::status), GuiStyle.HINT_COLOR));
         return header;
     }
 
@@ -422,106 +400,121 @@ public class ColonyView {
         hints = Flow.column()
             .coverChildren()
             .childPadding(2)
-            .padding(SIDE_PADDING)
-            .left(SCREEN_MARGIN)
-            .bottom(SCREEN_MARGIN)
+            .padding(GuiStyle.PADDING)
+            .left(GuiStyle.SCREEN_MARGIN)
+            .bottom(GuiStyle.SCREEN_MARGIN)
             .collapseDisabledChild()
             .crossAxisAlignment(Alignment.CrossAxis.START)
-            .background(skin(PANEL_BACKGROUND, PANEL_BORDER))
+            .background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER))
             .child(helpLine(IKey.str(SELECT_HINT)))
             .child(helpLine(IKey.str(MOVE_HINT)))
             .child(helpLine(IKey.str(CAMERA_HINT)))
             .child(helpLine(IKey.str(GROUP_HINT)))
             .child(helpLine(IKey.dynamic(this::keyHint)))
-            .child(label(IKey.dynamic(this::helpHint), TEXT_COLOR));
+            .child(GuiStyle.label(IKey.dynamic(this::helpHint), GuiStyle.TEXT_COLOR));
         return hints;
     }
 
     private TextWidget<?> helpLine(IKey key) {
-        TextWidget<?> line = label(key, HINT_COLOR);
+        TextWidget<?> line = GuiStyle.label(key, GuiStyle.HINT_COLOR);
         line.setEnabledIf(widget -> helpOpen);
         return line;
     }
 
     private ListWidget<IWidget, ?> buildSidePanel() {
         VerticalScrollData scroll = new VerticalScrollData();
-        scroll.texture(scrollHandle());
+        scroll.texture(GuiStyle.scrollHandle());
         ListWidget<IWidget, ?> list = new ListWidget<>();
         list.scrollDirection(scroll);
         list.collapseDisabledChild();
         list.crossAxisAlignment(Alignment.CrossAxis.START);
-        list.maxSizeRelOffset(1.0F, -SCREEN_MARGIN * 2);
+        list.maxSizeRelOffset(1.0F, -GuiStyle.SCREEN_MARGIN * 2);
         list.width(this::sideWidth, Unit.Measure.PIXEL);
-        list.right(SCREEN_MARGIN);
-        list.top(SCREEN_MARGIN);
-        list.padding(SIDE_PADDING);
-        list.background(skin(PANEL_BACKGROUND, PANEL_BORDER));
+        list.right(GuiStyle.SCREEN_MARGIN);
+        list.top(GuiStyle.SCREEN_MARGIN);
+        list.padding(GuiStyle.PADDING);
+        list.background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER));
         list.getScrollArea()
-            .setScrollBarBackgroundColor(SCROLL_TRACK);
+            .setScrollBarBackgroundColor(GuiStyle.SCROLL_TRACK);
 
-        list.child(section("Groups", this::groupValue, 0));
+        list.child(GuiStyle.section("Groups", this::groupValue, 0));
         for (int index = 0; index < MAX_GROUP_ROWS; index++) {
             list.child(buildGroupRow(index));
         }
         list.child(
-            row().child(groupField())
-                .child(button("Assign", ASSIGN_WIDTH, this::hasSelection, () -> sendGroup(groupField.getText()))));
+            GuiStyle.row()
+                .child(groupField())
+                .child(
+                    GuiStyle
+                        .button("Assign", ASSIGN_WIDTH, this::hasSelection, () -> sendGroup(groupField.getText()))));
         list.child(
-            row().child(button("Ungroup", EXPAND, this::hasSelection, () -> sendGroup("")))
-                .child(button("Select all", EXPAND, this::hasCitizens, this::selectAll)));
+            GuiStyle.row()
+                .child(GuiStyle.button("Ungroup", GuiStyle.EXPAND, this::hasSelection, () -> sendGroup("")))
+                .child(GuiStyle.button("Select all", GuiStyle.EXPAND, this::hasCitizens, this::selectAll)));
 
-        list.child(section("Selection", this::selectionValue, SECTION_GAP));
-        TextWidget<?> loadedLine = label(IKey.dynamic(this::loadedValue), HINT_COLOR);
+        list.child(GuiStyle.section("Selection", this::selectionValue, GuiStyle.SECTION_GAP));
+        TextWidget<?> loadedLine = GuiStyle.label(IKey.dynamic(this::loadedValue), GuiStyle.HINT_COLOR);
         loadedLine.widthRel(1.0F);
         loadedLine.setEnabledIf(widget -> hasSelection());
-        loadedLine.marginBottom(ROW_GAP);
+        loadedLine.marginBottom(GuiStyle.ROW_GAP);
         list.child(loadedLine);
         list.child(
-            row()
+            GuiStyle.row()
                 .child(
-                    button(
+                    GuiStyle.button(
                         "Guard",
-                        EXPAND,
+                        GuiStyle.EXPAND,
                         this::hasSelection,
                         () -> sendCommand(PacketCitizenCommand.GUARD, false, 0, 0, 0)))
                 .child(
-                    button(
+                    GuiStyle.button(
                         "Cancel",
-                        EXPAND,
+                        GuiStyle.EXPAND,
                         this::hasSelection,
                         () -> sendCommand(PacketCitizenCommand.CANCEL, false, 0, 0, 0))));
         list.child(
-            row().child(modeButton("Chop", EXPAND, TARGET_CHOP))
-                .child(modeButton("Mine", EXPAND, TARGET_MINE)));
-        list.child(row().child(modeButton("Farm", EXPAND, TARGET_FARM)));
+            GuiStyle.row()
+                .child(modeButton("Chop", GuiStyle.EXPAND, TARGET_CHOP))
+                .child(modeButton("Mine", GuiStyle.EXPAND, TARGET_MINE)));
         list.child(
-            row().child(
-                button(
-                    "Inventory",
-                    EXPAND,
-                    () -> getSingleSelected() != null,
-                    () -> openCitizen(getSingleSelected()))));
+            GuiStyle.row()
+                .child(modeButton("Farm", GuiStyle.EXPAND, TARGET_FARM)));
+        list.child(
+            GuiStyle.row()
+                .child(
+                    GuiStyle.button(
+                        "Inventory",
+                        GuiStyle.EXPAND,
+                        () -> getSingleSelected() != null,
+                        () -> openCitizen(getSingleSelected()))));
 
-        list.child(section("Colony", () -> "", SECTION_GAP));
+        list.child(GuiStyle.section("Colony", () -> "", GuiStyle.SECTION_GAP));
         list.child(
-            row().child(modeButton("Drop-off", EXPAND, TARGET_DROP_OFF))
-                .child(modeButton("Pick-up", EXPAND, TARGET_PICK_UP)));
-        list.child(row().child(modeButton("Materials", EXPAND, TARGET_MATERIALS)));
+            GuiStyle.row()
+                .child(modeButton("Drop-off", GuiStyle.EXPAND, TARGET_DROP_OFF))
+                .child(modeButton("Pick-up", GuiStyle.EXPAND, TARGET_PICK_UP)));
+        list.child(
+            GuiStyle.row()
+                .child(modeButton("Materials", GuiStyle.EXPAND, TARGET_MATERIALS)));
         list.child(entry("drop-off", this::dropOffValue, DROP_OFF_COLOR));
         list.child(entry("pick-up", this::pickUpValue, PICK_UP_COLOR));
         list.child(entry("materials", this::materialsValue, MATERIALS_COLOR));
 
-        list.child(section("Build", this::buildValue, SECTION_GAP));
+        list.child(GuiStyle.section("Build", this::buildValue, GuiStyle.SECTION_GAP));
         list.child(
-            row().child(modeButton("Blueprint", EXPAND, TARGET_BLUEPRINT))
-                .child(modeButton("Build", EXPAND, TARGET_BUILD)));
+            GuiStyle.row()
+                .child(modeButton("Blueprint", GuiStyle.EXPAND, TARGET_BLUEPRINT))
+                .child(modeButton("Build", GuiStyle.EXPAND, TARGET_BUILD)));
+        list.child(
+            GuiStyle.row()
+                .child(GuiStyle.button("Blueprints", GuiStyle.EXPAND, () -> true, this::openBlueprints)));
         list.child(entry("blueprint", this::blueprintValue, BUILD_COLOR));
         list.child(entry("site", this::buildSiteValue, BUILD_COLOR));
 
-        TextWidget<?> targetHint = label(IKey.dynamic(this::targetingLabel), HINT_COLOR);
+        TextWidget<?> targetHint = GuiStyle.label(IKey.dynamic(this::targetingLabel), GuiStyle.HINT_COLOR);
         targetHint.widthRel(1.0F);
         targetHint.setEnabledIf(widget -> targeting != TARGET_NONE);
-        targetHint.marginTop(ROW_GAP);
+        targetHint.marginTop(GuiStyle.ROW_GAP);
         list.child(targetHint);
 
         sidePanel = list;
@@ -534,68 +527,12 @@ public class ColonyView {
             .coverChildrenHeight()
             .marginBottom(1)
             .mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
-            .child(label(IKey.str(name), HINT_COLOR))
-            .child(label(IKey.dynamic(() -> entryValue(name, value)), color));
+            .child(GuiStyle.label(IKey.str(name), GuiStyle.HINT_COLOR))
+            .child(GuiStyle.label(IKey.dynamic(() -> entryValue(name, value)), color));
     }
 
     private String entryValue(String name, Supplier<String> value) {
-        return GuiText.trim(value.get(), innerWidth() - GuiText.width(name) - ROW_TEXT_PADDING);
-    }
-
-    private static Flow row() {
-        return Flow.row()
-            .widthRel(1.0F)
-            .height(BUTTON_HEIGHT)
-            .marginBottom(ROW_GAP)
-            .childPadding(ROW_GAP);
-    }
-
-    private Flow section(String title, Supplier<String> value, int gap) {
-        return Flow.column()
-            .widthRel(1.0F)
-            .coverChildrenHeight()
-            .marginTop(gap)
-            .marginBottom(ROW_GAP)
-            .child(
-                Flow.row()
-                    .widthRel(1.0F)
-                    .coverChildrenHeight()
-                    .mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
-                    .child(label(IKey.str(title), TITLE_COLOR))
-                    .child(label(IKey.dynamic(value), HINT_COLOR)))
-            .child(
-                new Widget<>().widthRel(1.0F)
-                    .height(1)
-                    .marginTop(2)
-                    .background(new Rectangle().color(SECTION_LINE)));
-    }
-
-    private static TextWidget<?> label(IKey key, int color) {
-        return key.asWidget()
-            .color(color)
-            .shadow(true);
-    }
-
-    private static IDrawable skin(int fill, int border) {
-        return (context, x, y, width, height, theme) -> {
-            GuiDraw.drawRect(x, y, width, height, fill);
-            GuiDraw.drawRect(x, y, width, 1, border);
-            GuiDraw.drawRect(x, y + height - 1, width, 1, border);
-            GuiDraw.drawRect(x, y, 1, height, border);
-            GuiDraw.drawRect(x + width - 1, y, 1, height, border);
-        };
-    }
-
-    private static IDrawable scrollHandle() {
-        return (context, x, y, width, height, theme) -> {
-            GuiDraw.drawRect(x + 1, y, width - 2, height, SCROLL_HANDLE);
-        };
-    }
-
-    private static IDrawable dynamicSkin(IntSupplier fill, IntSupplier border) {
-        return (context, x, y, width, height, theme) -> {
-            skin(fill.getAsInt(), border.getAsInt()).draw(context, x, y, width, height, theme);
-        };
+        return GuiText.trim(value.get(), innerWidth() - GuiText.width(name) - GuiStyle.ROW_TEXT_PADDING);
     }
 
     private boolean hasSelection() {
@@ -608,66 +545,14 @@ public class ColonyView {
     }
 
     private ButtonWidget<?> modeButton(String label, int width, int mode) {
-        ButtonWidget<?> widget = new ButtonWidget<>();
-        sizeButton(widget, width);
-        widget.background(
-            dynamicSkin(
-                () -> targeting == mode ? ACTIVE_BACKGROUND : BUTTON_BACKGROUND,
-                () -> targeting == mode ? ACTIVE_BORDER : BUTTON_BORDER));
-        widget.hoverBackground(
-            dynamicSkin(
-                () -> targeting == mode ? ACTIVE_BACKGROUND : BUTTON_HOVER,
-                () -> targeting == mode ? ACTIVE_BORDER : BUTTON_BORDER));
-        widget.child(
-            IKey.str(label)
-                .asWidget()
-                .color(() -> targeting == mode ? ACTIVE_COLOR : TEXT_COLOR)
-                .shadow(true)
-                .posRel(Alignment.Center));
-        widget.onMousePressed(mouseButton -> {
-            setTargeting(mode);
-            return true;
-        });
-        return widget;
-    }
-
-    private ButtonWidget<?> button(String label, int width, BooleanSupplier enabled, Runnable action) {
-        ButtonWidget<?> widget = new ButtonWidget<>();
-        sizeButton(widget, width);
-        widget.background(
-            dynamicSkin(
-                () -> enabled.getAsBoolean() ? BUTTON_BACKGROUND : DISABLED_BACKGROUND,
-                () -> enabled.getAsBoolean() ? BUTTON_BORDER : DISABLED_BORDER));
-        widget.hoverBackground(
-            dynamicSkin(
-                () -> enabled.getAsBoolean() ? BUTTON_HOVER : DISABLED_BACKGROUND,
-                () -> enabled.getAsBoolean() ? BUTTON_BORDER : DISABLED_BORDER));
-        widget.child(
-            IKey.str(label)
-                .asWidget()
-                .color(() -> enabled.getAsBoolean() ? TEXT_COLOR : DISABLED_COLOR)
-                .shadow(true)
-                .posRel(Alignment.Center));
-        widget.onMousePressed(mouseButton -> {
-            if (enabled.getAsBoolean()) {
-                action.run();
-            }
-            return true;
-        });
-        return widget;
-    }
-
-    private static void sizeButton(ButtonWidget<?> widget, int width) {
-        widget.height(BUTTON_HEIGHT);
-        if (width == EXPAND) {
-            widget.expanded();
-        } else {
-            widget.width(width);
-        }
+        return GuiStyle.toggleButton(() -> label, width, () -> targeting == mode, () -> setTargeting(mode));
     }
 
     private String targetingLabel() {
-        if (targeting == TARGET_CHOP || targeting == TARGET_FARM || targeting == TARGET_BLUEPRINT) {
+        if (targeting == TARGET_BLUEPRINT) {
+            return "drag the footprint, RMB cancels";
+        }
+        if (targeting == TARGET_CHOP || targeting == TARGET_FARM) {
             return "drag a region, RMB cancels";
         }
         if (targeting == TARGET_BUILD) {
@@ -704,10 +589,11 @@ public class ColonyView {
     }
 
     private String blueprintValue() {
-        if (!colony.hasBlueprint()) {
+        ColonySnapshot.BlueprintEntry entry = colony.getBlueprint(colony.getActiveBlueprint());
+        if (entry == null) {
             return "none";
         }
-        return colony.getBlueprintX() + "x" + colony.getBlueprintY() + "x" + colony.getBlueprintZ();
+        return entry.getLabel(colony.getActiveBlueprint());
     }
 
     private String buildSiteValue() {
@@ -719,16 +605,14 @@ public class ColonyView {
 
     private String buildValue() {
         if (!colony.hasBuildSite()) {
-            return colony.hasBlueprint() ? colony.getBlueprintBlocks() + " blocks" : "";
+            ColonySnapshot.BlueprintEntry entry = colony.getBlueprint(colony.getActiveBlueprint());
+            return entry == null ? "" : entry.getBlocks() + " blocks";
         }
         return colony.getBuildTotal() - colony.getBuildRemaining() + "/" + colony.getBuildTotal();
     }
 
     private TextFieldWidget groupField() {
-        groupField = new TextFieldWidget();
-        groupField.setMaxLength(PacketCitizenGroup.MAX_GROUP_LENGTH);
-        groupField.background(skin(ROW_BACKGROUND, BUTTON_BORDER));
-        groupField.height(BUTTON_HEIGHT);
+        groupField = GuiStyle.field(PacketCitizenGroup.MAX_GROUP_LENGTH);
         groupField.expanded();
         return groupField;
     }
@@ -736,22 +620,22 @@ public class ColonyView {
     private ButtonWidget<?> buildGroupRow(int index) {
         ButtonWidget<?> row = new ButtonWidget<>();
         row.widthRel(1.0F);
-        row.height(ROW_HEIGHT);
+        row.height(GuiStyle.ROW_HEIGHT);
         row.marginBottom(1);
-        row.background(groupRowSkin(index, ROW_BACKGROUND, ROW_SELECTED));
-        row.hoverBackground(groupRowSkin(index, BUTTON_HOVER, ROW_SELECTED_HOVER));
+        row.background(groupRowSkin(index, GuiStyle.ROW_BACKGROUND, GuiStyle.ROW_SELECTED));
+        row.hoverBackground(groupRowSkin(index, GuiStyle.BUTTON_HOVER, GuiStyle.ROW_SELECTED_HOVER));
         row.child(
             Flow.row()
                 .widthRel(1.0F)
                 .heightRel(1.0F)
-                .paddingLeft(SWATCH_WIDTH + 4)
+                .paddingLeft(GuiStyle.SWATCH_WIDTH + 4)
                 .paddingRight(4)
                 .mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
                 .crossAxisAlignment(Alignment.CrossAxis.CENTER)
                 .child(
                     IKey.dynamic(() -> groupRowLabel(index))
                         .asWidget()
-                        .color(TEXT_COLOR)
+                        .color(GuiStyle.TEXT_COLOR)
                         .shadow(true))
                 .child(
                     IKey.dynamic(() -> groupRowCount(index))
@@ -773,7 +657,7 @@ public class ColonyView {
     private IDrawable groupRowSkin(int index, int fill, int selected) {
         return (context, x, y, width, height, theme) -> {
             GuiDraw.drawRect(x, y, width, height, groupRowSelected(index) ? selected : fill);
-            GuiDraw.drawRect(x, y, SWATCH_WIDTH, height, groupRowColor(index));
+            GuiDraw.drawRect(x, y, GuiStyle.SWATCH_WIDTH, height, groupRowColor(index));
         };
     }
 
@@ -786,12 +670,13 @@ public class ColonyView {
         if (group == null) {
             return "";
         }
-        return GuiText
-            .trim(group, innerWidth() - SWATCH_WIDTH - ROW_TEXT_PADDING * 3 - GuiText.width(groupRowCount(index)));
+        return GuiText.trim(
+            group,
+            innerWidth() - GuiStyle.SWATCH_WIDTH - GuiStyle.ROW_TEXT_PADDING * 3 - GuiText.width(groupRowCount(index)));
     }
 
     private int innerWidth() {
-        return (int) sideWidth() - SIDE_PADDING * 2 - SCROLL_THICKNESS;
+        return (int) sideWidth() - GuiStyle.PADDING * 2 - GuiStyle.SCROLL_THICKNESS;
     }
 
     private int groupRowCounted(int index, boolean selectedOnly) {
@@ -821,13 +706,13 @@ public class ColonyView {
     }
 
     private int groupRowCountColor(int index) {
-        return groupRowCounted(index, true) > 0 ? ACTIVE_COLOR : HINT_COLOR;
+        return groupRowCounted(index, true) > 0 ? GuiStyle.ACTIVE_COLOR : GuiStyle.HINT_COLOR;
     }
 
     private int groupRowColor(int index) {
         String group = groupAt(index);
         if (group == null) {
-            return SECTION_LINE;
+            return GuiStyle.SECTION_LINE;
         }
         return ColonyWorldOverlay.groupColor(UNGROUPED.equals(group) ? "" : group) | 0xFF000000;
     }

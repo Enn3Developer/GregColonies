@@ -190,12 +190,52 @@ public class ColonyManager extends WorldSavedData {
         return true;
     }
 
-    public boolean setBlueprint(int colonyId, Blueprint blueprint) {
+    public int addBlueprint(int colonyId, Blueprint blueprint) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null) {
+            return -1;
+        }
+        int index = colony.addBlueprint(blueprint);
+        if (index >= 0) {
+            markDirty();
+        }
+        return index;
+    }
+
+    public boolean removeBlueprint(int colonyId, int index) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null || !colony.removeBlueprint(index)) {
+            return false;
+        }
+        markDirty();
+        return true;
+    }
+
+    public boolean renameBlueprint(int colonyId, int index, String name) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null || !colony.renameBlueprint(index, name)) {
+            return false;
+        }
+        markDirty();
+        return true;
+    }
+
+    public boolean setActiveBlueprint(int colonyId, int index) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null || !colony.setActiveBlueprint(index)) {
+            return false;
+        }
+        markDirty();
+        return true;
+    }
+
+    public boolean setPlacement(int colonyId, int rotation, boolean mirror) {
         Colony colony = colonies.get(colonyId);
         if (colony == null) {
             return false;
         }
-        colony.setBlueprint(blueprint);
+        colony.setPlaceRotation(rotation);
+        colony.setPlaceMirror(mirror);
         markDirty();
         return true;
     }
