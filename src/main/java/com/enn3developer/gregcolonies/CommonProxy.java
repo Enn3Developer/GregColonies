@@ -33,6 +33,14 @@ public class CommonProxy {
 
     public void openColonyScreen(ColonySnapshot colony) {}
 
+    public String trimText(String text, int width) {
+        return text;
+    }
+
+    public int textWidth(String text) {
+        return 0;
+    }
+
     public IDrawable armorSlotIcon(int armorType, BooleanSupplier visible) {
         return IDrawable.EMPTY;
     }

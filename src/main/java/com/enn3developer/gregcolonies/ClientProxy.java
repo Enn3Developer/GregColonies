@@ -13,6 +13,7 @@ import com.enn3developer.gregcolonies.client.RenderCitizen;
 import com.enn3developer.gregcolonies.client.gui.CitizenIcons;
 import com.enn3developer.gregcolonies.client.gui.ColonyScreen;
 import com.enn3developer.gregcolonies.client.gui.ColonyWorldOverlay;
+import com.enn3developer.gregcolonies.client.gui.GuiText;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
 
@@ -39,6 +40,16 @@ public class ClientProxy extends CommonProxy {
             .register(events);
         MinecraftForge.EVENT_BUS.register(events);
         MinecraftForge.EVENT_BUS.register(new ColonyWorldOverlay());
+    }
+
+    @Override
+    public String trimText(String text, int width) {
+        return GuiText.trim(text, width);
+    }
+
+    @Override
+    public int textWidth(String text) {
+        return GuiText.width(text);
     }
 
     @Override

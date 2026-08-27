@@ -177,6 +177,30 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     private static final int PREVIEW_HEIGHT = 72;
 
+    private static final int PREVIEW_INSET_X = 8;
+
+    private static final int PREVIEW_INSET_TOP = 15;
+
+    private static final int PREVIEW_INSET_BOTTOM = 5;
+
+    private static final int PREVIEW_X = (PANEL_WIDTH - PREVIEW_WIDTH) / 2;
+
+    private static final int SLOT_SIZE = 18;
+
+    private static final int EDGE_MARGIN = 7;
+
+    private static final int LEFT_COLUMN = EDGE_MARGIN;
+
+    private static final int RIGHT_COLUMN = PANEL_WIDTH - EDGE_MARGIN - SLOT_SIZE;
+
+    private static final int TOOL_ROW = TOP_ROW + SLOT_SIZE * 3 + 4;
+
+    private static final int TEXT_WIDTH = PANEL_WIDTH - TEXT_MARGIN * 2;
+
+    private static final int ICON_GAP = 3;
+
+    private static final int ROW_GAP = 4;
+
     private final CitizenCommandQueue commands = new CitizenCommandQueue();
     private final CitizenParameters parameters = new CitizenParameters();
     private final CitizenInventory inventory = new CitizenInventory(this);
@@ -732,26 +756,24 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         panel.child(
             textRow(
                 TITLE_ROW,
-                IKey.dynamic(this::getCitizenName),
+                IKey.dynamic(() -> rowLabel(getCitizenName(), healthLabel())),
                 PANEL_TITLE_COLOR,
                 iconValue(HEART_ICON, IKey.dynamic(this::healthLabel), PANEL_TITLE_COLOR)));
         panel.child(
             textRow(
                 STATUS_ROW,
-                IKey.dynamic(group::getValue),
+                IKey.dynamic(() -> rowLabel(group.getValue(), foodLabel(food.getIntValue()))),
                 PANEL_TEXT_COLOR,
-                iconValue(
-                    FOOD_ICON,
-                    IKey.dynamic(() -> food.getIntValue() + " / " + CitizenDiet.MAX_FOOD_LEVEL),
-                    PANEL_TEXT_COLOR)));
+                iconValue(FOOD_ICON, IKey.dynamic(() -> foodLabel(food.getIntValue())), PANEL_TEXT_COLOR)));
         panel.child(
-            new Widget<>().size(PANEL_WIDTH - TEXT_MARGIN * 2, 1)
+            new Widget<>().size(TEXT_WIDTH, 1)
                 .pos(TEXT_MARGIN, SEPARATOR_ROW)
                 .background(new Rectangle().color(PANEL_LINE_COLOR)));
         panel.child(
-            IKey.dynamic(task::getValue)
+            IKey.dynamic(() -> GregColonies.proxy.trimText(task.getValue(), TEXT_WIDTH))
                 .asWidget()
                 .color(PANEL_TASK_COLOR)
+                .size(TEXT_WIDTH, TEXT_HEIGHT)
                 .pos(TEXT_MARGIN, TASK_ROW));
         panel.child(
             SlotGroupWidget.builder()
@@ -772,7 +794,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
                                         .getStackInSlot(index) == null)),
                         ARMOR_HINTS[index]))
                 .build()
-                .pos(7, TOP_ROW));
+                .pos(LEFT_COLUMN, TOP_ROW));
         panel.child(
             SlotGroupWidget.builder()
                 .row("F")
@@ -791,7 +813,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
                                         .getStackInSlot(index) == null)),
                         "Food"))
                 .build()
-                .pos(151, TOP_ROW));
+                .pos(RIGHT_COLUMN, TOP_ROW));
         panel.child(
             hint(
                 new ItemSlot().slot(
@@ -802,15 +824,21 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
                             Items.iron_pickaxe,
                             () -> inventory.getTool()
                                 .getStackInSlot(0) == null)),
-                "Tool").pos(151, TOP_ROW + 58));
+                "Tool").pos(RIGHT_COLUMN, TOOL_ROW));
         IDrawable display = new EntityDisplayWidget(() -> this).doesLookAtMouse(true);
         panel.child(
             new Widget<>().size(PREVIEW_WIDTH, PREVIEW_HEIGHT)
-                .pos(61, TOP_ROW)
+                .pos(PREVIEW_X, TOP_ROW)
                 .background(GuiTextures.DISPLAY, (context, x, y, width, height, theme) -> {
                     previewRender = true;
                     try {
-                        display.draw(context, x, y, width, height, theme);
+                        display.draw(
+                            context,
+                            x + PREVIEW_INSET_X,
+                            y + PREVIEW_INSET_TOP,
+                            width - PREVIEW_INSET_X * 2,
+                            height - PREVIEW_INSET_TOP - PREVIEW_INSET_BOTTOM,
+                            theme);
                     } finally {
                         previewRender = false;
                     }
@@ -822,7 +850,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
                     'I',
                     index -> new ItemSlot().slot(new ModularSlot(inventory.getMain(), index).slotGroup(MAIN_GROUP)))
                 .build()
-                .pos(7, MAIN_ROW));
+                .pos(LEFT_COLUMN, MAIN_ROW));
         panel.child(SlotGroupWidget.playerInventory(true));
         return panel;
     }
@@ -881,6 +909,15 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
 
     public String describeGender() {
         return CitizenGender.describe(getGender(), isChild());
+    }
+
+    private static String foodLabel(int level) {
+        return level + " / " + CitizenDiet.MAX_FOOD_LEVEL;
+    }
+
+    private static String rowLabel(String left, String right) {
+        int used = HUD_ICON + ICON_GAP + GregColonies.proxy.textWidth(right) + ROW_GAP;
+        return GregColonies.proxy.trimText(left, TEXT_WIDTH - used);
     }
 
     private String healthLabel() {

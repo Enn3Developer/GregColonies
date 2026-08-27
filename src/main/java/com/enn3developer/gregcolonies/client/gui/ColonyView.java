@@ -76,6 +76,10 @@ public class ColonyView {
 
     private static final int SWATCH_WIDTH = 3;
 
+    private static final int SCROLL_THICKNESS = 4;
+
+    private static final int ROW_TEXT_PADDING = 4;
+
     private static final int ROW_HEIGHT = 13;
 
     private static final int BUTTON_HEIGHT = 15;
@@ -493,7 +497,11 @@ public class ColonyView {
             .marginBottom(1)
             .mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
             .child(label(IKey.str(name), HINT_COLOR))
-            .child(label(IKey.dynamic(value), color));
+            .child(label(IKey.dynamic(() -> entryValue(name, value)), color));
+    }
+
+    private String entryValue(String name, Supplier<String> value) {
+        return GuiText.trim(value.get(), innerWidth() - GuiText.width(name) - ROW_TEXT_PADDING);
     }
 
     private static Flow row() {
@@ -706,7 +714,15 @@ public class ColonyView {
 
     private String groupRowLabel(int index) {
         String group = groupAt(index);
-        return group == null ? "" : group;
+        if (group == null) {
+            return "";
+        }
+        return GuiText
+            .trim(group, innerWidth() - SWATCH_WIDTH - ROW_TEXT_PADDING * 3 - GuiText.width(groupRowCount(index)));
+    }
+
+    private int innerWidth() {
+        return (int) sideWidth() - SIDE_PADDING * 2 - SCROLL_THICKNESS;
     }
 
     private int groupRowCounted(int index, boolean selectedOnly) {
