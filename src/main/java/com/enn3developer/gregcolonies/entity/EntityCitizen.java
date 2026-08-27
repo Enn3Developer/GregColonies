@@ -460,9 +460,15 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     @Override
     public void onDeath(DamageSource cause) {
         super.onDeath(cause);
-        if (!worldObj.isRemote && colonyId != 0) {
+        if (worldObj.isRemote) {
+            return;
+        }
+        if (colonyId != 0) {
             ColonyManager.get(worldObj)
                 .removeCitizen(colonyId, getUniqueID());
+        }
+        for (ItemStack stack : inventory.takeAll()) {
+            entityDropItem(stack, 0.0F);
         }
     }
 
@@ -919,10 +925,5 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     }
 
     @Override
-    protected void dropEquipment(boolean recentlyHit, int looting) {
-        super.dropEquipment(recentlyHit, looting);
-        for (ItemStack stack : inventory.takeAll()) {
-            entityDropItem(stack, 0.0F);
-        }
-    }
+    protected void dropEquipment(boolean recentlyHit, int looting) {}
 }
