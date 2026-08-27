@@ -21,6 +21,8 @@ import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
 
 public abstract class CitizenCommandHarvest extends CitizenCommand {
 
+    public static final int MAX_HEIGHT = 32;
+
     protected static final int PHASE_TRAVEL = 0;
 
     protected static final int PHASE_WORK = 1;
@@ -112,6 +114,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
         maxX = Math.max(x1, x2);
         maxY = Math.max(y1, y2);
         maxZ = Math.max(z1, z2);
+        maxY = Math.min(maxY, minY + MAX_HEIGHT - 1);
     }
 
     protected abstract Block referenceBlock();

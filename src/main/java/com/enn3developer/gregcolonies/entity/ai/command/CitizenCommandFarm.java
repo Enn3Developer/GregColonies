@@ -152,6 +152,7 @@ public class CitizenCommandFarm extends CitizenCommand {
         maxZ = Math.max(z1, z2);
         maxX = Math.min(maxX, minX + MAX_SIDE - 1);
         maxZ = Math.min(maxZ, minZ + MAX_SIDE - 1);
+        maxY = Math.min(maxY, minY + CitizenCommandHarvest.MAX_HEIGHT - 1);
     }
 
     @Override
