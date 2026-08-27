@@ -23,6 +23,8 @@ public class Colony {
 
     public static final int MAX_BLUEPRINTS = 16;
 
+    private static final int BUILD_LEASE_TICKS = 100;
+
     private int id;
     private String name;
     private UUID owner;
@@ -48,6 +50,8 @@ public class Colony {
     private int placeRotation;
     private boolean placeMirror;
     private BuildSite buildSite;
+    private UUID buildOwner;
+    private long buildLease;
     private final Deque<CitizenCommand> orders = new ArrayDeque<>();
     private final Map<UUID, ColonyCitizen> citizens = new LinkedHashMap<>();
 
@@ -279,38 +283,21 @@ public class Colony {
 
     public void setBuildSite(BuildSite buildSite) {
         this.buildSite = buildSite;
-        releaseAllBuildSpots();
+        this.buildOwner = null;
     }
 
-    public boolean isBuildSpotFree(UUID id, int x, int y, int z) {
-        for (ColonyCitizen citizen : citizens.values()) {
-            if (!citizen.getId()
-                .equals(id) && citizen.isBuildSpotAt(x, y, z)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    public boolean claimBuildSpot(UUID id, int x, int y, int z) {
-        ColonyCitizen owner = citizens.get(id);
-        if (owner == null || !isBuildSpotFree(id, x, y, z)) {
+    public boolean claimBuildSite(UUID id, long time) {
+        if (buildOwner != null && !buildOwner.equals(id) && time - buildLease < BUILD_LEASE_TICKS) {
             return false;
         }
-        owner.setBuildSpot(x, y, z);
+        buildOwner = id;
+        buildLease = time;
         return true;
     }
 
-    public void releaseBuildSpot(UUID id) {
-        ColonyCitizen owner = citizens.get(id);
-        if (owner != null) {
-            owner.clearBuildSpot();
-        }
-    }
-
-    private void releaseAllBuildSpots() {
-        for (ColonyCitizen citizen : citizens.values()) {
-            citizen.clearBuildSpot();
+    public void releaseBuildSite(UUID id) {
+        if (buildOwner != null && buildOwner.equals(id)) {
+            buildOwner = null;
         }
     }
 

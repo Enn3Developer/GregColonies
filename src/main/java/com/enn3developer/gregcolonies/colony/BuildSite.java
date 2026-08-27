@@ -1,5 +1,8 @@
 package com.enn3developer.gregcolonies.colony;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import net.minecraft.block.Block;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -13,6 +16,7 @@ public class BuildSite {
     private int rotation;
     private boolean mirror;
     private Blueprint blueprint;
+    private final List<int[]> scaffolds = new ArrayList<>();
 
     private BuildSite() {}
 
@@ -47,6 +51,51 @@ public class BuildSite {
 
     public Blueprint getBlueprint() {
         return blueprint;
+    }
+
+    public boolean contains(int worldX, int worldY, int worldZ) {
+        return blueprint.contains(worldX - x, worldY - y, worldZ - z);
+    }
+
+    public boolean hasScaffolds() {
+        return !scaffolds.isEmpty();
+    }
+
+    public boolean isScaffoldAt(int worldX, int worldY, int worldZ) {
+        return indexOfScaffold(worldX, worldY, worldZ) >= 0;
+    }
+
+    public void addScaffold(int worldX, int worldY, int worldZ) {
+        if (!isScaffoldAt(worldX, worldY, worldZ)) {
+            scaffolds.add(new int[] { worldX, worldY, worldZ });
+        }
+    }
+
+    public void removeScaffold(int worldX, int worldY, int worldZ) {
+        int index = indexOfScaffold(worldX, worldY, worldZ);
+        if (index >= 0) {
+            scaffolds.remove(index);
+        }
+    }
+
+    public int[] topScaffold() {
+        int[] top = null;
+        for (int[] scaffold : scaffolds) {
+            if (top == null || scaffold[1] > top[1]) {
+                top = scaffold;
+            }
+        }
+        return top;
+    }
+
+    private int indexOfScaffold(int worldX, int worldY, int worldZ) {
+        for (int i = 0; i < scaffolds.size(); i++) {
+            int[] scaffold = scaffolds.get(i);
+            if (scaffold[0] == worldX && scaffold[1] == worldY && scaffold[2] == worldZ) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     public boolean isAt(int x, int y, int z) {
@@ -106,6 +155,14 @@ public class BuildSite {
         tag.setInteger("rotation", rotation);
         tag.setBoolean("mirror", mirror);
         tag.setTag("blueprint", blueprint.writeToNBT());
+        int[] packed = new int[scaffolds.size() * 3];
+        for (int i = 0; i < scaffolds.size(); i++) {
+            int[] scaffold = scaffolds.get(i);
+            packed[i * 3] = scaffold[0];
+            packed[i * 3 + 1] = scaffold[1];
+            packed[i * 3 + 2] = scaffold[2];
+        }
+        tag.setIntArray("scaffolds", packed);
         return tag;
     }
 
@@ -121,6 +178,10 @@ public class BuildSite {
         site.rotation = tag.getInteger("rotation");
         site.mirror = tag.getBoolean("mirror");
         site.blueprint = blueprint;
+        int[] packed = tag.getIntArray("scaffolds");
+        for (int i = 0; i + 2 < packed.length; i += 3) {
+            site.scaffolds.add(new int[] { packed[i], packed[i + 1], packed[i + 2] });
+        }
         return site;
     }
 }

@@ -24,10 +24,6 @@ public class ColonyCitizen {
     private int bedX;
     private int bedY;
     private int bedZ;
-    private boolean hasBuildSpot;
-    private int buildX;
-    private int buildY;
-    private int buildZ;
 
     private ColonyCitizen() {}
 
@@ -113,28 +109,6 @@ public class ColonyCitizen {
         bedX = 0;
         bedY = 0;
         bedZ = 0;
-    }
-
-    public boolean hasBuildSpot() {
-        return hasBuildSpot;
-    }
-
-    public boolean isBuildSpotAt(int x, int y, int z) {
-        return hasBuildSpot && buildX == x && buildY == y && buildZ == z;
-    }
-
-    public void setBuildSpot(int x, int y, int z) {
-        hasBuildSpot = true;
-        buildX = x;
-        buildY = y;
-        buildZ = z;
-    }
-
-    public void clearBuildSpot() {
-        hasBuildSpot = false;
-        buildX = 0;
-        buildY = 0;
-        buildZ = 0;
     }
 
     public int getDimension() {

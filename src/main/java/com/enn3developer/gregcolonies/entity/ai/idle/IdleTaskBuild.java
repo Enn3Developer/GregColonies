@@ -1,12 +1,11 @@
 package com.enn3developer.gregcolonies.entity.ai.idle;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import net.minecraft.block.Block;
+import net.minecraft.entity.item.EntityItem;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.MathHelper;
@@ -19,6 +18,8 @@ import com.enn3developer.gregcolonies.colony.ColonyManager;
 import com.enn3developer.gregcolonies.entity.CitizenJob;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.auto.AutoTask;
+import com.enn3developer.gregcolonies.entity.ai.work.BlockBreaker;
+import com.enn3developer.gregcolonies.entity.ai.work.DigResult;
 import com.enn3developer.gregcolonies.entity.ai.work.Inventories;
 import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
 
@@ -30,51 +31,77 @@ public class IdleTaskBuild extends AutoTask {
 
     private static final int RETRY_INTERVAL = 200;
 
-    private static final int TRAVEL_TIMEOUT = 600;
+    private static final int TRAVEL_TIMEOUT = 400;
+
+    private static final int STAND_TIMEOUT = 200;
 
     private static final int REPATH_INTERVAL = 10;
 
-    private static final double REACH = 4.5D;
+    private static final double REACH = 4.0D;
 
     private static final int PLACE_INTERVAL = 8;
 
-    private static final int MAX_CANDIDATES = 128;
+    private static final int STAND_RANGE = 3;
 
-    private static final int NEEDED_REFRESH = 40;
+    private static final int STAND_LEVELS = 2;
 
-    private static final int[][] NEIGHBOURS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+    private static final int COLUMN_RANGE = 2;
 
-    private static final int PHASE_FETCH = 0;
+    private static final int SCAFFOLD_FETCH = 16;
 
-    private static final int PHASE_PLACE = 1;
+    private static final int PHASE_CLEAR = 0;
 
-    private static final int PHASE_RETURN = 2;
+    private static final int PHASE_BUILD = 1;
 
-    private final List<int[]> candidates = new ArrayList<>();
+    private static final int PHASE_STRIP = 2;
 
-    private Set<Integer> needed = Collections.emptySet();
+    private final BlockBreaker breaker = new BlockBreaker();
 
-    private long neededAt;
+    private final Set<Long> blocked = new HashSet<>();
 
-    private boolean neededValid;
+    private final Set<Integer> missing = new HashSet<>();
 
-    private ItemStack fetched;
-
-    private long nextAttempt;
+    private String activity = "building";
 
     private int phase;
 
-    private boolean hasSpot;
+    private int cursor;
 
-    private int spotX;
+    private boolean progressed;
 
-    private int spotY;
+    private boolean storing;
 
-    private int spotZ;
+    private boolean hasTarget;
+
+    private int targetX;
+
+    private int targetY;
+
+    private int targetZ;
+
+    private boolean hasStand;
+
+    private boolean standDenied;
+
+    private int standX;
+
+    private int standY;
+
+    private int standZ;
+
+    private boolean hasColumn;
+
+    private int columnX;
+
+    private int columnZ;
+
+    private int columnTop;
 
     private int travelTicks;
 
     private int placeCooldown;
+
+    private long nextAttempt;
 
     @Override
     public String getId() {
@@ -83,10 +110,7 @@ public class IdleTaskBuild extends AutoTask {
 
     @Override
     public String describe() {
-        if (phase == PHASE_RETURN) {
-            return "returning materials";
-        }
-        return phase == PHASE_FETCH ? "fetching materials" : "building";
+        return storing ? "storing materials" : activity;
     }
 
     @Override
@@ -95,91 +119,227 @@ public class IdleTaskBuild extends AutoTask {
         if (!citizen.canWork() || world.getTotalWorldTime() < nextAttempt) {
             return false;
         }
-        if (world.provider.dimensionId != colony.getDimension()) {
+        if (world.provider.dimensionId != colony.getDimension() || citizen.getJob() != CitizenJob.BUILDER) {
             return false;
         }
-        if (citizen.getJob() != CitizenJob.BUILDER) {
-            return fetched != null && colony.hasMaterials();
-        }
-        if (colony.getBuildSite() == null) {
-            return fetched != null && colony.hasMaterials();
-        }
-        return colony.hasMaterials();
+        return colony.getBuildSite() != null && colony.hasMaterials();
     }
 
     @Override
     public void start(EntityCitizen citizen, Colony colony) {
-        hasSpot = false;
-        ColonyManager.get(citizen.worldObj)
-            .releaseBuildSpot(colony.getId(), citizen.getUniqueID());
+        blocked.clear();
+        storing = false;
         travelTicks = 0;
         placeCooldown = 0;
-        candidates.clear();
-        neededValid = false;
-        phase = PHASE_FETCH;
+        breaker.clear(citizen);
+        startPhase(PHASE_CLEAR, colony.getBuildSite());
     }
 
     @Override
     public boolean update(EntityCitizen citizen, Colony colony) {
+        World world = citizen.worldObj;
         BuildSite site = colony.getBuildSite();
         if (site == null) {
-            return fetched != null && returnMaterial(citizen, colony);
+            return false;
         }
-        if (phase == PHASE_RETURN) {
-            return returnMaterial(citizen, colony);
+        if (!ColonyManager.get(world)
+            .claimBuildSite(colony.getId(), citizen.getUniqueID(), world.getTotalWorldTime())) {
+            return false;
         }
-
-        World world = citizen.worldObj;
-        Set<Integer> wanted = needed(world, site);
-        ItemStack carrying = carried(citizen, site.getBlueprint(), wanted);
-        if (carrying != null) {
-            if (hasSpot && !site.needsStack(world, carrying, spotX, spotY, spotZ)) {
-                release(citizen, colony);
-            }
-            if (hasSpot || claim(citizen, colony, site, carrying)) {
-                phase = PHASE_PLACE;
-                return place(citizen, colony, site, carrying);
-            }
+        if (storing) {
+            return store(citizen, colony);
         }
-        release(citizen, colony);
-        if (fetched != null && carrying == null) {
-            return returnMaterial(citizen, colony);
+        if (phase == PHASE_CLEAR) {
+            return clear(citizen, colony, site);
         }
-        phase = PHASE_FETCH;
-        return fetch(citizen, colony, site, wanted);
+        if (phase == PHASE_BUILD) {
+            return build(citizen, colony, site);
+        }
+        return strip(citizen, colony, site);
     }
 
     @Override
     public void finish(EntityCitizen citizen) {
         Colony colony = citizen.getColony();
         if (colony != null) {
-            release(citizen, colony);
+            ColonyManager.get(citizen.worldObj)
+                .releaseBuildSite(colony.getId(), citizen.getUniqueID());
         }
-        candidates.clear();
-        neededValid = false;
+        breaker.clear(citizen);
         nextAttempt = citizen.worldObj.getTotalWorldTime() + RETRY_INTERVAL;
         citizen.getNavigator()
             .clearPathEntity();
     }
 
-    private static ItemStack carried(EntityCitizen citizen, Blueprint blueprint, Set<Integer> wanted) {
-        return citizen.getInventory()
-            .peekMain(stack -> matchesAny(blueprint, wanted, stack));
+    private void startPhase(int next, BuildSite site) {
+        phase = next;
+        cursor = next == PHASE_CLEAR && site != null ? site.getBlueprint()
+            .volume() - 1 : 0;
+        progressed = false;
+        hasTarget = false;
+        hasStand = false;
+        standDenied = false;
+        hasColumn = false;
+        travelTicks = 0;
+        missing.clear();
     }
 
-    private Set<Integer> needed(World world, BuildSite site) {
-        long time = world.getTotalWorldTime();
-        if (!neededValid || time - neededAt >= NEEDED_REFRESH) {
-            needed = neededCells(world, site);
-            neededAt = time;
-            neededValid = true;
+    private boolean clear(EntityCitizen citizen, Colony colony, BuildSite site) {
+        World world = citizen.worldObj;
+        activity = "clearing the site";
+        if (!hasTarget && !nextClearTarget(world, colony, site)) {
+            startPhase(PHASE_BUILD, site);
+            return true;
         }
-        return needed;
+        if (!inReach(citizen, targetX, targetY, targetZ)) {
+            breaker.clear(citizen);
+            if (!travel(citizen, targetX, targetY + 1, targetZ)) {
+                skipTarget();
+            }
+            return true;
+        }
+
+        citizen.getNavigator()
+            .clearPathEntity();
+        if (!breaker.isAt(targetX, targetY, targetZ)) {
+            breaker.setTarget(citizen, targetX, targetY, targetZ);
+        }
+        DigResult result = breaker.tick(citizen, true);
+        if (result == DigResult.PROGRESS) {
+            return true;
+        }
+        if (result == DigResult.INVENTORY_FULL) {
+            storing = true;
+            return true;
+        }
+        if (result == DigResult.BROKEN || result == DigResult.GONE) {
+            progressed = true;
+            hasTarget = false;
+            travelTicks = 0;
+            return true;
+        }
+        skipTarget();
+        return true;
     }
 
-    private boolean fetch(EntityCitizen citizen, Colony colony, BuildSite site, Set<Integer> wanted) {
-        if (!colony.hasMaterials() || wanted.isEmpty()) {
+    private boolean nextClearTarget(World world, Colony colony, BuildSite site) {
+        Blueprint blueprint = site.getBlueprint();
+        int sizeX = blueprint.getSizeX();
+        int sizeZ = blueprint.getSizeZ();
+        while (cursor >= 0) {
+            int x = site.getX() + cursor % sizeX;
+            int y = site.getY() + cursor / (sizeX * sizeZ);
+            int z = site.getZ() + cursor / sizeX % sizeZ;
+            if (!blocked.contains(WorkBlocks.pack(x, y, z)) && !isProtected(colony, x, y, z)
+                && needsClearing(world, site, x, y, z)) {
+                targetX = x;
+                targetY = y;
+                targetZ = z;
+                hasTarget = true;
+                travelTicks = 0;
+                return true;
+            }
+            cursor--;
+        }
+        return false;
+    }
+
+    private static boolean needsClearing(World world, BuildSite site, int x, int y, int z) {
+        Block block = world.getBlock(x, y, z);
+        if (block == null || block.isAir(world, x, y, z)
+            || block.getMaterial()
+                .isLiquid()) {
             return false;
+        }
+        if (site.isScaffoldAt(x, y, z)) {
+            return false;
+        }
+        return site.cellFor(x, y, z) == Blueprint.AIR || !site.isPlaced(world, x, y, z);
+    }
+
+    private static boolean isProtected(Colony colony, int x, int y, int z) {
+        if (colony.getX() == x && colony.getY() == y && colony.getZ() == z) {
+            return true;
+        }
+        if (colony.hasMaterials() && colony.getMaterialsX() == x
+            && colony.getMaterialsY() == y
+            && colony.getMaterialsZ() == z) {
+            return true;
+        }
+        if (colony.hasDropOff() && colony.getDropOffX() == x
+            && colony.getDropOffY() == y
+            && colony.getDropOffZ() == z) {
+            return true;
+        }
+        return colony.hasPickUp() && colony.getPickUpX() == x && colony.getPickUpY() == y && colony.getPickUpZ() == z;
+    }
+
+    private boolean build(EntityCitizen citizen, Colony colony, BuildSite site) {
+        World world = citizen.worldObj;
+        Blueprint blueprint = site.getBlueprint();
+        if (!hasTarget && !nextBuildTarget(world, site)) {
+            if (progressed) {
+                progressed = false;
+                cursor = 0;
+                missing.clear();
+                blocked.clear();
+                return true;
+            }
+            startPhase(PHASE_STRIP, site);
+            return true;
+        }
+
+        int cell = site.cellFor(targetX, targetY, targetZ);
+        if (!citizen.getInventory()
+            .hasMain(stack -> blueprint.matches(cell, stack))) {
+            return fetch(citizen, colony, blueprint, cell);
+        }
+        if (!inReach(citizen, targetX, targetY, targetZ) || occupies(citizen, targetX, targetY, targetZ)) {
+            return approach(citizen, colony, site);
+        }
+        return placeBlock(citizen, site, cell);
+    }
+
+    private boolean nextBuildTarget(World world, BuildSite site) {
+        Blueprint blueprint = site.getBlueprint();
+        int sizeX = blueprint.getSizeX();
+        int sizeZ = blueprint.getSizeZ();
+        int volume = blueprint.volume();
+        while (cursor < volume) {
+            int x = site.getX() + cursor % sizeX;
+            int y = site.getY() + cursor / (sizeX * sizeZ);
+            int z = site.getZ() + cursor / sizeX % sizeZ;
+            int cell = site.cellFor(x, y, z);
+            if (cell != Blueprint.AIR && !missing.contains(cell)
+                && !blocked.contains(WorkBlocks.pack(x, y, z))
+                && !site.isPlaced(world, x, y, z)
+                && site.isFree(world, x, y, z)) {
+                targetX = x;
+                targetY = y;
+                targetZ = z;
+                hasTarget = true;
+                hasStand = false;
+                standDenied = false;
+                hasColumn = false;
+                travelTicks = 0;
+                return true;
+            }
+            cursor++;
+        }
+        return false;
+    }
+
+    private boolean fetch(EntityCitizen citizen, Colony colony, Blueprint blueprint, int cell) {
+        activity = "fetching materials";
+        if (!colony.hasMaterials()) {
+            missing.add(cell);
+            skipCell();
+            return true;
+        }
+        if (!citizen.getInventory()
+            .hasFreeMainSlot()) {
+            storing = true;
+            return true;
         }
         int x = colony.getMaterialsX();
         int y = colony.getMaterialsY();
@@ -188,36 +348,316 @@ public class IdleTaskBuild extends AutoTask {
             return travel(citizen, x, y + 1, z);
         }
 
-        World world = citizen.worldObj;
-        IInventory inventory = Inventories.at(world, x, y, z);
+        IInventory inventory = Inventories.at(citizen.worldObj, x, y, z);
         if (inventory == null) {
             return false;
         }
-        Blueprint blueprint = site.getBlueprint();
-        ItemStack taken = Inventories
-            .extract(inventory, stack -> matchesAny(blueprint, wanted, stack), stackLimit(citizen));
+        ItemStack taken = Inventories.extract(inventory, stack -> blueprint.matches(cell, stack), 64);
+        travelTicks = 0;
         if (taken == null) {
-            return false;
+            missing.add(cell);
+            skipCell();
+            return true;
         }
-        fetched = taken.copy();
-        fetched.stackSize = 1;
         ItemStack rest = citizen.getInventory()
             .store(taken);
         if (rest != null) {
             Inventories.insert(inventory, rest);
         }
         citizen.swingItem();
-        travelTicks = 0;
-        candidates.clear();
-        phase = PHASE_PLACE;
         return true;
     }
 
-    private boolean returnMaterial(EntityCitizen citizen, Colony colony) {
-        if (!colony.hasMaterials() || fetched == null) {
+    private boolean approach(EntityCitizen citizen, Colony colony, BuildSite site) {
+        World world = citizen.worldObj;
+        if (!standDenied && !hasStand && !findStand(world, citizen, site)) {
+            standDenied = true;
+        }
+        if (standDenied) {
+            return scaffold(citizen, colony, site);
+        }
+        activity = "building";
+        breaker.clear(citizen);
+        if (!travel(citizen, standX, standY, standZ, STAND_TIMEOUT)) {
+            hasStand = false;
+            standDenied = true;
+            travelTicks = 0;
+        }
+        return true;
+    }
+
+    private boolean findStand(World world, EntityCitizen citizen, BuildSite site) {
+        double best = Double.MAX_VALUE;
+        for (int dy = -STAND_LEVELS; dy <= STAND_LEVELS; dy++) {
+            for (int dz = -STAND_RANGE; dz <= STAND_RANGE; dz++) {
+                for (int dx = -STAND_RANGE; dx <= STAND_RANGE; dx++) {
+                    int x = targetX + dx;
+                    int y = targetY + dy;
+                    int z = targetZ + dz;
+                    if (!canStand(world, site, x, y, z) || !reaches(x, y, z, targetX, targetY, targetZ)) {
+                        continue;
+                    }
+                    double distance = citizen.getDistanceSq(x + 0.5D, y, z + 0.5D);
+                    if (distance < best) {
+                        best = distance;
+                        standX = x;
+                        standY = y;
+                        standZ = z;
+                        hasStand = true;
+                    }
+                }
+            }
+        }
+        return hasStand;
+    }
+
+    private boolean canStand(World world, BuildSite site, int x, int y, int z) {
+        if (x == targetX && z == targetZ && (y == targetY || y + 1 == targetY)) {
             return false;
         }
-        phase = PHASE_RETURN;
+        if (site.cellFor(x, y, z) != Blueprint.AIR || site.cellFor(x, y + 1, z) != Blueprint.AIR) {
+            return false;
+        }
+        return !WorkBlocks.blocksMovement(world, x, y, z) && !WorkBlocks.blocksMovement(world, x, y + 1, z)
+            && WorkBlocks.blocksMovement(world, x, y - 1, z);
+    }
+
+    private static boolean reaches(int x, int y, int z, int targetX, int targetY, int targetZ) {
+        double dx = x - targetX;
+        double dy = y - targetY;
+        double dz = z - targetZ;
+        return dx * dx + dy * dy + dz * dz <= REACH * REACH;
+    }
+
+    private boolean scaffold(EntityCitizen citizen, Colony colony, BuildSite site) {
+        World world = citizen.worldObj;
+        activity = "raising scaffolding";
+        if (!hasColumn && !findColumn(world, citizen, site)) {
+            skipTarget();
+            return true;
+        }
+        int x = MathHelper.floor_double(citizen.posX);
+        int z = MathHelper.floor_double(citizen.posZ);
+        int feet = MathHelper.floor_double(citizen.boundingBox.minY + 0.1D);
+        if (feet >= columnTop) {
+            hasColumn = false;
+            hasStand = false;
+            return true;
+        }
+        if (x != columnX || z != columnZ) {
+            breaker.clear(citizen);
+            if (!travel(citizen, columnX, feet, columnZ)) {
+                skipTarget();
+            }
+            return true;
+        }
+        if (!WorkBlocks.blocksMovement(world, x, feet - 1, z) || WorkBlocks.blocksMovement(world, x, feet + 1, z)
+            || WorkBlocks.blocksMovement(world, x, feet + 2, z)) {
+            skipTarget();
+            return true;
+        }
+        if (placeCooldown > 0) {
+            placeCooldown--;
+            return true;
+        }
+
+        ItemStack stack = citizen.getInventory()
+            .takeScaffold();
+        if (stack == null) {
+            return fetchScaffold(citizen, colony, site);
+        }
+        Block block = Block.getBlockFromItem(stack.getItem());
+        if (block == null) {
+            skipTarget();
+            return true;
+        }
+        citizen.getNavigator()
+            .clearPathEntity();
+        world.setBlock(x, feet, z, block, stack.getItemDamage(), 3);
+        site.addScaffold(x, feet, z);
+        ColonyManager.get(world)
+            .markDirty();
+        playPlace(world, block, x, feet, z);
+        citizen.setPosition(x + 0.5D, feet + 1.0D, z + 0.5D);
+        citizen.motionY = 0.0D;
+        citizen.fallDistance = 0.0F;
+        citizen.swingItem();
+        placeCooldown = PLACE_INTERVAL;
+        return true;
+    }
+
+    private boolean findColumn(World world, EntityCitizen citizen, BuildSite site) {
+        double best = Double.MAX_VALUE;
+        for (int dz = -COLUMN_RANGE; dz <= COLUMN_RANGE; dz++) {
+            for (int dx = -COLUMN_RANGE; dx <= COLUMN_RANGE; dx++) {
+                if (dx == 0 && dz == 0) {
+                    continue;
+                }
+                int x = targetX + dx;
+                int z = targetZ + dz;
+                if (!reaches(x, targetY, z, targetX, targetY, targetZ) || !isFreeColumn(world, site, x, z)) {
+                    continue;
+                }
+                double distance = citizen.getDistanceSq(x + 0.5D, targetY, z + 0.5D);
+                if (distance < best) {
+                    best = distance;
+                    columnX = x;
+                    columnZ = z;
+                    columnTop = targetY;
+                    hasColumn = true;
+                }
+            }
+        }
+        return hasColumn;
+    }
+
+    private boolean isFreeColumn(World world, BuildSite site, int x, int z) {
+        for (int y = site.getY(); y <= targetY + 1; y++) {
+            if (site.cellFor(x, y, z) != Blueprint.AIR) {
+                return false;
+            }
+            if (y >= targetY && WorkBlocks.blocksMovement(world, x, y, z)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean fetchScaffold(EntityCitizen citizen, Colony colony, BuildSite site) {
+        activity = "fetching scaffolding";
+        if (!colony.hasMaterials()) {
+            skipTarget();
+            return true;
+        }
+        if (!citizen.getInventory()
+            .hasFreeMainSlot()) {
+            storing = true;
+            return true;
+        }
+        int x = colony.getMaterialsX();
+        int y = colony.getMaterialsY();
+        int z = colony.getMaterialsZ();
+        if (!inReach(citizen, x, y, z)) {
+            return travel(citizen, x, y + 1, z);
+        }
+
+        IInventory inventory = Inventories.at(citizen.worldObj, x, y, z);
+        if (inventory == null) {
+            return false;
+        }
+        Blueprint blueprint = site.getBlueprint();
+        ItemStack taken = Inventories
+            .extract(inventory, stack -> WorkBlocks.isScaffold(stack) && !isMaterial(blueprint, stack), SCAFFOLD_FETCH);
+        travelTicks = 0;
+        if (taken == null) {
+            skipTarget();
+            return true;
+        }
+        ItemStack rest = citizen.getInventory()
+            .store(taken);
+        if (rest != null) {
+            Inventories.insert(inventory, rest);
+        }
+        citizen.swingItem();
+        return true;
+    }
+
+    private static boolean isMaterial(Blueprint blueprint, ItemStack stack) {
+        for (int cell : blueprint.materials()
+            .keySet()) {
+            if (blueprint.matches(cell, stack)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean placeBlock(EntityCitizen citizen, BuildSite site, int cell) {
+        activity = "building";
+        if (placeCooldown > 0) {
+            placeCooldown--;
+            return true;
+        }
+        World world = citizen.worldObj;
+        Blueprint blueprint = site.getBlueprint();
+        Block block = blueprint.blockOf(cell);
+        ItemStack used = citizen.getInventory()
+            .takeMain(stack -> blueprint.matches(cell, stack));
+        if (block == null || used == null) {
+            skipTarget();
+            return true;
+        }
+        citizen.getNavigator()
+            .clearPathEntity();
+        world.setBlock(targetX, targetY, targetZ, block, Blueprint.metaOf(cell), 3);
+        playPlace(world, block, targetX, targetY, targetZ);
+        citizen.swingItem();
+        progressed = true;
+        placeCooldown = PLACE_INTERVAL;
+        skipCell();
+        return true;
+    }
+
+    private boolean strip(EntityCitizen citizen, Colony colony, BuildSite site) {
+        World world = citizen.worldObj;
+        if (!site.hasScaffolds()) {
+            return citizen.getInventory()
+                .countMain(stack -> true) > 0 && store(citizen, colony);
+        }
+        activity = "removing scaffolding";
+        int x = MathHelper.floor_double(citizen.posX);
+        int z = MathHelper.floor_double(citizen.posZ);
+        int feet = MathHelper.floor_double(citizen.boundingBox.minY + 0.1D);
+        int[] scaffold = site.isScaffoldAt(x, feet - 1, z) ? new int[] { x, feet - 1, z } : site.topScaffold();
+        if (scaffold == null) {
+            return true;
+        }
+        if (!inReach(citizen, scaffold[0], scaffold[1], scaffold[2])) {
+            if (!travel(citizen, scaffold[0], scaffold[1] + 1, scaffold[2])) {
+                site.removeScaffold(scaffold[0], scaffold[1], scaffold[2]);
+                travelTicks = 0;
+            }
+            return true;
+        }
+        if (!citizen.getInventory()
+            .hasFreeMainSlot()) {
+            storing = true;
+            return true;
+        }
+        if (placeCooldown > 0) {
+            placeCooldown--;
+            return true;
+        }
+
+        Block block = world.getBlock(scaffold[0], scaffold[1], scaffold[2]);
+        if (block != null && !block.isAir(world, scaffold[0], scaffold[1], scaffold[2])) {
+            int meta = world.getBlockMetadata(scaffold[0], scaffold[1], scaffold[2]);
+            for (ItemStack drop : new ArrayList<ItemStack>(
+                block.getDrops(world, scaffold[0], scaffold[1], scaffold[2], meta, 0))) {
+                ItemStack rest = citizen.getInventory()
+                    .store(drop);
+                if (rest != null) {
+                    dropAt(world, scaffold[0], scaffold[1], scaffold[2], rest);
+                }
+            }
+            world.setBlockToAir(scaffold[0], scaffold[1], scaffold[2]);
+            playPlace(world, block, scaffold[0], scaffold[1], scaffold[2]);
+            citizen.swingItem();
+        }
+        site.removeScaffold(scaffold[0], scaffold[1], scaffold[2]);
+        ColonyManager.get(world)
+            .markDirty();
+        placeCooldown = PLACE_INTERVAL;
+        travelTicks = 0;
+        return true;
+    }
+
+    private boolean store(EntityCitizen citizen, Colony colony) {
+        activity = "storing materials";
+        if (!colony.hasMaterials()) {
+            storing = false;
+            return false;
+        }
         int x = colony.getMaterialsX();
         int y = colony.getMaterialsY();
         int z = colony.getMaterialsZ();
@@ -226,200 +666,46 @@ public class IdleTaskBuild extends AutoTask {
         }
         IInventory inventory = Inventories.at(citizen.worldObj, x, y, z);
         if (inventory == null) {
+            storing = false;
             return false;
         }
-        ItemStack kind = fetched;
-        ItemStack held = citizen.getInventory()
-            .takeMain(stack -> sameKind(kind, stack));
-        while (held != null) {
-            ItemStack rest = Inventories.insert(inventory, held);
-            if (rest != null) {
-                citizen.getInventory()
-                    .store(rest);
-                break;
-            }
-            held = citizen.getInventory()
-                .takeMain(stack -> sameKind(kind, stack));
-        }
-        fetched = null;
+        int moved = citizen.getInventory()
+            .deposit(inventory);
         citizen.swingItem();
-        return false;
-    }
-
-    private static boolean sameKind(ItemStack kind, ItemStack stack) {
-        return stack != null && kind != null
-            && stack.getItem() == kind.getItem()
-            && stack.getItemDamage() == kind.getItemDamage();
-    }
-
-    private boolean place(EntityCitizen citizen, Colony colony, BuildSite site, ItemStack carrying) {
-        World world = citizen.worldObj;
-        if (!hasSpot) {
-            return true;
-        }
-        if (standsOn(citizen, spotX, spotY, spotZ) || !inReach(citizen, spotX, spotY, spotZ)) {
-            return travelNear(citizen, site);
-        }
-        if (placeCooldown > 0) {
-            placeCooldown--;
-            return true;
-        }
-
-        int cell = site.cellFor(spotX, spotY, spotZ);
-        Blueprint blueprint = site.getBlueprint();
-        Block block = blueprint.blockOf(cell);
-        ItemStack used = citizen.getInventory()
-            .takeMain(stack -> blueprint.matches(cell, stack));
-        if (block == null || used == null) {
-            release(citizen, colony);
-            return true;
-        }
-        citizen.getNavigator()
-            .clearPathEntity();
-        world.setBlock(spotX, spotY, spotZ, block, Blueprint.metaOf(cell), 3);
-        world.playSoundEffect(
-            spotX + 0.5D,
-            spotY + 0.5D,
-            spotZ + 0.5D,
-            block.stepSound.func_150496_b(),
-            (block.stepSound.getVolume() + 1.0F) / 2.0F,
-            block.stepSound.getPitch() * 0.8F);
-        citizen.swingItem();
-        release(citizen, colony);
-        if (!citizen.getInventory()
-            .hasMain(stack -> sameKind(fetched, stack))) {
-            fetched = null;
-        }
-        placeCooldown = PLACE_INTERVAL;
+        storing = false;
         travelTicks = 0;
-        return true;
+        return moved > 0;
     }
 
-    private boolean travelNear(EntityCitizen citizen, BuildSite site) {
-        World world = citizen.worldObj;
-        int bestX = spotX + 1;
-        int bestY = spotY;
-        int bestZ = spotZ;
-        double best = Double.MAX_VALUE;
-        for (int level = 0; level <= 1; level++) {
-            int y = spotY - level;
-            for (int[] step : NEIGHBOURS) {
-                int x = spotX + step[0];
-                int z = spotZ + step[1];
-                if (site.cellFor(x, y, z) != Blueprint.AIR || !WorkBlocks.blocksMovement(world, x, y - 1, z)) {
-                    continue;
-                }
-                double distance = citizen.getDistanceSq(x + 0.5D, y, z + 0.5D);
-                if (distance < best) {
-                    best = distance;
-                    bestX = x;
-                    bestY = y;
-                    bestZ = z;
-                }
-            }
-        }
-        return travel(citizen, bestX, bestY, bestZ);
+    private void skipCell() {
+        hasTarget = false;
+        hasStand = false;
+        standDenied = false;
+        hasColumn = false;
+        travelTicks = 0;
+        cursor++;
     }
 
-    private boolean claim(EntityCitizen citizen, Colony colony, BuildSite site, ItemStack carrying) {
-        World world = citizen.worldObj;
-        if (candidates.isEmpty()) {
-            scan(world, colony, citizen, site, carrying);
+    private void skipTarget() {
+        if (hasTarget) {
+            blocked.add(WorkBlocks.pack(targetX, targetY, targetZ));
         }
-        while (!candidates.isEmpty()) {
-            int[] spot = WorkBlocks.takeNearest(citizen.posX, citizen.posY, citizen.posZ, candidates);
-            if (spot == null) {
-                return false;
-            }
-            if (!site.needsStack(world, carrying, spot[0], spot[1], spot[2])) {
-                continue;
-            }
-            if (!ColonyManager.get(world)
-                .claimBuildSpot(colony.getId(), citizen.getUniqueID(), spot[0], spot[1], spot[2])) {
-                continue;
-            }
-            spotX = spot[0];
-            spotY = spot[1];
-            spotZ = spot[2];
-            hasSpot = true;
-            travelTicks = 0;
-            return true;
-        }
-        return false;
-    }
-
-    private void scan(World world, Colony colony, EntityCitizen citizen, BuildSite site, ItemStack carrying) {
-        Blueprint blueprint = site.getBlueprint();
-        for (int dy = 0; dy < blueprint.getSizeY() && candidates.isEmpty(); dy++) {
-            for (int dz = 0; dz < blueprint.getSizeZ(); dz++) {
-                for (int dx = 0; dx < blueprint.getSizeX(); dx++) {
-                    int x = site.getX() + dx;
-                    int y = site.getY() + dy;
-                    int z = site.getZ() + dz;
-                    if (!site.needsStack(world, carrying, x, y, z)) {
-                        continue;
-                    }
-                    if (!colony.isBuildSpotFree(citizen.getUniqueID(), x, y, z)) {
-                        continue;
-                    }
-                    candidates.add(new int[] { x, y, z });
-                    if (candidates.size() >= MAX_CANDIDATES) {
-                        return;
-                    }
-                }
-            }
-        }
-    }
-
-    private static Set<Integer> neededCells(World world, BuildSite site) {
-        Blueprint blueprint = site.getBlueprint();
-        Set<Integer> needed = new HashSet<>();
-        for (int dy = 0; dy < blueprint.getSizeY(); dy++) {
-            for (int dz = 0; dz < blueprint.getSizeZ(); dz++) {
-                for (int dx = 0; dx < blueprint.getSizeX(); dx++) {
-                    int cell = blueprint.cellAt(dx, dy, dz);
-                    if (cell == Blueprint.AIR || needed.contains(cell)) {
-                        continue;
-                    }
-                    int x = site.getX() + dx;
-                    int y = site.getY() + dy;
-                    int z = site.getZ() + dz;
-                    if (!site.isPlaced(world, x, y, z) && site.isFree(world, x, y, z)) {
-                        needed.add(cell);
-                    }
-                }
-            }
-        }
-        return needed;
-    }
-
-    private static boolean matchesAny(Blueprint blueprint, Set<Integer> needed, ItemStack stack) {
-        if (!WorkBlocks.isScaffold(stack)) {
-            return false;
-        }
-        for (int cell : needed) {
-            if (blueprint.matches(cell, stack)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static int stackLimit(EntityCitizen citizen) {
-        return citizen.getInventory()
-            .hasFreeMainSlot() ? 64 : 0;
-    }
-
-    private void release(EntityCitizen citizen, Colony colony) {
-        if (hasSpot) {
-            ColonyManager.get(citizen.worldObj)
-                .releaseBuildSpot(colony.getId(), citizen.getUniqueID());
-            hasSpot = false;
+        hasTarget = false;
+        hasStand = false;
+        standDenied = false;
+        hasColumn = false;
+        travelTicks = 0;
+        if (phase == PHASE_BUILD) {
+            cursor++;
         }
     }
 
     private boolean travel(EntityCitizen citizen, int x, int y, int z) {
-        if (++travelTicks > TRAVEL_TIMEOUT) {
+        return travel(citizen, x, y, z, TRAVEL_TIMEOUT);
+    }
+
+    private boolean travel(EntityCitizen citizen, int x, int y, int z, int limit) {
+        if (++travelTicks > limit) {
             return false;
         }
         if (travelTicks % REPATH_INTERVAL == 1 && citizen.getNavigator()
@@ -429,15 +715,31 @@ public class IdleTaskBuild extends AutoTask {
         return true;
     }
 
+    private static void playPlace(World world, Block block, int x, int y, int z) {
+        world.playSoundEffect(
+            x + 0.5D,
+            y + 0.5D,
+            z + 0.5D,
+            block.stepSound.func_150496_b(),
+            (block.stepSound.getVolume() + 1.0F) / 2.0F,
+            block.stepSound.getPitch() * 0.8F);
+    }
+
+    private static void dropAt(World world, int x, int y, int z, ItemStack stack) {
+        EntityItem item = new EntityItem(world, x + 0.5D, y + 0.5D, z + 0.5D, stack);
+        item.delayBeforeCanPickup = 10;
+        world.spawnEntityInWorld(item);
+    }
+
     private static boolean inReach(EntityCitizen citizen, int x, int y, int z) {
         return citizen.getDistanceSq(x + 0.5D, y + 0.5D, z + 0.5D) <= REACH * REACH;
     }
 
-    private static boolean standsOn(EntityCitizen citizen, int x, int y, int z) {
+    private static boolean occupies(EntityCitizen citizen, int x, int y, int z) {
         if (MathHelper.floor_double(citizen.posX) != x || MathHelper.floor_double(citizen.posZ) != z) {
             return false;
         }
-        int feet = MathHelper.floor_double(citizen.boundingBox.minY);
-        return y == feet || y == feet + 1;
+        int feet = MathHelper.floor_double(citizen.boundingBox.minY + 0.1D);
+        return feet == y || feet + 1 == y;
     }
 }

@@ -265,20 +265,15 @@ public class ColonyManager extends WorldSavedData {
         return true;
     }
 
-    public boolean claimBuildSpot(int colonyId, UUID id, int x, int y, int z) {
+    public boolean claimBuildSite(int colonyId, UUID id, long time) {
         Colony colony = colonies.get(colonyId);
-        if (colony == null || !colony.claimBuildSpot(id, x, y, z)) {
-            return false;
-        }
-        markDirty();
-        return true;
+        return colony != null && colony.claimBuildSite(id, time);
     }
 
-    public void releaseBuildSpot(int colonyId, UUID id) {
+    public void releaseBuildSite(int colonyId, UUID id) {
         Colony colony = colonies.get(colonyId);
         if (colony != null) {
-            colony.releaseBuildSpot(id);
-            markDirty();
+            colony.releaseBuildSite(id);
         }
     }
 
