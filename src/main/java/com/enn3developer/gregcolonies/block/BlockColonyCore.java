@@ -77,6 +77,29 @@ public class BlockColonyCore extends BlockContainer {
     }
 
     @Override
+    public boolean removedByPlayer(World world, EntityPlayer player, int x, int y, int z, boolean willHarvest) {
+        if (!world.isRemote && !player.capabilities.isCreativeMode) {
+            Colony colony = colonyAt(world, x, y, z);
+            if (colony != null && !colony.canAccess(player)) {
+                player.addChatMessage(
+                    new ChatComponentText(
+                        EnumChatFormatting.RED + "Only " + colony.getOwnerName() + " can remove this colony core"));
+                return false;
+            }
+        }
+        return super.removedByPlayer(world, player, x, y, z, willHarvest);
+    }
+
+    private static Colony colonyAt(World world, int x, int y, int z) {
+        TileEntity tile = world.getTileEntity(x, y, z);
+        if (!(tile instanceof TileColonyCore)) {
+            return null;
+        }
+        return ColonyManager.get(world)
+            .getColony(((TileColonyCore) tile).getColonyId());
+    }
+
+    @Override
     public void breakBlock(World world, int x, int y, int z, net.minecraft.block.Block block, int meta) {
         if (!world.isRemote) {
             TileEntity tile = world.getTileEntity(x, y, z);
