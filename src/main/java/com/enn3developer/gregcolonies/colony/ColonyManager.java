@@ -190,6 +190,43 @@ public class ColonyManager extends WorldSavedData {
         return true;
     }
 
+    public boolean setBlueprint(int colonyId, Blueprint blueprint) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null) {
+            return false;
+        }
+        colony.setBlueprint(blueprint);
+        markDirty();
+        return true;
+    }
+
+    public boolean setBuildSite(int colonyId, BuildSite site) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null) {
+            return false;
+        }
+        colony.setBuildSite(site);
+        markDirty();
+        return true;
+    }
+
+    public boolean claimBuildSpot(int colonyId, UUID id, int x, int y, int z) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null || !colony.claimBuildSpot(id, x, y, z)) {
+            return false;
+        }
+        markDirty();
+        return true;
+    }
+
+    public void releaseBuildSpot(int colonyId, UUID id) {
+        Colony colony = colonies.get(colonyId);
+        if (colony != null) {
+            colony.releaseBuildSpot(id);
+            markDirty();
+        }
+    }
+
     public boolean claimBed(int colonyId, UUID id, int x, int y, int z) {
         Colony colony = colonies.get(colonyId);
         if (colony == null || !colony.claimBed(id, x, y, z)) {

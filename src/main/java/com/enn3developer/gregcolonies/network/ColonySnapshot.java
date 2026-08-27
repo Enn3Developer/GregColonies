@@ -9,6 +9,8 @@ import java.util.UUID;
 import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.Config;
+import com.enn3developer.gregcolonies.colony.Blueprint;
+import com.enn3developer.gregcolonies.colony.BuildSite;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
@@ -39,6 +41,16 @@ public class ColonySnapshot {
     private int materialsX;
     private int materialsY;
     private int materialsZ;
+    private int blueprintX;
+    private int blueprintY;
+    private int blueprintZ;
+    private int blueprintBlocks;
+    private boolean hasBuildSite;
+    private int buildX;
+    private int buildY;
+    private int buildZ;
+    private int buildRemaining;
+    private int buildTotal;
     private final List<CitizenSnapshot> citizens = new ArrayList<>();
 
     private ColonySnapshot() {}
@@ -66,6 +78,22 @@ public class ColonySnapshot {
         snapshot.materialsX = colony.getMaterialsX();
         snapshot.materialsY = colony.getMaterialsY();
         snapshot.materialsZ = colony.getMaterialsZ();
+        Blueprint blueprint = colony.getBlueprint();
+        if (blueprint != null) {
+            snapshot.blueprintX = blueprint.getSizeX();
+            snapshot.blueprintY = blueprint.getSizeY();
+            snapshot.blueprintZ = blueprint.getSizeZ();
+            snapshot.blueprintBlocks = blueprint.blockCount();
+        }
+        BuildSite site = colony.getBuildSite();
+        if (site != null) {
+            snapshot.hasBuildSite = true;
+            snapshot.buildX = site.getX();
+            snapshot.buildY = site.getY();
+            snapshot.buildZ = site.getZ();
+            snapshot.buildRemaining = site.remaining(world);
+            snapshot.buildTotal = site.total();
+        }
 
         Map<UUID, EntityCitizen> loaded = new HashMap<>();
         for (Object object : world.loadedEntityList) {
@@ -179,6 +207,54 @@ public class ColonySnapshot {
         return hasMaterials && materialsX == x && materialsY == y && materialsZ == z;
     }
 
+    public boolean hasBlueprint() {
+        return blueprintBlocks > 0;
+    }
+
+    public int getBlueprintX() {
+        return blueprintX;
+    }
+
+    public int getBlueprintY() {
+        return blueprintY;
+    }
+
+    public int getBlueprintZ() {
+        return blueprintZ;
+    }
+
+    public int getBlueprintBlocks() {
+        return blueprintBlocks;
+    }
+
+    public boolean hasBuildSite() {
+        return hasBuildSite;
+    }
+
+    public int getBuildX() {
+        return buildX;
+    }
+
+    public int getBuildY() {
+        return buildY;
+    }
+
+    public int getBuildZ() {
+        return buildZ;
+    }
+
+    public int getBuildRemaining() {
+        return buildRemaining;
+    }
+
+    public int getBuildTotal() {
+        return buildTotal;
+    }
+
+    public boolean isBuildSiteAt(int x, int y, int z) {
+        return hasBuildSite && buildX == x && buildY == y + 1 && buildZ == z;
+    }
+
     public List<CitizenSnapshot> getCitizens() {
         return citizens;
     }
@@ -205,6 +281,16 @@ public class ColonySnapshot {
         buf.writeInt(materialsX);
         buf.writeInt(materialsY);
         buf.writeInt(materialsZ);
+        buf.writeInt(blueprintX);
+        buf.writeInt(blueprintY);
+        buf.writeInt(blueprintZ);
+        buf.writeInt(blueprintBlocks);
+        buf.writeBoolean(hasBuildSite);
+        buf.writeInt(buildX);
+        buf.writeInt(buildY);
+        buf.writeInt(buildZ);
+        buf.writeInt(buildRemaining);
+        buf.writeInt(buildTotal);
         buf.writeInt(citizens.size());
         for (CitizenSnapshot citizen : citizens) {
             citizen.write(buf);
@@ -234,6 +320,16 @@ public class ColonySnapshot {
         snapshot.materialsX = buf.readInt();
         snapshot.materialsY = buf.readInt();
         snapshot.materialsZ = buf.readInt();
+        snapshot.blueprintX = buf.readInt();
+        snapshot.blueprintY = buf.readInt();
+        snapshot.blueprintZ = buf.readInt();
+        snapshot.blueprintBlocks = buf.readInt();
+        snapshot.hasBuildSite = buf.readBoolean();
+        snapshot.buildX = buf.readInt();
+        snapshot.buildY = buf.readInt();
+        snapshot.buildZ = buf.readInt();
+        snapshot.buildRemaining = buf.readInt();
+        snapshot.buildTotal = buf.readInt();
         int count = buf.readInt();
         for (int i = 0; i < count; i++) {
             snapshot.citizens.add(CitizenSnapshot.read(buf));

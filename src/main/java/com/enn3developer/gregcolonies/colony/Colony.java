@@ -39,6 +39,8 @@ public class Colony {
     private int materialsX;
     private int materialsY;
     private int materialsZ;
+    private Blueprint blueprint;
+    private BuildSite buildSite;
     private final Deque<CitizenCommand> orders = new ArrayDeque<>();
     private final Map<UUID, ColonyCitizen> citizens = new LinkedHashMap<>();
 
@@ -191,6 +193,55 @@ public class Colony {
         materialsX = 0;
         materialsY = 0;
         materialsZ = 0;
+    }
+
+    public Blueprint getBlueprint() {
+        return blueprint;
+    }
+
+    public void setBlueprint(Blueprint blueprint) {
+        this.blueprint = blueprint;
+    }
+
+    public BuildSite getBuildSite() {
+        return buildSite;
+    }
+
+    public void setBuildSite(BuildSite buildSite) {
+        this.buildSite = buildSite;
+        releaseAllBuildSpots();
+    }
+
+    public boolean isBuildSpotFree(UUID id, int x, int y, int z) {
+        for (ColonyCitizen citizen : citizens.values()) {
+            if (!citizen.getId()
+                .equals(id) && citizen.isBuildSpotAt(x, y, z)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public boolean claimBuildSpot(UUID id, int x, int y, int z) {
+        ColonyCitizen owner = citizens.get(id);
+        if (owner == null || !isBuildSpotFree(id, x, y, z)) {
+            return false;
+        }
+        owner.setBuildSpot(x, y, z);
+        return true;
+    }
+
+    public void releaseBuildSpot(UUID id) {
+        ColonyCitizen owner = citizens.get(id);
+        if (owner != null) {
+            owner.clearBuildSpot();
+        }
+    }
+
+    private void releaseAllBuildSpots() {
+        for (ColonyCitizen citizen : citizens.values()) {
+            citizen.clearBuildSpot();
+        }
     }
 
     public boolean isBedFree(UUID id, int x, int y, int z) {
@@ -371,6 +422,13 @@ public class Colony {
             tag.setInteger("materialsZ", materialsZ);
         }
 
+        if (blueprint != null) {
+            tag.setTag("blueprint", blueprint.writeToNBT());
+        }
+        if (buildSite != null) {
+            tag.setTag("buildSite", buildSite.writeToNBT());
+        }
+
         NBTTagList orderList = new NBTTagList();
         for (CitizenCommand order : orders) {
             orderList.appendTag(CitizenCommandRegistry.write(order));
@@ -412,6 +470,13 @@ public class Colony {
             colony.materialsX = tag.getInteger("materialsX");
             colony.materialsY = tag.getInteger("materialsY");
             colony.materialsZ = tag.getInteger("materialsZ");
+        }
+
+        if (tag.hasKey("blueprint", 10)) {
+            colony.blueprint = Blueprint.readFromNBT(tag.getCompoundTag("blueprint"));
+        }
+        if (tag.hasKey("buildSite", 10)) {
+            colony.buildSite = BuildSite.readFromNBT(tag.getCompoundTag("buildSite"));
         }
 
         NBTTagList orderList = tag.getTagList("orders", 10);

@@ -349,6 +349,16 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             view.setTargeting(ColonyView.TARGET_NONE);
             return;
         }
+        if (view.getTargeting() == ColonyView.TARGET_BUILD) {
+            view.sendBuild(area[0], area[1], area[2]);
+            view.setTargeting(ColonyView.TARGET_NONE);
+            return;
+        }
+        if (view.getTargeting() == ColonyView.TARGET_BLUEPRINT) {
+            view.sendBlueprint(area[0], area[1], area[2], area[3], area[4], area[5]);
+            view.setTargeting(ColonyView.TARGET_NONE);
+            return;
+        }
         view.sendArea(
             areaAction(view.getTargeting()),
             Interactable.hasShiftDown(),
@@ -363,7 +373,8 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
 
     private static boolean isSpotMode(int mode) {
         return mode == ColonyView.TARGET_DROP_OFF || mode == ColonyView.TARGET_PICK_UP
-            || mode == ColonyView.TARGET_MATERIALS;
+            || mode == ColonyView.TARGET_MATERIALS
+            || mode == ColonyView.TARGET_BUILD;
     }
 
     private static byte areaAction(int targeting) {

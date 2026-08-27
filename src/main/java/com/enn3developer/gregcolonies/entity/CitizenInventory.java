@@ -156,6 +156,16 @@ public class CitizenInventory {
         return null;
     }
 
+    public ItemStack peekMain(Predicate<ItemStack> filter) {
+        for (int i = 0; i < MAIN_SLOTS; i++) {
+            ItemStack stack = main.getStackInSlot(i);
+            if (stack != null && filter.test(stack)) {
+                return stack.copy();
+            }
+        }
+        return null;
+    }
+
     public int countMain(Predicate<ItemStack> filter) {
         int count = 0;
         for (int i = 0; i < MAIN_SLOTS; i++) {

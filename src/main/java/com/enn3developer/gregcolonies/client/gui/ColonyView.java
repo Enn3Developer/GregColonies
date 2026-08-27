@@ -33,11 +33,14 @@ import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
 import com.enn3developer.gregcolonies.client.ControllingCompat;
 import com.enn3developer.gregcolonies.client.GCKeyBindings;
+import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.network.CitizenSnapshot;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
 import com.enn3developer.gregcolonies.network.GCNetwork;
 import com.enn3developer.gregcolonies.network.PacketCitizenCommand;
 import com.enn3developer.gregcolonies.network.PacketCitizenGroup;
+import com.enn3developer.gregcolonies.network.PacketColonyBlueprint;
+import com.enn3developer.gregcolonies.network.PacketColonyBuild;
 import com.enn3developer.gregcolonies.network.PacketColonyDropOff;
 import com.enn3developer.gregcolonies.network.PacketColonyMaterials;
 import com.enn3developer.gregcolonies.network.PacketColonyPickUp;
@@ -60,6 +63,10 @@ public class ColonyView {
     public static final int TARGET_PICK_UP = 5;
 
     public static final int TARGET_MATERIALS = 6;
+
+    public static final int TARGET_BLUEPRINT = 7;
+
+    public static final int TARGET_BUILD = 8;
 
     private static final int MAX_GROUP_ROWS = 32;
 
@@ -136,6 +143,8 @@ public class ColonyView {
     private static final int PICK_UP_COLOR = 0xFF7CE0FF;
 
     private static final int MATERIALS_COLOR = 0xFFFFC46B;
+
+    private static final int BUILD_COLOR = 0xFF9CE06B;
 
     private static final String SELECT_HINT = "LMB select   LMB drag box   shift add   LMB twice opens";
 
@@ -317,6 +326,16 @@ public class ColonyView {
         GCNetwork.CHANNEL.sendToServer(new PacketColonyMaterials(colony.getId(), x, y, z, clear));
     }
 
+    public void sendBlueprint(int x1, int y1, int z1, int x2, int y2, int z2) {
+        int top = Math.max(y1, y2) + Blueprint.MAX_SIDE - 1;
+        GCNetwork.CHANNEL.sendToServer(new PacketColonyBlueprint(colony.getId(), x1, y1, z1, x2, top, z2));
+    }
+
+    public void sendBuild(int x, int y, int z) {
+        boolean clear = colony.isBuildSiteAt(x, y, z);
+        GCNetwork.CHANNEL.sendToServer(new PacketColonyBuild(colony.getId(), x, y, z, clear));
+    }
+
     public CitizenSnapshot getSingleSelected() {
         if (selection.size() != 1) {
             return null;
@@ -492,6 +511,13 @@ public class ColonyView {
         list.child(entry("pick-up", this::pickUpValue, PICK_UP_COLOR));
         list.child(entry("materials", this::materialsValue, MATERIALS_COLOR));
 
+        list.child(section("Build", this::buildValue, SECTION_GAP));
+        list.child(
+            row().child(modeButton("Blueprint", EXPAND, TARGET_BLUEPRINT))
+                .child(modeButton("Build", EXPAND, TARGET_BUILD)));
+        list.child(entry("blueprint", this::blueprintValue, BUILD_COLOR));
+        list.child(entry("site", this::buildSiteValue, BUILD_COLOR));
+
         TextWidget<?> targetHint = label(IKey.dynamic(this::targetingLabel), HINT_COLOR);
         targetHint.widthRel(1.0F);
         targetHint.setEnabledIf(widget -> targeting != TARGET_NONE);
@@ -641,8 +667,11 @@ public class ColonyView {
     }
 
     private String targetingLabel() {
-        if (targeting == TARGET_CHOP || targeting == TARGET_FARM) {
+        if (targeting == TARGET_CHOP || targeting == TARGET_FARM || targeting == TARGET_BLUEPRINT) {
             return "drag a region, RMB cancels";
+        }
+        if (targeting == TARGET_BUILD) {
+            return "click the ground, again to clear";
         }
         if (targeting == TARGET_MINE) {
             return "click a chunk, RMB cancels";
@@ -672,6 +701,27 @@ public class ColonyView {
             return "not set";
         }
         return colony.getMaterialsX() + "/" + colony.getMaterialsY() + "/" + colony.getMaterialsZ();
+    }
+
+    private String blueprintValue() {
+        if (!colony.hasBlueprint()) {
+            return "none";
+        }
+        return colony.getBlueprintX() + "x" + colony.getBlueprintY() + "x" + colony.getBlueprintZ();
+    }
+
+    private String buildSiteValue() {
+        if (!colony.hasBuildSite()) {
+            return "none";
+        }
+        return colony.getBuildX() + "/" + colony.getBuildY() + "/" + colony.getBuildZ();
+    }
+
+    private String buildValue() {
+        if (!colony.hasBuildSite()) {
+            return colony.hasBlueprint() ? colony.getBlueprintBlocks() + " blocks" : "";
+        }
+        return colony.getBuildTotal() - colony.getBuildRemaining() + "/" + colony.getBuildTotal();
     }
 
     private TextFieldWidget groupField() {
