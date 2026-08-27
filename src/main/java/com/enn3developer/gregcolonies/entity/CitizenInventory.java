@@ -160,7 +160,7 @@ public class CitizenInventory {
         int count = 0;
         for (int i = 0; i < MAIN_SLOTS; i++) {
             ItemStack stack = main.getStackInSlot(i);
-            if (filter.test(stack)) {
+            if (stack != null && filter.test(stack)) {
                 count += stack.stackSize;
             }
         }
