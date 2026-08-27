@@ -8,7 +8,7 @@ public class EntityAICitizenDanger extends EntityAIBase {
 
     private static final double ESCAPE_SPEED = 1.3D;
 
-    private static final int SEARCH_RADIUS = 6;
+    private static final int ESCAPE_RADIUS = 12;
 
     private static final int SEARCH_HEIGHT = 4;
 
@@ -19,6 +19,8 @@ public class EntityAICitizenDanger extends EntityAIBase {
     private static final int TIMEOUT = 200;
 
     private static final int REPATH_INTERVAL = 10;
+
+    private static final int SEARCH_INTERVAL = 10;
 
     private static final double REACHED_SQ = 2.25D;
 
@@ -32,6 +34,8 @@ public class EntityAICitizenDanger extends EntityAIBase {
 
     private int ticks;
 
+    private int searchCooldown;
+
     public EntityAICitizenDanger(EntityCitizen citizen) {
         this.citizen = citizen;
         setMutexBits(3);
@@ -41,11 +45,17 @@ public class EntityAICitizenDanger extends EntityAIBase {
     public boolean shouldExecute() {
         boolean danger = Hazards.isInDanger(citizen) || isDrowning();
         if (!danger && !citizen.isBurning()) {
+            searchCooldown = 0;
             return false;
         }
-        int[] spot = danger ? Hazards.findSafeSpot(citizen, SEARCH_RADIUS, SEARCH_HEIGHT)
+        if (searchCooldown > 0) {
+            searchCooldown--;
+            return false;
+        }
+        int[] spot = danger ? Hazards.findEscapeSpot(citizen, ESCAPE_RADIUS, SEARCH_HEIGHT)
             : Hazards.findWater(citizen, WATER_RADIUS, SEARCH_HEIGHT);
         if (spot == null) {
+            searchCooldown = SEARCH_INTERVAL;
             return false;
         }
         x = spot[0];

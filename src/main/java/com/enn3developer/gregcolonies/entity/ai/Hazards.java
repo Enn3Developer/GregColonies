@@ -120,12 +120,52 @@ public final class Hazards {
     }
 
     private static boolean isSafeSpot(World world, int x, int y, int z) {
+        return isStandable(world, x, y, z) && !isNearDeadly(world, x, y, z);
+    }
+
+    private static boolean isStandable(World world, int x, int y, int z) {
         Block floor = world.getBlock(x, y - 1, z);
         if (!floor.getMaterial()
             .isSolid()) {
             return false;
         }
-        return isClear(world, x, y, z) && isClear(world, x, y + 1, z) && !isNearDeadly(world, x, y, z);
+        return isClear(world, x, y, z) && isClear(world, x, y + 1, z);
+    }
+
+    public static int[] findEscapeSpot(EntityLivingBase entity, int radius, int height) {
+        World world = entity.worldObj;
+        int cx = MathHelper.floor_double(entity.posX);
+        int cy = MathHelper.floor_double(entity.boundingBox.minY);
+        int cz = MathHelper.floor_double(entity.posZ);
+        int minY = Math.max(cy - height, 1);
+        int maxY = Math.min(cy + height, 253);
+        if (!world.checkChunksExist(cx - radius, minY, cz - radius, cx + radius, maxY, cz + radius)) {
+            return null;
+        }
+
+        int[] safe = null;
+        int[] clear = null;
+        double bestSafeSq = Double.MAX_VALUE;
+        double bestClearSq = Double.MAX_VALUE;
+        for (int y = minY; y <= maxY; y++) {
+            for (int x = cx - radius; x <= cx + radius; x++) {
+                for (int z = cz - radius; z <= cz + radius; z++) {
+                    if (!isStandable(world, x, y, z) || isDeadlyStep(world, x, y, z)) {
+                        continue;
+                    }
+                    double distanceSq = entity.getDistanceSq(x + 0.5D, y, z + 0.5D);
+                    if (distanceSq < bestClearSq) {
+                        bestClearSq = distanceSq;
+                        clear = new int[] { x, y, z };
+                    }
+                    if (distanceSq < bestSafeSq && !isNearDeadly(world, x, y, z)) {
+                        bestSafeSq = distanceSq;
+                        safe = new int[] { x, y, z };
+                    }
+                }
+            }
+        }
+        return safe != null ? safe : clear;
     }
 
     private static boolean isClear(World world, int x, int y, int z) {
