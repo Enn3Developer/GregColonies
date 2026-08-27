@@ -47,15 +47,18 @@ public final class SeedCrafting {
         World world = citizen.worldObj;
         CitizenInventory inventory = citizen.getInventory();
         int made = 0;
-        for (int pass = 0; pass < MAX_CRAFTS; pass++) {
-            if (inventory.countMain(stack -> Crops.isSeedFor(stack, world, x, y, z, wanted)) >= target) {
-                break;
-            }
+        int stored = inventory.countMain(stack -> Crops.isSeedFor(stack, world, x, y, z, wanted));
+        for (int pass = 0; pass < MAX_CRAFTS && stored < target; pass++) {
             ItemStack seeds = craftOnce(citizen, wanted, x, y, z);
             if (seeds == null) {
                 break;
             }
             made += seeds.stackSize;
+            int now = inventory.countMain(stack -> Crops.isSeedFor(stack, world, x, y, z, wanted));
+            if (now <= stored) {
+                break;
+            }
+            stored = now;
         }
         return made;
     }
