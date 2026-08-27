@@ -131,6 +131,15 @@ public class ColonyCommand extends CommandBase {
             int y;
             int z;
             if (args.length >= 2) {
+                if (colony.getDimension() != world.provider.dimensionId) {
+                    sender.addChatMessage(
+                        new ChatComponentText(
+                            EnumChatFormatting.RED + "Colony #"
+                                + colony.getId()
+                                + " is in dim "
+                                + colony.getDimension()));
+                    return;
+                }
                 x = colony.getX();
                 y = colony.getY() + 1;
                 z = colony.getZ();
