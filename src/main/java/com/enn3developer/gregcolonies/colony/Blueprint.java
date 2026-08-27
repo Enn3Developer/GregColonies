@@ -168,7 +168,7 @@ public class Blueprint {
                         targetX = sourceX;
                         targetZ = z;
                     }
-                    placed.cells[placed.index(targetX, y, targetZ)] = cells[index(x, y, z)];
+                    placed.cells[placed.index(targetX, y, targetZ)] = rotateCell(cells[index(x, y, z)], steps, mirror);
                 }
             }
         }
@@ -249,7 +249,28 @@ public class Blueprint {
             return null;
         }
         Item item = Item.getItemFromBlock(block);
-        return item == null ? null : new ItemStack(item, 1, metaOf(cell));
+        return item == null ? null : new ItemStack(item, 1, itemMeta(block, metaOf(cell)));
+    }
+
+    private int rotateCell(int cell, int steps, boolean mirror) {
+        Block block = blockOf(cell);
+        if (block == null) {
+            return cell;
+        }
+        int meta = BlockRotation.transform(block, metaOf(cell), steps, mirror) & META_MASK;
+        return (cell & ~META_MASK) | meta;
+    }
+
+    public int itemCell(int cell) {
+        Block block = blockOf(cell);
+        if (block == null) {
+            return cell;
+        }
+        return (cell & ~META_MASK) | itemMeta(block, metaOf(cell));
+    }
+
+    private static int itemMeta(Block block, int meta) {
+        return block.damageDropped(meta) & META_MASK;
     }
 
     public static int metaOf(int cell) {
@@ -274,7 +295,7 @@ public class Blueprint {
         Map<Integer, Integer> counts = new LinkedHashMap<>();
         for (int cell : cells) {
             if (cell != AIR) {
-                counts.merge(cell, 1, Integer::sum);
+                counts.merge(itemCell(cell), 1, Integer::sum);
             }
         }
         List<Map.Entry<Integer, Integer>> entries = new ArrayList<>(counts.entrySet());
@@ -292,7 +313,7 @@ public class Blueprint {
         Block block = blockOf(cell);
         return block != null && stack != null
             && Block.getBlockFromItem(stack.getItem()) == block
-            && stack.getItemDamage() == metaOf(cell);
+            && stack.getItemDamage() == itemMeta(block, metaOf(cell));
     }
 
     public void write(ByteBuf buf) {
