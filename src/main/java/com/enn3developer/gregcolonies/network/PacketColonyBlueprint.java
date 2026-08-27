@@ -93,8 +93,11 @@ public class PacketColonyBlueprint implements IMessage {
                 return;
             }
 
-            int height = Math.max(1, Math.min(Blueprint.MAX_SIDE, message.height));
             int baseY = Math.max(0, Math.min(world.getHeight() - 1, message.baseY));
+            int height = message.height <= 0
+                ? Blueprint.detectHeight(world, message.x1, message.z1, message.x2, message.z2, baseY)
+                : message.height;
+            height = Math.max(1, Math.min(Blueprint.MAX_SIDE, height));
             Blueprint blueprint = Blueprint.capture(
                 world,
                 message.name,
@@ -115,16 +118,22 @@ public class PacketColonyBlueprint implements IMessage {
             if (index < 0) {
                 return;
             }
-            player.addChatMessage(
-                new ChatComponentText(
-                    "Blueprint captured: " + blueprint.getSizeX()
-                        + "x"
-                        + blueprint.getSizeY()
-                        + "x"
-                        + blueprint.getSizeZ()
-                        + ", "
-                        + blueprint.blockCount()
-                        + " blocks"));
+            String summary = "Blueprint captured: " + blueprint.getSizeX()
+                + "x"
+                + blueprint.getSizeY()
+                + "x"
+                + blueprint.getSizeZ()
+                + ", "
+                + blueprint.blockCount()
+                + " blocks";
+            player.addChatMessage(new ChatComponentText(summary));
+            if (blueprint.getSkipped() > 0) {
+                player.addChatMessage(
+                    new ChatComponentText(
+                        EnumChatFormatting.YELLOW + "Skipped "
+                            + blueprint.getSkipped()
+                            + " blocks a builder cannot place"));
+            }
             GCNetwork.sendColony(player, colony);
             GCNetwork.sendBlueprint(player, colony, index);
         }

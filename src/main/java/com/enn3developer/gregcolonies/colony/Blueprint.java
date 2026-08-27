@@ -7,14 +7,13 @@ import java.util.List;
 import java.util.Map;
 
 import net.minecraft.block.Block;
+import net.minecraft.init.Blocks;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.nbt.NBTTagString;
 import net.minecraft.world.World;
-
-import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
 
 import cpw.mods.fml.common.network.ByteBufUtils;
 import io.netty.buffer.ByteBuf;
@@ -43,6 +42,7 @@ public class Blueprint {
     private int sizeZ;
     private final List<String> palette = new ArrayList<>();
     private int[] cells = new int[0];
+    private int skipped;
 
     private Blueprint() {}
 
@@ -75,6 +75,31 @@ public class Blueprint {
             }
         }
         return blueprint.trimmed();
+    }
+
+    public static int detectHeight(World world, int x1, int z1, int x2, int z2, int baseY) {
+        int minX = Math.min(x1, x2);
+        int maxX = Math.min(Math.max(x1, x2), minX + MAX_SIDE - 1);
+        int minZ = Math.min(z1, z2);
+        int maxZ = Math.min(Math.max(z1, z2), minZ + MAX_SIDE - 1);
+        int limit = Math.min(world.getHeight() - 1, baseY + MAX_SIDE - 1);
+
+        int top = baseY - 1;
+        for (int y = baseY; y <= limit; y++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                for (int x = minX; x <= maxX; x++) {
+                    if (!world.blockExists(x, y, z)) {
+                        continue;
+                    }
+                    Block block = world.getBlock(x, y, z);
+                    if (block != null && !block.isAir(world, x, y, z)
+                        && isBuildable(block, world.getBlockMetadata(x, y, z))) {
+                        top = y;
+                    }
+                }
+            }
+        }
+        return Math.max(1, top - baseY + 1);
     }
 
     public static String cleanName(String name) {
@@ -122,6 +147,7 @@ public class Blueprint {
         }
         Blueprint trimmed = new Blueprint();
         trimmed.name = name;
+        trimmed.skipped = skipped;
         trimmed.sizeX = highX - lowX + 1;
         trimmed.sizeY = highY - lowY + 1;
         trimmed.sizeZ = highZ - lowZ + 1;
@@ -180,12 +206,14 @@ public class Blueprint {
         if (block == null || block.isAir(world, x, y, z)) {
             return AIR;
         }
-        ItemStack stack = new ItemStack(block, 1, world.getBlockMetadata(x, y, z));
-        if (!WorkBlocks.isScaffold(stack)) {
+        int meta = world.getBlockMetadata(x, y, z);
+        if (!isBuildable(block, meta)) {
+            skipped++;
             return AIR;
         }
         String name = Block.blockRegistry.getNameForObject(block);
         if (name == null || name.isEmpty()) {
+            skipped++;
             return AIR;
         }
         int slot = palette.indexOf(name);
@@ -193,7 +221,22 @@ public class Blueprint {
             slot = palette.size();
             palette.add(name);
         }
-        return (slot << META_BITS) | (world.getBlockMetadata(x, y, z) & META_MASK);
+        return (slot << META_BITS) | (meta & META_MASK);
+    }
+
+    public static boolean isBuildable(Block block, int meta) {
+        if (block == null || block == Blocks.air) {
+            return false;
+        }
+        if (block.getMaterial()
+            .isLiquid() || block.hasTileEntity(meta)) {
+            return false;
+        }
+        return Item.getItemFromBlock(block) != null;
+    }
+
+    public int getSkipped() {
+        return skipped;
     }
 
     public String getName() {

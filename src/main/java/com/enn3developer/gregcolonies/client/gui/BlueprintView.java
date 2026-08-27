@@ -8,6 +8,7 @@ import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.item.ItemStack;
+import net.minecraft.world.World;
 
 import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.cleanroommc.modularui.api.drawable.IKey;
@@ -39,19 +40,23 @@ public class BlueprintView {
 
     private static final int LEFT_WIDTH = 118;
 
-    private static final int LIBRARY_HEIGHT = 52;
+    private static final int LIBRARY_MIN_HEIGHT = 52;
 
-    private static final int MATERIALS_HEIGHT = 52;
+    private static final int LIBRARY_MAX_HEIGHT = 208;
+
+    private static final int LEFT_FIXED = 116;
+
+    private static final int MATERIALS_HEIGHT = 65;
 
     private static final int COLUMN_GAP = 6;
 
-    private static final int MIN_WIDTH = 260;
+    private static final int MIN_WIDTH = 300;
 
-    private static final int MAX_WIDTH = 440;
+    private static final int MAX_WIDTH = 560;
 
-    private static final int MIN_HEIGHT = 190;
+    private static final int MIN_HEIGHT = 200;
 
-    private static final int MAX_HEIGHT = 320;
+    private static final int MAX_HEIGHT = 420;
 
     private static final int SCREEN_INSET = 10;
 
@@ -59,15 +64,15 @@ public class BlueprintView {
 
     private static final int FIELD_WIDTH = 26;
 
-    private static final int DEFAULT_HEIGHT = 8;
+    private static final int AUTO_HEIGHT = 0;
 
     private static final int BACK_WIDTH = 34;
 
     private static final int HEADER_HEIGHT = 18;
 
-    private static final int DETAIL_FIXED = 131;
+    private static final int DETAIL_FIXED = 144;
 
-    private static final int MIN_PREVIEW = 40;
+    private static final int MIN_PREVIEW = 60;
 
     private static final int COLONY_INTERVAL = 20;
 
@@ -107,7 +112,21 @@ public class BlueprintView {
 
     private final StringValue baseValue = new StringValue("");
 
-    private final StringValue heightValue = new StringValue(String.valueOf(DEFAULT_HEIGHT));
+    private final StringValue heightValue = new StringValue("");
+
+    private final int[] region = new int[5];
+
+    private boolean hasRegion;
+
+    private int autoHeight = 1;
+
+    private int measuredBase = Integer.MIN_VALUE;
+
+    private boolean placementPending;
+
+    private int pendingRotation;
+
+    private boolean pendingMirror;
 
     public BlueprintView(ColonyView colonyView) {
         this.colonyView = colonyView;
@@ -125,6 +144,10 @@ public class BlueprintView {
     public void setColony(ColonySnapshot colony) {
         this.colony = colony;
         colonyView.setColony(colony);
+        if (placementPending && normalize(colony.getPlaceRotation()) == pendingRotation
+            && colony.isPlaceMirror() == pendingMirror) {
+            placementPending = false;
+        }
         int active = colony.getActiveBlueprint();
         if (active < 0) {
             clearDetail();
@@ -171,8 +194,35 @@ public class BlueprintView {
         GCNetwork.CHANNEL.sendToServer(new PacketBlueprintAction(colony.getId(), PacketBlueprintAction.REQUEST, index));
     }
 
+    private static int normalize(int rotation) {
+        return ((rotation % Blueprint.ROTATIONS) + Blueprint.ROTATIONS) % Blueprint.ROTATIONS;
+    }
+
+    private int rotation() {
+        return placementPending ? pendingRotation : normalize(colony.getPlaceRotation());
+    }
+
+    private boolean mirror() {
+        return placementPending ? pendingMirror : colony.isPlaceMirror();
+    }
+
+    private void setPlacement(int rotation, boolean mirror) {
+        pendingRotation = normalize(rotation);
+        pendingMirror = mirror;
+        placementPending = true;
+        retransform();
+        GCNetwork.CHANNEL.sendToServer(
+            new PacketBlueprintAction(
+                colony.getId(),
+                PacketBlueprintAction.PLACEMENT,
+                colony.getActiveBlueprint(),
+                pendingRotation,
+                pendingMirror,
+                ""));
+    }
+
     private void retransform() {
-        placed = source == null ? null : source.transformed(colony.getPlaceRotation(), colony.isPlaceMirror());
+        placed = source == null ? null : source.transformed(rotation(), mirror());
         if (placed == null) {
             layer = 0;
         } else {
@@ -230,6 +280,7 @@ public class BlueprintView {
     }
 
     private void tick() {
+        syncRegion();
         if (++colonyTicks >= COLONY_INTERVAL) {
             colonyTicks = 0;
             GCNetwork.CHANNEL.sendToServer(new PacketRequestColony());
@@ -238,6 +289,54 @@ public class BlueprintView {
             detailTicks = 0;
             request(colony.getActiveBlueprint());
         }
+    }
+
+    private void syncRegion() {
+        if (!colonyView.hasRegion()) {
+            hasRegion = false;
+            return;
+        }
+        int x1 = colonyView.getRegionX1();
+        int z1 = colonyView.getRegionZ1();
+        int x2 = colonyView.getRegionX2();
+        int z2 = colonyView.getRegionZ2();
+        int y = colonyView.getRegionY();
+        if (!hasRegion || region[0] != x1 || region[1] != z1 || region[2] != x2 || region[3] != z2 || region[4] != y) {
+            region[0] = x1;
+            region[1] = z1;
+            region[2] = x2;
+            region[3] = z2;
+            region[4] = y;
+            hasRegion = true;
+            measuredBase = Integer.MIN_VALUE;
+            if (baseField != null && !baseField.isFocused()) {
+                baseValue.setStringValue(String.valueOf(y));
+            }
+            if (heightField != null && !heightField.isFocused()) {
+                heightValue.setStringValue("");
+            }
+        }
+
+        int base = captureBase();
+        if (base != measuredBase) {
+            measuredBase = base;
+            World world = Minecraft.getMinecraft().theWorld;
+            autoHeight = world == null ? 1 : Blueprint.detectHeight(world, x1, z1, x2, z2, base);
+        }
+    }
+
+    private int captureBase() {
+        return parse(baseField, colonyView.getRegionY());
+    }
+
+    private int captureHeight() {
+        int typed = parse(heightField, AUTO_HEIGHT);
+        return typed > 0 ? Math.min(Blueprint.MAX_SIDE, typed) : autoHeight;
+    }
+
+    private double libraryHeight() {
+        double room = panelHeight() - GuiStyle.PADDING * 2 - HEADER_HEIGHT - LEFT_FIXED;
+        return Math.max(LIBRARY_MIN_HEIGHT, Math.min(LIBRARY_MAX_HEIGHT, room));
     }
 
     private static ScaledResolution resolution() {
@@ -267,7 +366,7 @@ public class BlueprintView {
         list.collapseDisabledChild();
         list.crossAxisAlignment(Alignment.CrossAxis.START);
         list.widthRel(1.0F);
-        list.height(LIBRARY_HEIGHT);
+        list.height(this::libraryHeight, Unit.Measure.PIXEL);
         list.marginBottom(GuiStyle.ROW_GAP);
         list.background(GuiStyle.skin(GuiStyle.SCROLL_TRACK, GuiStyle.SECTION_LINE));
         list.getScrollArea()
@@ -313,6 +412,7 @@ public class BlueprintView {
 
     private TextFieldWidget baseField() {
         baseValue.setStringValue(String.valueOf(colonyView.getRegionY()));
+        measuredBase = Integer.MIN_VALUE;
         baseField = GuiStyle.field(4);
         baseField.width(FIELD_WIDTH);
         baseField.value(baseValue);
@@ -356,14 +456,9 @@ public class BlueprintView {
                         GuiStyle.toggleButton(
                             this::rotationLabel,
                             GuiStyle.EXPAND,
-                            () -> colony.getPlaceRotation() != 0,
+                            () -> rotation() != 0,
                             this::sendRotate))
-                    .child(
-                        GuiStyle.toggleButton(
-                            () -> "Mirror",
-                            GuiStyle.EXPAND,
-                            () -> colony.isPlaceMirror(),
-                            this::sendMirror)))
+                    .child(GuiStyle.toggleButton(() -> "Mirror", GuiStyle.EXPAND, this::mirror, this::sendMirror)))
             .child(preview)
             .child(
                 GuiStyle.row()
@@ -566,19 +661,31 @@ public class BlueprintView {
     }
 
     private String captureValue() {
-        return colonyView.hasRegion() ? "ready" : "no region";
+        if (!colonyView.hasRegion()) {
+            return "no region";
+        }
+        if (colony.getBlueprints()
+            .size() >= Colony.MAX_BLUEPRINTS) {
+            return "library full";
+        }
+        int width = Math.min(colonyView.getRegionWidth(), Blueprint.MAX_SIDE);
+        int depth = Math.min(colonyView.getRegionDepth(), Blueprint.MAX_SIDE);
+        int layers = Math.max(1, Math.min(Blueprint.MAX_SIDE, Blueprint.MAX_VOLUME / (width * depth)));
+        return captureHeight() > layers ? "clipped to " + layers : "ready";
     }
 
     private String regionValue() {
         if (!colonyView.hasRegion()) {
-            return GuiText.trim("drag a region with Blueprint mode", LEFT_WIDTH);
+            return GuiText.trim("drag a region in Blueprint mode", LEFT_WIDTH);
         }
-        return colonyView.getRegionWidth() + "x"
-            + colonyView.getRegionDepth()
-            + " at "
-            + colonyView.getRegionX1()
-            + "/"
-            + colonyView.getRegionZ1();
+        String size = colonyView.getRegionWidth() + "x" + captureHeight() + "x" + colonyView.getRegionDepth();
+        return GuiText.trim(
+            size + (parse(heightField, AUTO_HEIGHT) > 0 ? "" : " auto")
+                + " at "
+                + colonyView.getRegionX1()
+                + "/"
+                + colonyView.getRegionZ1(),
+            LEFT_WIDTH);
     }
 
     private String detailValue() {
@@ -595,7 +702,7 @@ public class BlueprintView {
     }
 
     private String rotationLabel() {
-        return "Turn " + colony.getPlaceRotation() * 90 + "°";
+        return "Turn " + rotation() * 90 + "°";
     }
 
     private String layerValue() {
@@ -643,25 +750,11 @@ public class BlueprintView {
     }
 
     private void sendRotate() {
-        GCNetwork.CHANNEL.sendToServer(
-            new PacketBlueprintAction(
-                colony.getId(),
-                PacketBlueprintAction.PLACEMENT,
-                colony.getActiveBlueprint(),
-                colony.getPlaceRotation() + 1,
-                colony.isPlaceMirror(),
-                ""));
+        setPlacement(rotation() + 1, mirror());
     }
 
     private void sendMirror() {
-        GCNetwork.CHANNEL.sendToServer(
-            new PacketBlueprintAction(
-                colony.getId(),
-                PacketBlueprintAction.PLACEMENT,
-                colony.getActiveBlueprint(),
-                colony.getPlaceRotation(),
-                !colony.isPlaceMirror(),
-                ""));
+        setPlacement(rotation(), !mirror());
     }
 
     private void sendCapture() {
@@ -675,12 +768,15 @@ public class BlueprintView {
                 colonyView.getRegionZ1(),
                 colonyView.getRegionX2(),
                 colonyView.getRegionZ2(),
-                parse(baseField, colonyView.getRegionY()),
-                parse(heightField, DEFAULT_HEIGHT),
+                captureBase(),
+                parse(heightField, AUTO_HEIGHT),
                 nameField.getText()));
     }
 
     private static int parse(TextFieldWidget field, int fallback) {
+        if (field == null) {
+            return fallback;
+        }
         try {
             return Integer.parseInt(
                 field.getText()

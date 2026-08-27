@@ -69,6 +69,8 @@ public class IdleTaskBuild extends AutoTask {
 
     private boolean progressed;
 
+    private boolean detailPass;
+
     private boolean storing;
 
     private boolean hasTarget;
@@ -176,6 +178,7 @@ public class IdleTaskBuild extends AutoTask {
         cursor = next == PHASE_CLEAR && site != null ? site.getBlueprint()
             .volume() - 1 : 0;
         progressed = false;
+        detailPass = false;
         hasTarget = false;
         hasStand = false;
         standDenied = false;
@@ -278,8 +281,16 @@ public class IdleTaskBuild extends AutoTask {
         World world = citizen.worldObj;
         Blueprint blueprint = site.getBlueprint();
         if (!hasTarget && !nextBuildTarget(world, site)) {
+            if (!detailPass) {
+                detailPass = true;
+                cursor = 0;
+                missing.clear();
+                blocked.clear();
+                return true;
+            }
             if (progressed) {
                 progressed = false;
+                detailPass = false;
                 cursor = 0;
                 missing.clear();
                 blocked.clear();
@@ -310,7 +321,8 @@ public class IdleTaskBuild extends AutoTask {
             int y = site.getY() + cursor / (sizeX * sizeZ);
             int z = site.getZ() + cursor / sizeX % sizeZ;
             int cell = site.cellFor(x, y, z);
-            if (cell != Blueprint.AIR && !missing.contains(cell)
+            if (cell != Blueprint.AIR && (detailPass || isFullCube(blueprint, cell))
+                && !missing.contains(cell)
                 && !blocked.contains(WorkBlocks.pack(x, y, z))
                 && !site.isPlaced(world, x, y, z)
                 && site.isFree(world, x, y, z)) {
@@ -327,6 +339,11 @@ public class IdleTaskBuild extends AutoTask {
             cursor++;
         }
         return false;
+    }
+
+    private static boolean isFullCube(Blueprint blueprint, int cell) {
+        Block block = blueprint.blockOf(cell);
+        return block != null && block.renderAsNormalBlock();
     }
 
     private boolean fetch(EntityCitizen citizen, Colony colony, Blueprint blueprint, int cell) {
