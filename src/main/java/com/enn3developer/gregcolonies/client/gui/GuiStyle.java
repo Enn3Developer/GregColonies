@@ -4,13 +4,19 @@ import java.util.function.BooleanSupplier;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.ScaledResolution;
+
 import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.cleanroommc.modularui.api.drawable.IKey;
+import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.drawable.GuiDraw;
 import com.cleanroommc.modularui.drawable.Rectangle;
 import com.cleanroommc.modularui.utils.Alignment;
 import com.cleanroommc.modularui.widget.Widget;
+import com.cleanroommc.modularui.widget.scroll.VerticalScrollData;
 import com.cleanroommc.modularui.widgets.ButtonWidget;
+import com.cleanroommc.modularui.widgets.ListWidget;
 import com.cleanroommc.modularui.widgets.TextWidget;
 import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
@@ -94,6 +100,47 @@ public final class GuiStyle {
     public static IDrawable dynamicSkin(IntSupplier fill, IntSupplier border) {
         return (context, x, y, width, height, theme) -> skin(fill.getAsInt(), border.getAsInt())
             .draw(context, x, y, width, height, theme);
+    }
+
+    public static ListWidget<IWidget, ?> scrollList() {
+        VerticalScrollData scroll = new VerticalScrollData();
+        scroll.texture(scrollHandle());
+        ListWidget<IWidget, ?> list = new ListWidget<>();
+        list.scrollDirection(scroll);
+        list.collapseDisabledChild();
+        list.crossAxisAlignment(Alignment.CrossAxis.START);
+        list.getScrollArea()
+            .setScrollBarBackgroundColor(SCROLL_TRACK);
+        return list;
+    }
+
+    public static ListWidget<IWidget, ?> panelList() {
+        ListWidget<IWidget, ?> list = scrollList();
+        list.padding(PADDING);
+        list.background(skin(PANEL_BACKGROUND, PANEL_BORDER));
+        return list;
+    }
+
+    public static Flow panelBox() {
+        return Flow.column()
+            .coverChildren()
+            .childPadding(2)
+            .padding(PADDING)
+            .crossAxisAlignment(Alignment.CrossAxis.START)
+            .background(skin(PANEL_BACKGROUND, PANEL_BORDER));
+    }
+
+    public static int screenWidth() {
+        return resolution().getScaledWidth();
+    }
+
+    public static int screenHeight() {
+        return resolution().getScaledHeight();
+    }
+
+    private static ScaledResolution resolution() {
+        Minecraft mc = Minecraft.getMinecraft();
+        return new ScaledResolution(mc, mc.displayWidth, mc.displayHeight);
     }
 
     public static IDrawable scrollHandle() {

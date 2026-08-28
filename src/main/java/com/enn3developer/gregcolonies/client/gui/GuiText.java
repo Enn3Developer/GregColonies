@@ -22,6 +22,10 @@ public final class GuiText {
         return room <= 0 ? "" : font.trimStringToWidth(text, room) + ELLIPSIS;
     }
 
+    public static String fit(String label, String hint, int room) {
+        return trim(label, room - width(hint));
+    }
+
     private static FontRenderer font() {
         return Minecraft.getMinecraft().fontRenderer;
     }

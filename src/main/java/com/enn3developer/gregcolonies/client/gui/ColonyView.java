@@ -19,7 +19,6 @@ import com.cleanroommc.modularui.api.widget.Interactable;
 import com.cleanroommc.modularui.drawable.GuiDraw;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.utils.Alignment;
-import com.cleanroommc.modularui.widget.scroll.VerticalScrollData;
 import com.cleanroommc.modularui.widget.sizer.Area;
 import com.cleanroommc.modularui.widget.sizer.Unit;
 import com.cleanroommc.modularui.widgets.ButtonWidget;
@@ -42,7 +41,7 @@ import com.enn3developer.gregcolonies.network.PacketColonyBuild;
 import com.enn3developer.gregcolonies.network.PacketColonySite;
 import com.enn3developer.gregcolonies.network.PacketOpenCitizen;
 
-public class ColonyView {
+public class ColonyView extends OverlayView {
 
     public static final String UNGROUPED = "ungrouped";
 
@@ -84,17 +83,12 @@ public class ColonyView {
 
     private boolean hasPending;
 
-    private boolean helpOpen;
-
     private ModularPanel panel;
-
-    private Flow header;
 
     private ListWidget<IWidget, ?> sidePanel;
 
-    private Flow hints;
-
     public ColonyView(ColonySnapshot colony) {
+        super(false);
         setColony(colony);
     }
 
@@ -172,14 +166,6 @@ public class ColonyView {
     public void setTargeting(TargetMode mode) {
         targeting = targeting == mode ? TargetMode.NONE : mode;
         hasPending = false;
-    }
-
-    public boolean isHelpOpen() {
-        return helpOpen;
-    }
-
-    public void toggleHelp() {
-        helpOpen = !helpOpen;
     }
 
     public boolean hasPending() {
@@ -291,7 +277,7 @@ public class ColonyView {
     }
 
     public boolean isOverChrome(int x, int y) {
-        return covers(header, x, y) || covers(sidePanel, x, y) || covers(hints, x, y);
+        return covers(getHeader(), x, y) || covers(sidePanel, x, y) || covers(getHints(), x, y);
     }
 
     private static boolean covers(IWidget widget, int x, int y) {
@@ -313,60 +299,12 @@ public class ColonyView {
         return Math.max(SIDE_MIN_WIDTH, Math.min(SIDE_WIDTH, fraction));
     }
 
-    private Flow buildHeader() {
-        header = Flow.column()
-            .coverChildren()
-            .childPadding(2)
-            .padding(GuiStyle.PADDING)
-            .pos(GuiStyle.SCREEN_MARGIN, GuiStyle.SCREEN_MARGIN)
-            .crossAxisAlignment(Alignment.CrossAxis.START)
-            .background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER))
-            .child(GuiStyle.label(IKey.dynamic(this::title), GuiStyle.TITLE_COLOR))
-            .child(GuiStyle.label(IKey.dynamic(this::census), GuiStyle.TEXT_COLOR))
-            .child(GuiStyle.label(IKey.dynamic(this::status), GuiStyle.HINT_COLOR));
-        return header;
-    }
-
-    private Flow buildHints() {
-        hints = Flow.column()
-            .coverChildren()
-            .childPadding(2)
-            .padding(GuiStyle.PADDING)
-            .left(GuiStyle.SCREEN_MARGIN)
-            .bottom(GuiStyle.SCREEN_MARGIN)
-            .collapseDisabledChild()
-            .crossAxisAlignment(Alignment.CrossAxis.START)
-            .background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER))
-            .child(helpLine(IKey.str(SELECT_HINT)))
-            .child(helpLine(IKey.str(MOVE_HINT)))
-            .child(helpLine(IKey.str(CAMERA_HINT)))
-            .child(helpLine(IKey.str(GROUP_HINT)))
-            .child(helpLine(IKey.dynamic(this::keyHint)))
-            .child(GuiStyle.label(IKey.dynamic(this::helpHint), GuiStyle.TEXT_COLOR));
-        return hints;
-    }
-
-    private TextWidget<?> helpLine(IKey key) {
-        TextWidget<?> line = GuiStyle.label(key, GuiStyle.HINT_COLOR);
-        line.setEnabledIf(widget -> helpOpen);
-        return line;
-    }
-
     private ListWidget<IWidget, ?> buildSidePanel() {
-        VerticalScrollData scroll = new VerticalScrollData();
-        scroll.texture(GuiStyle.scrollHandle());
-        ListWidget<IWidget, ?> list = new ListWidget<>();
-        list.scrollDirection(scroll);
-        list.collapseDisabledChild();
-        list.crossAxisAlignment(Alignment.CrossAxis.START);
+        ListWidget<IWidget, ?> list = GuiStyle.panelList();
         list.maxSizeRelOffset(1.0F, -GuiStyle.SCREEN_MARGIN * 2);
         list.width(this::sideWidth, Unit.Measure.PIXEL);
         list.right(GuiStyle.SCREEN_MARGIN);
         list.top(GuiStyle.SCREEN_MARGIN);
-        list.padding(GuiStyle.PADDING);
-        list.background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER));
-        list.getScrollArea()
-            .setScrollBarBackgroundColor(GuiStyle.SCROLL_TRACK);
 
         list.child(GuiStyle.section("Groups", this::groupValue, 0));
         for (int index = 0; index < MAX_GROUP_ROWS; index++) {
@@ -473,7 +411,7 @@ public class ColonyView {
     }
 
     private String entryValue(String name, Supplier<String> value) {
-        return GuiText.trim(value.get(), innerWidth() - GuiText.width(name) - GuiStyle.ROW_TEXT_PADDING);
+        return GuiText.fit(value.get(), name, innerWidth() - GuiStyle.ROW_TEXT_PADDING);
     }
 
     private String buildersValue() {
@@ -567,9 +505,8 @@ public class ColonyView {
         if (group == null) {
             return "";
         }
-        return GuiText.trim(
-            group,
-            innerWidth() - GuiStyle.SWATCH_WIDTH - GuiStyle.ROW_TEXT_PADDING * 3 - GuiText.width(groupRowCount(index)));
+        return GuiText
+            .fit(group, groupRowCount(index), innerWidth() - GuiStyle.SWATCH_WIDTH - GuiStyle.ROW_TEXT_PADDING * 3);
     }
 
     private int innerWidth() {
@@ -619,11 +556,13 @@ public class ColonyView {
             .isEmpty() ? UNGROUPED : citizen.getGroup();
     }
 
-    private String title() {
+    @Override
+    protected String title() {
         return colony.getName() + " #" + colony.getId();
     }
 
-    private String status() {
+    @Override
+    protected String headerHint() {
         return "owner " + colony.getOwnerName()
             + "   dim "
             + colony.getDimension()
@@ -637,7 +576,8 @@ public class ColonyView {
             + colony.getRadius();
     }
 
-    private String census() {
+    @Override
+    protected String headerLine() {
         int loaded = 0;
         for (CitizenSnapshot citizen : colony.getCitizens()) {
             if (citizen.isLoaded()) {
@@ -669,12 +609,15 @@ public class ColonyView {
         return getSelectedLoaded() + " of " + selection.size() + " loaded";
     }
 
-    private String helpHint() {
-        return (helpOpen ? "H hide help   " : "H help   ") + ControllingCompat.describe(GCKeyBindings.openColony)
+    @Override
+    protected String helpHint() {
+        return (isHelpOpen() ? "H hide help   " : "H help   ") + ControllingCompat.describe(GCKeyBindings.openColony)
             + " close";
     }
 
-    private String keyHint() {
-        return "R recenter   ctrl+A all   G guard   C cancel   I inventory";
+    @Override
+    protected IKey[] hintLines() {
+        return new IKey[] { text(SELECT_HINT), text(MOVE_HINT), text(CAMERA_HINT), text(GROUP_HINT),
+            text("R recenter   ctrl+A all   G guard   C cancel   I inventory") };
     }
 }

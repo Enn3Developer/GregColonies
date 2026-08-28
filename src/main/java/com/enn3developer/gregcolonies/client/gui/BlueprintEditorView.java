@@ -5,8 +5,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.item.ItemStack;
 
 import com.cleanroommc.modularui.api.drawable.IDrawable;
@@ -16,7 +14,6 @@ import com.cleanroommc.modularui.drawable.GuiDraw;
 import com.cleanroommc.modularui.drawable.Rectangle;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.utils.Alignment;
-import com.cleanroommc.modularui.widget.scroll.VerticalScrollData;
 import com.cleanroommc.modularui.widget.sizer.Unit;
 import com.cleanroommc.modularui.widgets.ButtonWidget;
 import com.cleanroommc.modularui.widgets.ListWidget;
@@ -28,7 +25,7 @@ import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
 import com.enn3developer.gregcolonies.network.PacketColonyPalette;
 
-public class BlueprintEditorView {
+public class BlueprintEditorView extends OverlayView {
 
     private static final int SIDE_WIDTH = 118;
 
@@ -74,17 +71,11 @@ public class BlueprintEditorView {
 
     private ModularPanel panel;
 
-    private Flow header;
-
-    private Flow hints;
-
     private ListWidget<IWidget, ?> sidePanel;
 
     private ListWidget<IWidget, ?> palettePanel;
 
     private TextFieldWidget nameField;
-
-    private boolean helpOpen = true;
 
     private boolean confirming;
 
@@ -95,6 +86,7 @@ public class BlueprintEditorView {
     private final List<Integer> missingCells = new ArrayList<>();
 
     public BlueprintEditorView(BlueprintEditor editor) {
+        super(true);
         this.editor = editor;
     }
 
@@ -116,10 +108,6 @@ public class BlueprintEditorView {
 
     public boolean isEditingText() {
         return nameField != null && nameField.isFocused();
-    }
-
-    public void toggleHelp() {
-        helpOpen = !helpOpen;
     }
 
     public boolean isConfirming() {
@@ -171,20 +159,6 @@ public class BlueprintEditorView {
         missingCells.addAll(missing.keySet());
     }
 
-    private Flow buildHeader() {
-        header = Flow.column()
-            .coverChildren()
-            .childPadding(2)
-            .padding(GuiStyle.PADDING)
-            .pos(GuiStyle.SCREEN_MARGIN, GuiStyle.SCREEN_MARGIN)
-            .crossAxisAlignment(Alignment.CrossAxis.START)
-            .background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER))
-            .child(GuiStyle.label(IKey.dynamic(this::title), GuiStyle.TITLE_COLOR))
-            .child(GuiStyle.label(IKey.dynamic(this::sizeValue), GuiStyle.TEXT_COLOR))
-            .child(GuiStyle.label(IKey.dynamic(this::aimValue), GuiStyle.HINT_COLOR));
-        return header;
-    }
-
     private Flow buildConfirm() {
         Flow prompt = Flow.column();
         prompt.width(this::confirmWidth, Unit.Measure.PIXEL);
@@ -216,20 +190,14 @@ public class BlueprintEditorView {
     // the help panel is bottom anchored and grows upwards, so the palette stops above it;
     // this resolves at layout time, so it is sized for the taller help-open case
     private double paletteHeight() {
-        double floor = hints == null ? scaledHeight() - GuiStyle.SCREEN_MARGIN : hints.getArea().y;
+        double floor = getHints() == null ? GuiStyle.screenHeight() - GuiStyle.SCREEN_MARGIN : getHints().getArea().y;
         double room = floor - PALETTE_TOP - CONFIRM_GAP;
         return Math.max(PALETTE_MIN_HEIGHT, Math.min(PALETTE_HEIGHT, room));
     }
 
-    private static double scaledHeight() {
-        Minecraft mc = Minecraft.getMinecraft();
-        return new ScaledResolution(mc, mc.displayWidth, mc.displayHeight).getScaledHeight();
-    }
-
     // the prompt is centred on the screen, so it must stay clear of the palette column
     private double confirmWidth() {
-        Minecraft mc = Minecraft.getMinecraft();
-        double screen = new ScaledResolution(mc, mc.displayWidth, mc.displayHeight).getScaledWidth();
+        double screen = GuiStyle.screenWidth();
         double room = (screen / 2.0D - GuiStyle.SCREEN_MARGIN - PALETTE_WIDTH - CONFIRM_GAP) * 2.0D;
         return Math.max(CONFIRM_MIN_WIDTH, Math.min(CONFIRM_WIDTH, room));
     }
@@ -244,46 +212,12 @@ public class BlueprintEditorView {
             .blockCount() + " blocks would be lost";
     }
 
-    private Flow buildHints() {
-        hints = Flow.column()
-            .coverChildren()
-            .childPadding(2)
-            .padding(GuiStyle.PADDING)
-            .left(GuiStyle.SCREEN_MARGIN)
-            .bottom(GuiStyle.SCREEN_MARGIN)
-            .collapseDisabledChild()
-            .crossAxisAlignment(Alignment.CrossAxis.START)
-            .background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER))
-            .child(helpLine(IKey.str(PAINT_HINT)))
-            .child(helpLine(IKey.str(CAMERA_HINT)))
-            .child(helpLine(IKey.str(LAYER_HINT)))
-            .child(helpLine(IKey.str(EDIT_HINT)))
-            .child(helpLine(IKey.str(ANCHOR_HINT)))
-            .child(GuiStyle.label(IKey.dynamic(this::helpHint), GuiStyle.TEXT_COLOR));
-        return hints;
-    }
-
-    private TextWidget<?> helpLine(IKey key) {
-        TextWidget<?> line = GuiStyle.label(key, GuiStyle.HINT_COLOR);
-        line.setEnabledIf(widget -> helpOpen);
-        return line;
-    }
-
     private ListWidget<IWidget, ?> buildPalette() {
-        VerticalScrollData scroll = new VerticalScrollData();
-        scroll.texture(GuiStyle.scrollHandle());
-        ListWidget<IWidget, ?> list = new ListWidget<>();
-        list.scrollDirection(scroll);
-        list.collapseDisabledChild();
-        list.crossAxisAlignment(Alignment.CrossAxis.START);
+        ListWidget<IWidget, ?> list = GuiStyle.panelList();
         list.width(PALETTE_WIDTH);
         list.height(this::paletteHeight, Unit.Measure.PIXEL);
         list.left(GuiStyle.SCREEN_MARGIN);
         list.top(PALETTE_TOP);
-        list.padding(GuiStyle.PADDING);
-        list.background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER));
-        list.getScrollArea()
-            .setScrollBarBackgroundColor(GuiStyle.SCROLL_TRACK);
         list.child(GuiStyle.section("Materials chest", this::paletteValue, 0));
         for (int index = 0; index < MAX_PALETTE_ROWS; index++) {
             list.child(buildPaletteRow(index));
@@ -336,12 +270,8 @@ public class BlueprintEditorView {
         if (brush == null) {
             return "";
         }
-        int room = PALETTE_WIDTH - GuiStyle.PADDING * 2
-            - GuiStyle.SCROLL_THICKNESS
-            - ICON_WIDTH
-            - 8
-            - GuiText.width(paletteCount(index));
-        return GuiText.trim(brush.label(), room);
+        int room = PALETTE_WIDTH - GuiStyle.PADDING * 2 - GuiStyle.SCROLL_THICKNESS - ICON_WIDTH - 8;
+        return GuiText.fit(brush.label(), paletteCount(index), room);
     }
 
     private String paletteCount(int index) {
@@ -360,20 +290,11 @@ public class BlueprintEditorView {
     }
 
     private ListWidget<IWidget, ?> buildSidePanel() {
-        VerticalScrollData scroll = new VerticalScrollData();
-        scroll.texture(GuiStyle.scrollHandle());
-        ListWidget<IWidget, ?> list = new ListWidget<>();
-        list.scrollDirection(scroll);
-        list.collapseDisabledChild();
-        list.crossAxisAlignment(Alignment.CrossAxis.START);
+        ListWidget<IWidget, ?> list = GuiStyle.panelList();
         list.maxSizeRelOffset(1.0F, -GuiStyle.SCREEN_MARGIN * 2);
         list.width(SIDE_WIDTH);
         list.right(GuiStyle.SCREEN_MARGIN);
         list.top(GuiStyle.SCREEN_MARGIN);
-        list.padding(GuiStyle.PADDING);
-        list.background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER));
-        list.getScrollArea()
-            .setScrollBarBackgroundColor(GuiStyle.SCROLL_TRACK);
 
         list.child(GuiStyle.section("Tool", this::toolValue, 0));
         list.child(
@@ -432,16 +353,9 @@ public class BlueprintEditorView {
                 .child(GuiStyle.button("Close", GuiStyle.EXPAND, () -> true, this::close)));
 
         list.child(GuiStyle.section("Missing", this::missingValue, GuiStyle.SECTION_GAP));
-        ListWidget<IWidget, ?> shortfall = new ListWidget<>();
-        VerticalScrollData innerScroll = new VerticalScrollData();
-        innerScroll.texture(GuiStyle.scrollHandle());
-        shortfall.scrollDirection(innerScroll);
-        shortfall.collapseDisabledChild();
-        shortfall.crossAxisAlignment(Alignment.CrossAxis.START);
+        ListWidget<IWidget, ?> shortfall = GuiStyle.scrollList();
         shortfall.widthRel(1.0F);
         shortfall.height(MATERIALS_HEIGHT);
-        shortfall.getScrollArea()
-            .setScrollBarBackgroundColor(GuiStyle.SCROLL_TRACK);
         for (int index = 0; index < MAX_MATERIAL_ROWS; index++) {
             shortfall.child(buildMissingRow(index));
         }
@@ -492,7 +406,7 @@ public class BlueprintEditorView {
         ItemStack stack = editor.getModel()
             .stackOf(cell);
         String name = stack == null ? "unknown block" : safeName(stack);
-        return GuiText.trim(name, SIDE_WIDTH - GuiStyle.PADDING * 2 - 10 - GuiText.width(missingCount(index)));
+        return GuiText.fit(name, missingCount(index), SIDE_WIDTH - GuiStyle.PADDING * 2 - 10);
     }
 
     private static String safeName(ItemStack stack) {
@@ -535,13 +449,15 @@ public class BlueprintEditorView {
         BlueprintEditorScreen.back();
     }
 
-    private String title() {
+    @Override
+    protected String title() {
         String name = editor.getModel()
             .getName();
         return "Editor - " + (name.isEmpty() ? "untitled" : name);
     }
 
-    private String sizeValue() {
+    @Override
+    protected String headerLine() {
         Blueprint model = editor.getModel();
         return model.getSizeX() + "x"
             + model.getSizeY()
@@ -552,7 +468,8 @@ public class BlueprintEditorView {
             + " blocks";
     }
 
-    private String aimValue() {
+    @Override
+    protected String headerHint() {
         if (hover == null) {
             return "aim at the build plane";
         }
@@ -596,8 +513,14 @@ public class BlueprintEditorView {
         return missingCells.isEmpty() ? "stocked" : missingCells.size() + " short";
     }
 
-    private String helpHint() {
-        return helpOpen ? "H hides help" : "H shows help";
+    @Override
+    protected String helpHint() {
+        return isHelpOpen() ? "H hides help" : "H shows help";
+    }
+
+    @Override
+    protected IKey[] hintLines() {
+        return new IKey[] { text(PAINT_HINT), text(CAMERA_HINT), text(LAYER_HINT), text(EDIT_HINT), text(ANCHOR_HINT) };
     }
 
 }

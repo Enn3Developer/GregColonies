@@ -64,13 +64,9 @@ public class BlueprintEditor {
 
     private boolean sliced;
 
-    private final Deque<Blueprint> undo = new ArrayDeque<>();
+    private final Deque<Snapshot> undo = new ArrayDeque<>();
 
-    private final Deque<int[]> undoAnchor = new ArrayDeque<>();
-
-    private final Deque<Blueprint> redo = new ArrayDeque<>();
-
-    private final Deque<int[]> redoAnchor = new ArrayDeque<>();
+    private final Deque<Snapshot> redo = new ArrayDeque<>();
 
     private int[] boxAnchor;
 
@@ -333,48 +329,58 @@ public class BlueprintEditor {
     }
 
     public void pushUndo() {
-        undo.addLast(model.copy());
-        undoAnchor.addLast(anchor());
+        undo.addLast(snapshot());
         while (undo.size() > UNDO_DEPTH) {
             undo.removeFirst();
-            undoAnchor.removeFirst();
         }
         redo.clear();
-        redoAnchor.clear();
         dirty = true;
     }
 
     public void undo() {
-        if (undo.isEmpty()) {
-            return;
+        if (!undo.isEmpty()) {
+            redo.addLast(snapshot());
+            restore(undo.removeLast());
         }
-        redo.addLast(model.copy());
-        redoAnchor.addLast(anchor());
-        model = undo.removeLast();
-        restore(undoAnchor.removeLast());
     }
 
     public void redo() {
-        if (redo.isEmpty()) {
-            return;
+        if (!redo.isEmpty()) {
+            undo.addLast(snapshot());
+            restore(redo.removeLast());
         }
-        undo.addLast(model.copy());
-        undoAnchor.addLast(anchor());
-        model = redo.removeLast();
-        restore(redoAnchor.removeLast());
     }
 
-    private int[] anchor() {
-        return new int[] { anchorX, anchorY, anchorZ };
+    private Snapshot snapshot() {
+        return new Snapshot(model.copy(), anchorX, anchorY, anchorZ);
     }
 
-    private void restore(int[] anchor) {
-        anchorX = anchor[0];
-        anchorY = anchor[1];
-        anchorZ = anchor[2];
+    private void restore(Snapshot snapshot) {
+        model = snapshot.model;
+        anchorX = snapshot.anchorX;
+        anchorY = snapshot.anchorY;
+        anchorZ = snapshot.anchorZ;
         layer = clamp(layer, 0, model.getSizeY() - 1);
         dirty = true;
         touchAll();
+    }
+
+    private static final class Snapshot {
+
+        private final Blueprint model;
+
+        private final int anchorX;
+
+        private final int anchorY;
+
+        private final int anchorZ;
+
+        private Snapshot(Blueprint model, int anchorX, int anchorY, int anchorZ) {
+            this.model = model;
+            this.anchorX = anchorX;
+            this.anchorY = anchorY;
+            this.anchorZ = anchorZ;
+        }
     }
 
     public int brushCell() {

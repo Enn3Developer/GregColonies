@@ -5,8 +5,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.item.ItemStack;
 
 import com.cleanroommc.modularui.api.drawable.IDrawable;
@@ -15,7 +13,6 @@ import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.drawable.GuiDraw;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.utils.Alignment;
-import com.cleanroommc.modularui.widget.scroll.VerticalScrollData;
 import com.cleanroommc.modularui.widget.sizer.Unit;
 import com.cleanroommc.modularui.widgets.ListWidget;
 import com.cleanroommc.modularui.widgets.TextWidget;
@@ -292,18 +289,13 @@ public class BlueprintView {
         return Math.max(LIBRARY_MIN_HEIGHT, Math.min(LIBRARY_MAX_HEIGHT, room));
     }
 
-    private static ScaledResolution resolution() {
-        Minecraft mc = Minecraft.getMinecraft();
-        return new ScaledResolution(mc, mc.displayWidth, mc.displayHeight);
-    }
-
     private double panelWidth() {
-        int screen = resolution().getScaledWidth();
+        int screen = GuiStyle.screenWidth();
         return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, screen - SCREEN_INSET * 2));
     }
 
     private double panelHeight() {
-        int screen = resolution().getScaledHeight();
+        int screen = GuiStyle.screenHeight();
         return Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, screen - SCREEN_INSET * 2));
     }
 
@@ -312,18 +304,11 @@ public class BlueprintView {
     }
 
     private Flow buildLibrary() {
-        VerticalScrollData scroll = new VerticalScrollData();
-        scroll.texture(GuiStyle.scrollHandle());
-        ListWidget<IWidget, ?> list = new ListWidget<>();
-        list.scrollDirection(scroll);
-        list.collapseDisabledChild();
-        list.crossAxisAlignment(Alignment.CrossAxis.START);
+        ListWidget<IWidget, ?> list = GuiStyle.scrollList();
         list.widthRel(1.0F);
         list.height(this::libraryHeight, Unit.Measure.PIXEL);
         list.marginBottom(GuiStyle.ROW_GAP);
         list.background(GuiStyle.skin(GuiStyle.SCROLL_TRACK, GuiStyle.SECTION_LINE));
-        list.getScrollArea()
-            .setScrollBarBackgroundColor(GuiStyle.SCROLL_TRACK);
         for (int index = 0; index < MAX_LIBRARY_ROWS; index++) {
             list.child(buildLibraryRow(index));
         }
@@ -356,16 +341,9 @@ public class BlueprintView {
         preview.height(this::previewHeight, Unit.Measure.PIXEL);
         preview.marginBottom(GuiStyle.ROW_GAP);
 
-        VerticalScrollData scroll = new VerticalScrollData();
-        scroll.texture(GuiStyle.scrollHandle());
-        ListWidget<IWidget, ?> list = new ListWidget<>();
-        list.scrollDirection(scroll);
-        list.collapseDisabledChild();
-        list.crossAxisAlignment(Alignment.CrossAxis.START);
+        ListWidget<IWidget, ?> list = GuiStyle.scrollList();
         list.widthRel(1.0F);
         list.height(MATERIALS_HEIGHT);
-        list.getScrollArea()
-            .setScrollBarBackgroundColor(GuiStyle.SCROLL_TRACK);
         for (int index = 0; index < MAX_MATERIAL_ROWS; index++) {
             list.child(buildMaterialRow(index));
         }
@@ -441,11 +419,8 @@ public class BlueprintView {
         if (entry == null) {
             return "";
         }
-        int room = LEFT_WIDTH - GuiStyle.SWATCH_WIDTH
-            - GuiStyle.SCROLL_THICKNESS
-            - 12
-            - GuiText.width(libraryRowSize(index));
-        return GuiText.trim(entry.getLabel(index), room);
+        int room = LEFT_WIDTH - GuiStyle.SWATCH_WIDTH - GuiStyle.SCROLL_THICKNESS - 12;
+        return GuiText.fit(entry.getLabel(index), libraryRowSize(index), room);
     }
 
     private String libraryRowSize(int index) {
@@ -481,7 +456,7 @@ public class BlueprintView {
             return "";
         }
         String name = stackName(materials.get(index));
-        return GuiText.trim(name, detailWidth() - GuiText.width(materialCount(index)) - 20);
+        return GuiText.fit(name, materialCount(index), detailWidth() - 20);
     }
 
     private String stackName(int cell) {
