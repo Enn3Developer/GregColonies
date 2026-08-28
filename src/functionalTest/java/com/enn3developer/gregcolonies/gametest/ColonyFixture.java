@@ -6,6 +6,7 @@ import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.inventory.IInventory;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 
 import com.enn3developer.gregcolonies.colony.Blueprint;
@@ -16,7 +17,9 @@ import com.enn3developer.gregcolonies.colony.ColonyRegistry;
 import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.entity.CitizenJob;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
+import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.work.Inventories;
+import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
 import com.gtnewhorizons.horizonqa.api.GameTestHelper;
 import com.gtnewhorizons.horizonqa.api.TestPos;
 
@@ -102,8 +105,12 @@ final class ColonyFixture {
 
     static final TestPos SPAWN = at(2, 1, 2);
 
-    static void chestWith(GameTestHelper helper, TestPos local, ItemStack stack) {
+    static void chest(GameTestHelper helper, TestPos local) {
         helper.setBlock(local, Blocks.chest);
+    }
+
+    static void chestWith(GameTestHelper helper, TestPos local, ItemStack stack) {
+        chest(helper, local);
         helper.insertItem(local, stack);
     }
 
@@ -127,10 +134,18 @@ final class ColonyFixture {
         return blueprint;
     }
 
-    static void materials(GameTestHelper helper, Colony colony, TestPos local) {
+    static void site(GameTestHelper helper, Colony colony, ColonySiteKind kind, TestPos local) {
         TestPos world = helper.absolute(local);
-        colony.site(ColonySiteKind.MATERIALS)
+        colony.site(kind)
             .set(world.x(), world.y(), world.z());
+    }
+
+    static void materials(GameTestHelper helper, Colony colony, TestPos local) {
+        site(helper, colony, ColonySiteKind.MATERIALS, local);
+    }
+
+    static void order(GameTestHelper helper, Colony colony, CitizenCommand command) {
+        registry(helper).enqueueOrder(colony.getId(), command);
     }
 
     /** Point the colony at a one-block build anchored on the given local position. */
@@ -140,11 +155,36 @@ final class ColonyFixture {
         colony.setBuildSite(new BuildSite(world.x(), world.y(), world.z(), blueprint, 0, false));
     }
 
-    /** Cobblestone needs a real tool, so a builder that has to clear a site carries one. */
-    static void givePickaxe(EntityCitizen citizen) {
+    static void giveTool(EntityCitizen citizen, Item tool) {
         citizen.getInventory()
             .getTool()
-            .setStackInSlot(0, new ItemStack(Items.iron_pickaxe));
+            .setStackInSlot(0, new ItemStack(tool));
+    }
+
+    /** Cobblestone needs a real tool, so a builder that has to clear a site carries one. */
+    static void givePickaxe(EntityCitizen citizen) {
+        giveTool(citizen, Items.iron_pickaxe);
+    }
+
+    static final int TREE_LOGS = 3;
+
+    static void tree(GameTestHelper helper, TestPos base) {
+        helper.setBlock(base.x(), base.y() - 1, base.z(), Blocks.dirt);
+        for (int log = 0; log < TREE_LOGS; log++) {
+            helper.setBlock(base.x(), base.y() + log, base.z(), Blocks.log);
+        }
+        helper.setBlock(base.x(), base.y() + TREE_LOGS, base.z(), Blocks.leaves);
+    }
+
+    static int standingLogs(GameTestHelper helper, TestPos base) {
+        TestPos world = helper.absolute(base);
+        int standing = 0;
+        for (int log = 0; log < TREE_LOGS; log++) {
+            if (WorkBlocks.isLog(helper.getWorld(), world.x(), world.y() + log, world.z())) {
+                standing++;
+            }
+        }
+        return standing;
     }
 
     static int carried(EntityCitizen citizen, Block block) {
