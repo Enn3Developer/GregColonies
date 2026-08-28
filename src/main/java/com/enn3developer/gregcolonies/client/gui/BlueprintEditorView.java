@@ -35,6 +35,10 @@ public class BlueprintEditorView {
 
     private static final int PALETTE_HEIGHT = 150;
 
+    private static final int PALETTE_MIN_HEIGHT = 52;
+
+    private static final int PALETTE_TOP = GuiStyle.SCREEN_MARGIN + 46;
+
     private static final int MAX_PALETTE_ROWS = 64;
 
     private static final int MAX_MATERIAL_ROWS = 24;
@@ -208,6 +212,19 @@ public class BlueprintEditorView {
         return overlay;
     }
 
+    // the help panel is bottom anchored and grows upwards, so the palette stops above it;
+    // this resolves at layout time, so it is sized for the taller help-open case
+    private double paletteHeight() {
+        double floor = hints == null ? scaledHeight() - GuiStyle.SCREEN_MARGIN : hints.getArea().y;
+        double room = floor - PALETTE_TOP - CONFIRM_GAP;
+        return Math.max(PALETTE_MIN_HEIGHT, Math.min(PALETTE_HEIGHT, room));
+    }
+
+    private static double scaledHeight() {
+        Minecraft mc = Minecraft.getMinecraft();
+        return new ScaledResolution(mc, mc.displayWidth, mc.displayHeight).getScaledHeight();
+    }
+
     // the prompt is centred on the screen, so it must stay clear of the palette column
     private double confirmWidth() {
         Minecraft mc = Minecraft.getMinecraft();
@@ -259,9 +276,9 @@ public class BlueprintEditorView {
         list.collapseDisabledChild();
         list.crossAxisAlignment(Alignment.CrossAxis.START);
         list.width(PALETTE_WIDTH);
-        list.height(PALETTE_HEIGHT);
+        list.height(this::paletteHeight, Unit.Measure.PIXEL);
         list.left(GuiStyle.SCREEN_MARGIN);
-        list.top(GuiStyle.SCREEN_MARGIN + 46);
+        list.top(PALETTE_TOP);
         list.padding(GuiStyle.PADDING);
         list.background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER));
         list.getScrollArea()
