@@ -332,6 +332,14 @@ class CitizenCommandQueueTest {
     }
 
     @Test
+    void aRejectedDuplicateLeavesTheOriginalFactoryInPlace() {
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> CitizenCommandRegistry.register(TestCommand.ID, () -> new ScriptedCommand(1)));
+        assertInstanceOf(TestCommand.class, CitizenCommandRegistry.create(TestCommand.ID));
+    }
+
+    @Test
     void theRegistryReturnsNullForUnknownIds() {
         assertNull(CitizenCommandRegistry.create("gregcolonies:nope"));
     }

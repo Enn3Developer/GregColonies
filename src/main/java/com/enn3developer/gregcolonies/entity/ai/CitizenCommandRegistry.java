@@ -20,7 +20,7 @@ public final class CitizenCommandRegistry {
     private CitizenCommandRegistry() {}
 
     public static void register(String id, Supplier<CitizenCommand> factory) {
-        if (FACTORIES.put(id, factory) != null) {
+        if (FACTORIES.putIfAbsent(id, factory) != null) {
             throw new IllegalArgumentException("Duplicate citizen command id " + id);
         }
     }
