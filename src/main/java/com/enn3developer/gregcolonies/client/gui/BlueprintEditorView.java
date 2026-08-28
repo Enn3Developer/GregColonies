@@ -45,7 +45,7 @@ public class BlueprintEditorView {
 
     private static final float FIT_DISTANCE = 2.4F;
 
-    private static final int CONFIRM_WIDTH = 150;
+    private static final int CONFIRM_WIDTH = 210;
 
     private static final String PAINT_HINT = "LMB paint   RMB erase   RMB drag pan";
     private static final String CAMERA_HINT = "MMB drag turn   wheel zoom   WASD pan   R recenter";
@@ -172,7 +172,7 @@ public class BlueprintEditorView {
 
     private Flow buildConfirm() {
         Flow prompt = Flow.column()
-            .coverChildren()
+            .coverChildrenHeight()
             .childPadding(GuiStyle.ROW_GAP)
             .padding(GuiStyle.PADDING)
             .width(CONFIRM_WIDTH)
