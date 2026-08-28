@@ -34,7 +34,13 @@ public class BlueprintScreen extends ModularScreen {
     public static void open(ColonyView colonyView) {
         returning = false;
         Minecraft.getMinecraft()
-            .func_152344_a(() -> ClientGUI.open(new BlueprintScreen(new BlueprintView(colonyView))));
+            .func_152344_a(() -> {
+                try {
+                    ClientGUI.open(new BlueprintScreen(new BlueprintView(colonyView)));
+                } catch (RuntimeException error) {
+                    GregColonies.LOG.error("Failed to open the blueprint library", error);
+                }
+            });
     }
 
     public static void back() {

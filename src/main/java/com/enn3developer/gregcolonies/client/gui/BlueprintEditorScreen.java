@@ -42,7 +42,13 @@ public class BlueprintEditorScreen extends ModularScreen {
         }
         returning = false;
         Minecraft.getMinecraft()
-            .func_152344_a(() -> ClientGUI.open(new BlueprintEditorScreen(new BlueprintEditorView(editor))));
+            .func_152344_a(() -> {
+                try {
+                    ClientGUI.open(new BlueprintEditorScreen(new BlueprintEditorView(editor)));
+                } catch (RuntimeException error) {
+                    GregColonies.LOG.error("Failed to open the blueprint editor", error);
+                }
+            });
     }
 
     public static void back() {

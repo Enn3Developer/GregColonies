@@ -9,6 +9,7 @@ import net.minecraft.client.renderer.texture.TextureMap;
 
 import org.lwjgl.opengl.GL11;
 
+import com.enn3developer.gregcolonies.GregColonies;
 import com.enn3developer.gregcolonies.colony.Blueprint;
 
 public final class BlueprintGhost {
@@ -41,17 +42,30 @@ public final class BlueprintGhost {
 
     private static int builtCeiling = -1;
 
+    private static boolean warned;
+
     private BlueprintGhost() {}
 
     public static void forget() {
         BlueprintMesh.forget();
         if (listBase >= 0) {
-            GLAllocation.deleteDisplayLists(listBase);
+            try {
+                GLAllocation.deleteDisplayLists(listBase);
+            } catch (RuntimeException error) {
+                GL11.glDeleteLists(listBase, listCount);
+            }
             listBase = -1;
             listCount = 0;
         }
         built = new int[0];
         builtCeiling = -1;
+    }
+
+    private static void warnOnce(RuntimeException error) {
+        if (!warned) {
+            warned = true;
+            GregColonies.LOG.error("Blueprint ghost failed to render", error);
+        }
     }
 
     public static void render(BlueprintEditor editor, BlueprintTrace.Hit hover, double cameraX, double cameraY,
@@ -61,10 +75,15 @@ public final class BlueprintGhost {
             return;
         }
         GL11.glPushMatrix();
-        GL11.glTranslated(-cameraX, -cameraY, -cameraZ);
-        drawBlocks(editor, model);
-        drawGuides(editor, model, hover);
-        GL11.glPopMatrix();
+        try {
+            GL11.glTranslated(-cameraX, -cameraY, -cameraZ);
+            drawBlocks(editor, model);
+            drawGuides(editor, model, hover);
+        } catch (RuntimeException error) {
+            warnOnce(error);
+        } finally {
+            GL11.glPopMatrix();
+        }
     }
 
     private static void drawBlocks(BlueprintEditor editor, Blueprint model) {
@@ -122,11 +141,17 @@ public final class BlueprintGhost {
             }
             built[y] = editor.layerRevision(y);
             GL11.glNewList(listBase + y, GL11.GL_COMPILE);
-            Tessellator tessellator = Tessellator.instance;
-            tessellator.startDrawingQuads();
-            layer(editor, model, y, top, tessellator);
-            tessellator.draw();
-            GL11.glEndList();
+            try {
+                Tessellator tessellator = Tessellator.instance;
+                tessellator.startDrawingQuads();
+                layer(editor, model, y, top, tessellator);
+                tessellator.draw();
+            } catch (RuntimeException error) {
+                built[y] = 0;
+                warnOnce(error);
+            } finally {
+                GL11.glEndList();
+            }
         }
         builtCeiling = top;
     }

@@ -19,6 +19,7 @@ import com.cleanroommc.modularui.screen.viewport.ModularGuiContext;
 import com.cleanroommc.modularui.theme.WidgetThemeEntry;
 import com.cleanroommc.modularui.widget.Widget;
 import com.cleanroommc.modularui.widget.sizer.Area;
+import com.enn3developer.gregcolonies.GregColonies;
 import com.enn3developer.gregcolonies.colony.Blueprint;
 
 public class BlueprintPreview extends Widget<BlueprintPreview> implements Interactable {
@@ -59,6 +60,8 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
 
     private static boolean built;
 
+    private static boolean warned;
+
     private final BlueprintView view;
 
     private float yaw = DEFAULT_YAW;
@@ -92,10 +95,21 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
 
     public static void forget() {
         if (list >= 0) {
-            GLAllocation.deleteDisplayLists(list);
+            try {
+                GLAllocation.deleteDisplayLists(list);
+            } catch (RuntimeException error) {
+                GL11.glDeleteLists(list, 1);
+            }
             list = -1;
         }
         built = false;
+    }
+
+    private static void warnOnce(RuntimeException error) {
+        if (!warned) {
+            warned = true;
+            GregColonies.LOG.error("Blueprint preview failed to render", error);
+        }
     }
 
     @Override
@@ -122,8 +136,13 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
             pick(model, top, look, width, height, scale, area);
         }
         Stencil.applyTransformed(1, 1, width - 2, height - 2);
-        render(model, top, look, width / 2.0F, height / 2.0F, scale);
-        Stencil.remove();
+        try {
+            render(model, top, look, width / 2.0F, height / 2.0F, scale);
+        } catch (RuntimeException error) {
+            warnOnce(error);
+        } finally {
+            Stencil.remove();
+        }
     }
 
     private float scale(Blueprint model, int width, int height) {
@@ -171,6 +190,19 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
             .bindTexture(TextureMap.locationBlocksTexture);
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT);
         GL11.glPushMatrix();
+        try {
+            paint3D(model, top, look, centreX, centreY, scale);
+        } finally {
+            OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
+            OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glPopMatrix();
+            GL11.glPopAttrib();
+        }
+    }
+
+    private void paint3D(Blueprint model, int top, double[] look, float centreX, float centreY, float scale) {
         GL11.glTranslatef(centreX, centreY, 0.0F);
         GL11.glScalef(scale, -scale, scale);
         GL11.glRotatef(pitch, 1.0F, 0.0F, 0.0F);
@@ -189,13 +221,6 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
         OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
 
         GL11.glCallList(list);
-
-        OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-        GL11.glPopMatrix();
-        GL11.glPopAttrib();
     }
 
     private void compile(Blueprint model, int top, double[] look) {
@@ -210,11 +235,17 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
         builtKey = key;
         built = true;
         GL11.glNewList(list, GL11.GL_COMPILE);
-        Tessellator tessellator = Tessellator.instance;
-        tessellator.startDrawingQuads();
-        paint(model, top, look, tessellator);
-        tessellator.draw();
-        GL11.glEndList();
+        try {
+            Tessellator tessellator = Tessellator.instance;
+            tessellator.startDrawingQuads();
+            paint(model, top, look, tessellator);
+            tessellator.draw();
+        } catch (RuntimeException error) {
+            built = false;
+            warnOnce(error);
+        } finally {
+            GL11.glEndList();
+        }
     }
 
     private void paint(Blueprint model, int top, double[] look, Tessellator tessellator) {
