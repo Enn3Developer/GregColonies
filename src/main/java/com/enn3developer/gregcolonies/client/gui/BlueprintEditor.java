@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 
 import net.minecraft.block.Block;
-import net.minecraft.util.MathHelper;
 
 import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
@@ -49,11 +48,11 @@ public class BlueprintEditor {
 
     private Blueprint model;
 
-    private final int anchorX;
+    private int anchorX;
 
-    private final int anchorY;
+    private int anchorY;
 
-    private final int anchorZ;
+    private int anchorZ;
 
     private final List<BlueprintBrush> palette = new ArrayList<>();
 
@@ -67,7 +66,11 @@ public class BlueprintEditor {
 
     private final Deque<Blueprint> undo = new ArrayDeque<>();
 
+    private final Deque<int[]> undoAnchor = new ArrayDeque<>();
+
     private final Deque<Blueprint> redo = new ArrayDeque<>();
+
+    private final Deque<int[]> redoAnchor = new ArrayDeque<>();
 
     private int[] boxAnchor;
 
@@ -278,15 +281,25 @@ public class BlueprintEditor {
 
     public void turn() {
         pushUndo();
-        model = model.transformed(1, false);
+        pivot(model.transformed(1, false));
         layer = clamp(layer, 0, model.getSizeY() - 1);
         touchAll();
     }
 
     public void flip() {
         pushUndo();
-        model = model.transformed(0, true);
+        pivot(model.transformed(0, true));
         touchAll();
+    }
+
+    private void pivot(Blueprint turned) {
+        int worldX = anchorX + model.getOriginX();
+        int worldY = anchorY + model.getOriginY();
+        int worldZ = anchorZ + model.getOriginZ();
+        model = turned;
+        anchorX = worldX - model.getOriginX();
+        anchorY = worldY - model.getOriginY();
+        anchorZ = worldZ - model.getOriginZ();
     }
 
     public void clearLayer() {
@@ -321,10 +334,13 @@ public class BlueprintEditor {
 
     public void pushUndo() {
         undo.addLast(model.copy());
+        undoAnchor.addLast(anchor());
         while (undo.size() > UNDO_DEPTH) {
             undo.removeFirst();
+            undoAnchor.removeFirst();
         }
         redo.clear();
+        redoAnchor.clear();
         dirty = true;
     }
 
@@ -333,10 +349,9 @@ public class BlueprintEditor {
             return;
         }
         redo.addLast(model.copy());
+        redoAnchor.addLast(anchor());
         model = undo.removeLast();
-        layer = clamp(layer, 0, model.getSizeY() - 1);
-        dirty = true;
-        touchAll();
+        restore(undoAnchor.removeLast());
     }
 
     public void redo() {
@@ -344,7 +359,19 @@ public class BlueprintEditor {
             return;
         }
         undo.addLast(model.copy());
+        undoAnchor.addLast(anchor());
         model = redo.removeLast();
+        restore(redoAnchor.removeLast());
+    }
+
+    private int[] anchor() {
+        return new int[] { anchorX, anchorY, anchorZ };
+    }
+
+    private void restore(int[] anchor) {
+        anchorX = anchor[0];
+        anchorY = anchor[1];
+        anchorZ = anchor[2];
         layer = clamp(layer, 0, model.getSizeY() - 1);
         dirty = true;
         touchAll();
@@ -376,7 +403,7 @@ public class BlueprintEditor {
         return missing;
     }
 
-    public void apply(Hit hit, boolean erasing) {
+    public void apply(BlueprintTrace.Hit hit, boolean erasing) {
         if (hit == null) {
             return;
         }
@@ -410,7 +437,7 @@ public class BlueprintEditor {
         }
     }
 
-    private void take(Hit hit) {
+    private void take(BlueprintTrace.Hit hit) {
         if (!hit.solid) {
             return;
         }
@@ -434,7 +461,7 @@ public class BlueprintEditor {
         }
     }
 
-    private void box(Hit hit, boolean erasing) {
+    private void box(BlueprintTrace.Hit hit, boolean erasing) {
         int[] target = erasing || tool == TOOL_ERASE ? hit.hit() : hit.place();
         if (target == null) {
             return;
@@ -460,157 +487,14 @@ public class BlueprintEditor {
         boxAnchor = null;
     }
 
-    public Hit trace(double originX, double originY, double originZ, double dirX, double dirY, double dirZ) {
-        double ox = originX - anchorX;
-        double oy = originY - anchorY;
-        double oz = originZ - anchorZ;
-        int top = ceiling();
-        double[] origin = { ox, oy, oz };
-        double[] direction = { dirX, dirY, dirZ };
-        double[] high = { model.getSizeX(), top + 1.0D, model.getSizeZ() };
-
-        double near = 0.0D;
-        double far = Double.MAX_VALUE;
-        int entryAxis = -1;
-        for (int axis = 0; axis < 3; axis++) {
-            if (Math.abs(direction[axis]) < EPSILON) {
-                if (origin[axis] < 0.0D || origin[axis] > high[axis]) {
-                    return plane(ox, oy, oz, dirX, dirY, dirZ);
-                }
-                continue;
-            }
-            double first = -origin[axis] / direction[axis];
-            double second = (high[axis] - origin[axis]) / direction[axis];
-            if (first > second) {
-                double swap = first;
-                first = second;
-                second = swap;
-            }
-            if (first > near) {
-                near = first;
-                entryAxis = axis;
-            }
-            far = Math.min(far, second);
-        }
-        if (near > far || far < 0.0D) {
-            return plane(ox, oy, oz, dirX, dirY, dirZ);
-        }
-
-        double startX = ox + dirX * (near + EPSILON);
-        double startY = oy + dirY * (near + EPSILON);
-        double startZ = oz + dirZ * (near + EPSILON);
-        int voxelX = clamp(MathHelper.floor_double(startX), 0, model.getSizeX() - 1);
-        int voxelY = clamp(MathHelper.floor_double(startY), 0, top);
-        int voxelZ = clamp(MathHelper.floor_double(startZ), 0, model.getSizeZ() - 1);
-
-        int stepX = dirX > 0.0D ? 1 : -1;
-        int stepY = dirY > 0.0D ? 1 : -1;
-        int stepZ = dirZ > 0.0D ? 1 : -1;
-        double deltaX = Math.abs(direction[0]) < EPSILON ? Double.MAX_VALUE : Math.abs(1.0D / dirX);
-        double deltaY = Math.abs(direction[1]) < EPSILON ? Double.MAX_VALUE : Math.abs(1.0D / dirY);
-        double deltaZ = Math.abs(direction[2]) < EPSILON ? Double.MAX_VALUE : Math.abs(1.0D / dirZ);
-        double nextX = boundary(startX, voxelX, stepX, deltaX);
-        double nextY = boundary(startY, voxelY, stepY, deltaY);
-        double nextZ = boundary(startZ, voxelZ, stepZ, deltaZ);
-
-        int faceX = entryAxis == 0 ? -stepX : 0;
-        int faceY = entryAxis == 1 ? -stepY : 0;
-        int faceZ = entryAxis == 2 ? -stepZ : 0;
-        int steps = model.getSizeX() + model.getSizeY() + model.getSizeZ() + 3;
-        for (int i = 0; i < steps; i++) {
-            if (voxelX < 0 || voxelY < 0
-                || voxelZ < 0
-                || voxelX >= model.getSizeX()
-                || voxelY > top
-                || voxelZ >= model.getSizeZ()) {
-                break;
-            }
-            if (model.cellAt(voxelX, voxelY, voxelZ) != Blueprint.AIR) {
-                return new Hit(true, voxelX, voxelY, voxelZ, voxelX + faceX, voxelY + faceY, voxelZ + faceZ);
-            }
-            if (nextX <= nextY && nextX <= nextZ) {
-                voxelX += stepX;
-                nextX += deltaX;
-                faceX = -stepX;
-                faceY = 0;
-                faceZ = 0;
-            } else if (nextY <= nextZ) {
-                voxelY += stepY;
-                nextY += deltaY;
-                faceX = 0;
-                faceY = -stepY;
-                faceZ = 0;
-            } else {
-                voxelZ += stepZ;
-                nextZ += deltaZ;
-                faceX = 0;
-                faceY = 0;
-                faceZ = -stepZ;
-            }
-        }
-        return plane(ox, oy, oz, dirX, dirY, dirZ);
-    }
-
-    private Hit plane(double ox, double oy, double oz, double dirX, double dirY, double dirZ) {
-        if (Math.abs(dirY) < EPSILON) {
-            return null;
-        }
-        double distance = (layer - oy) / dirY;
-        if (distance < 0.0D) {
-            return null;
-        }
-        int x = MathHelper.floor_double(ox + dirX * distance);
-        int z = MathHelper.floor_double(oz + dirZ * distance);
-        if (!model.contains(x, layer, z)) {
-            return null;
-        }
-        return new Hit(false, x, layer, z, x, layer, z);
-    }
-
-    private static double boundary(double start, int voxel, int step, double delta) {
-        if (delta == Double.MAX_VALUE) {
-            return Double.MAX_VALUE;
-        }
-        double fraction = step > 0 ? voxel + 1 - start : start - voxel;
-        return fraction * delta;
+    public BlueprintTrace.Hit trace(double originX, double originY, double originZ, double dirX, double dirY,
+        double dirZ) {
+        return BlueprintTrace
+            .trace(model, ceiling(), layer, originX - anchorX, originY - anchorY, originZ - anchorZ, dirX, dirY, dirZ);
     }
 
     private static int clamp(int value, int min, int max) {
         return value < min ? min : Math.min(value, max);
     }
 
-    public static class Hit {
-
-        public final boolean solid;
-
-        public final int hitX;
-
-        public final int hitY;
-
-        public final int hitZ;
-
-        public final int placeX;
-
-        public final int placeY;
-
-        public final int placeZ;
-
-        Hit(boolean solid, int hitX, int hitY, int hitZ, int placeX, int placeY, int placeZ) {
-            this.solid = solid;
-            this.hitX = hitX;
-            this.hitY = hitY;
-            this.hitZ = hitZ;
-            this.placeX = placeX;
-            this.placeY = placeY;
-            this.placeZ = placeZ;
-        }
-
-        int[] hit() {
-            return solid ? new int[] { hitX, hitY, hitZ } : null;
-        }
-
-        int[] place() {
-            return new int[] { placeX, placeY, placeZ };
-        }
-    }
 }

@@ -92,6 +92,14 @@ public class BlueprintView {
 
     private int layer;
 
+    private int revision;
+
+    private Blueprint shown;
+
+    private int shownRotation = Integer.MIN_VALUE;
+
+    private boolean shownMirror;
+
     private int colonyTicks;
 
     private int detailTicks;
@@ -149,9 +157,10 @@ public class BlueprintView {
         materials.clear();
         materials.addAll(needed.keySet());
         if (preview != null) {
-            preview.forgetColors();
+            preview.reset();
         }
         retransform();
+        layer = placed == null ? 0 : placed.getSizeY() - 1;
     }
 
     private void clearDetail() {
@@ -200,12 +209,24 @@ public class BlueprintView {
     }
 
     private void retransform() {
-        placed = source == null ? null : source.transformed(rotation(), mirror());
+        int rotation = rotation();
+        boolean mirror = mirror();
+        if (source != shown || rotation != shownRotation || mirror != shownMirror) {
+            shown = source;
+            shownRotation = rotation;
+            shownMirror = mirror;
+            placed = source == null ? null : source.transformed(rotation, mirror);
+            revision++;
+        }
         if (placed == null) {
             layer = 0;
         } else {
             layer = Math.max(0, Math.min(layer, placed.getSizeY() - 1));
         }
+    }
+
+    public int getRevision() {
+        return revision;
     }
 
     public Blueprint getPlaced() {
@@ -591,14 +612,14 @@ public class BlueprintView {
 
     private String layerValue() {
         if (placed == null) {
-            return "no layer";
+            return "no slice";
         }
-        return "layer " + (layer + 1) + "/" + placed.getSizeY();
+        return "slice " + (layer + 1) + "/" + placed.getSizeY();
     }
 
     private String hoverValue() {
         if (preview == null || preview.getHovered() == Blueprint.AIR) {
-            return placed == null ? "" : "scroll the grid to change layer";
+            return placed == null ? "" : "drag to turn, wheel zooms, shift wheel slices";
         }
         return GuiText.trim(stackName(preview.getHovered()), detailWidth());
     }

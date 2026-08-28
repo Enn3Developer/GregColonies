@@ -51,6 +51,12 @@ public class BlueprintScreen extends ModularScreen {
             });
     }
 
+    @Override
+    public void onClose() {
+        super.onClose();
+        BlueprintPreview.forget();
+    }
+
     public static void accept(PacketBlueprintData data) {
         BlueprintScreen screen = getOpen();
         if (screen != null && screen.view.getColony()

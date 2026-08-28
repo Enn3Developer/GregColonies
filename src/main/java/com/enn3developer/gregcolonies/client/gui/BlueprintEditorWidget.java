@@ -51,7 +51,7 @@ public class BlueprintEditorWidget extends Widget<BlueprintEditorWidget> impleme
         view.setHover(live ? traceAt(getContext().getMouseX(), getContext().getMouseY()) : null);
     }
 
-    private BlueprintEditor.Hit traceAt(int mouseX, int mouseY) {
+    private BlueprintTrace.Hit traceAt(int mouseX, int mouseY) {
         if (!ColonyWorldOverlay.ray(mouseX, mouseY, ray)) {
             return null;
         }
@@ -112,7 +112,7 @@ public class BlueprintEditorWidget extends Widget<BlueprintEditorWidget> impleme
         if (mouseButton != 0) {
             return Result.SUCCESS;
         }
-        BlueprintEditor.Hit hit = traceAt(getContext().getMouseX(), getContext().getMouseY());
+        BlueprintTrace.Hit hit = traceAt(getContext().getMouseX(), getContext().getMouseY());
         if (hit == null) {
             return Result.SUCCESS;
         }
@@ -131,7 +131,7 @@ public class BlueprintEditorWidget extends Widget<BlueprintEditorWidget> impleme
         if (mouseButton == 0) {
             stroking = false;
         } else if (mouseButton == 1 && dragTravel <= CLICK_SLOP) {
-            BlueprintEditor.Hit hit = traceAt(getContext().getMouseX(), getContext().getMouseY());
+            BlueprintTrace.Hit hit = traceAt(getContext().getMouseX(), getContext().getMouseY());
             BlueprintEditor editor = view.getEditor();
             if (hit != null && hit.solid) {
                 int tool = editor.getTool();
@@ -159,7 +159,7 @@ public class BlueprintEditorWidget extends Widget<BlueprintEditorWidget> impleme
         dragTravel += Math.abs(deltaX) + Math.abs(deltaY);
         if (dragButton == 0) {
             if (stroking) {
-                BlueprintEditor.Hit hit = traceAt(getContext().getMouseX(), getContext().getMouseY());
+                BlueprintTrace.Hit hit = traceAt(getContext().getMouseX(), getContext().getMouseY());
                 if (hit != null) {
                     view.getEditor()
                         .apply(hit, false);

@@ -55,7 +55,7 @@ public class BlueprintEditorView {
 
     private final BlueprintEditor editor;
 
-    private BlueprintEditor.Hit hover;
+    private BlueprintTrace.Hit hover;
 
     private ModularPanel panel;
 
@@ -91,11 +91,11 @@ public class BlueprintEditorView {
         return editor.getColony();
     }
 
-    public BlueprintEditor.Hit getHover() {
+    public BlueprintTrace.Hit getHover() {
         return hover;
     }
 
-    public void setHover(BlueprintEditor.Hit hover) {
+    public void setHover(BlueprintTrace.Hit hover) {
         this.hover = hover;
     }
 

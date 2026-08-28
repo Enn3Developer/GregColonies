@@ -1,16 +1,11 @@
 package com.enn3developer.gregcolonies.client.gui;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GLAllocation;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.texture.TextureMap;
-import net.minecraft.init.Blocks;
-import net.minecraft.util.IIcon;
 
 import org.lwjgl.opengl.GL11;
 
@@ -19,11 +14,6 @@ import com.enn3developer.gregcolonies.colony.Blueprint;
 public final class BlueprintGhost {
 
     private static final float ALPHA = 0.92F;
-
-    private static final float[] SHADE = { 0.5F, 1.0F, 0.8F, 0.8F, 0.6F, 0.6F };
-
-    private static final int[][] OFFSETS = { { 0, -1, 0 }, { 0, 1, 0 }, { 0, 0, -1 }, { 0, 0, 1 }, { -1, 0, 0 },
-        { 1, 0, 0 } };
 
     private static final int BOUNDS_COLOR = 0xFF3FA9F5;
 
@@ -41,12 +31,6 @@ public final class BlueprintGhost {
 
     private static final double SWELL = 0.002D;
 
-    private static final int META_SHIFT = 3;
-
-    private static final int ID_SHIFT = 12;
-
-    private static final Map<Integer, IIcon> ICONS = new HashMap<>();
-
     private static final int ANCHOR_MARK_COLOR = 0xFFFFE45C;
 
     private static int listBase = -1;
@@ -60,7 +44,7 @@ public final class BlueprintGhost {
     private BlueprintGhost() {}
 
     public static void forget() {
-        ICONS.clear();
+        BlueprintMesh.forget();
         if (listBase >= 0) {
             GLAllocation.deleteDisplayLists(listBase);
             listBase = -1;
@@ -70,7 +54,7 @@ public final class BlueprintGhost {
         builtCeiling = -1;
     }
 
-    public static void render(BlueprintEditor editor, BlueprintEditor.Hit hover, double cameraX, double cameraY,
+    public static void render(BlueprintEditor editor, BlueprintTrace.Hit hover, double cameraX, double cameraY,
         double cameraZ) {
         Blueprint model = editor.getModel();
         if (model == null) {
@@ -159,106 +143,27 @@ public final class BlueprintGhost {
                     continue;
                 }
                 int meta = Blueprint.metaOf(cell);
-                for (int side = 0; side < OFFSETS.length; side++) {
-                    int[] step = OFFSETS[side];
+                for (int side = 0; side < BlueprintMesh.SIDES; side++) {
+                    int[] step = BlueprintMesh.OFFSETS[side];
                     int neighbourY = y + step[1];
                     if (neighbourY <= top && model.cellAt(x + step[0], neighbourY, z + step[2]) != Blueprint.AIR) {
                         continue;
                     }
-                    face(
+                    BlueprintMesh.face(
                         tessellator,
                         block,
                         meta,
                         side,
                         editor.getAnchorX() + x,
                         editor.getAnchorY() + y,
-                        editor.getAnchorZ() + z);
+                        editor.getAnchorZ() + z,
+                        ALPHA);
                 }
             }
         }
     }
 
-    private static void face(Tessellator tessellator, Block block, int meta, int side, double x, double y, double z) {
-        IIcon icon = iconOf(block, meta, side);
-        if (icon == null) {
-            return;
-        }
-        int tint = renderColor(block, meta);
-        float shade = SHADE[side];
-        tessellator.setColorRGBA_F(
-            (tint >> 16 & 0xFF) / 255.0F * shade,
-            (tint >> 8 & 0xFF) / 255.0F * shade,
-            (tint & 0xFF) / 255.0F * shade,
-            ALPHA);
-        double minU = icon.getMinU();
-        double maxU = icon.getMaxU();
-        double minV = icon.getMinV();
-        double maxV = icon.getMaxV();
-        double x1 = x + 1.0D;
-        double y1 = y + 1.0D;
-        double z1 = z + 1.0D;
-
-        if (side == 0) {
-            tessellator.addVertexWithUV(x, y, z, minU, minV);
-            tessellator.addVertexWithUV(x, y, z1, minU, maxV);
-            tessellator.addVertexWithUV(x1, y, z1, maxU, maxV);
-            tessellator.addVertexWithUV(x1, y, z, maxU, minV);
-        } else if (side == 1) {
-            tessellator.addVertexWithUV(x, y1, z, minU, minV);
-            tessellator.addVertexWithUV(x1, y1, z, maxU, minV);
-            tessellator.addVertexWithUV(x1, y1, z1, maxU, maxV);
-            tessellator.addVertexWithUV(x, y1, z1, minU, maxV);
-        } else if (side == 2) {
-            tessellator.addVertexWithUV(x, y, z, maxU, maxV);
-            tessellator.addVertexWithUV(x1, y, z, minU, maxV);
-            tessellator.addVertexWithUV(x1, y1, z, minU, minV);
-            tessellator.addVertexWithUV(x, y1, z, maxU, minV);
-        } else if (side == 3) {
-            tessellator.addVertexWithUV(x, y, z1, minU, maxV);
-            tessellator.addVertexWithUV(x, y1, z1, minU, minV);
-            tessellator.addVertexWithUV(x1, y1, z1, maxU, minV);
-            tessellator.addVertexWithUV(x1, y, z1, maxU, maxV);
-        } else if (side == 4) {
-            tessellator.addVertexWithUV(x, y, z, minU, maxV);
-            tessellator.addVertexWithUV(x, y1, z, minU, minV);
-            tessellator.addVertexWithUV(x, y1, z1, maxU, minV);
-            tessellator.addVertexWithUV(x, y, z1, maxU, maxV);
-        } else {
-            tessellator.addVertexWithUV(x1, y, z, maxU, maxV);
-            tessellator.addVertexWithUV(x1, y, z1, minU, maxV);
-            tessellator.addVertexWithUV(x1, y1, z1, minU, minV);
-            tessellator.addVertexWithUV(x1, y1, z, maxU, minV);
-        }
-    }
-
-    private static IIcon iconOf(Block block, int meta, int side) {
-        int key = Block.getIdFromBlock(block) << ID_SHIFT | (meta & 0xFF) << META_SHIFT | side;
-        IIcon cached = ICONS.get(key);
-        if (cached == null) {
-            cached = lookup(block, meta, side);
-            ICONS.put(key, cached);
-        }
-        return cached;
-    }
-
-    private static IIcon lookup(Block block, int meta, int side) {
-        try {
-            IIcon icon = block.getIcon(side, meta);
-            return icon != null ? icon : Blocks.stone.getIcon(side, 0);
-        } catch (RuntimeException error) {
-            return Blocks.stone.getIcon(side, 0);
-        }
-    }
-
-    private static int renderColor(Block block, int meta) {
-        try {
-            return block.getRenderColor(meta);
-        } catch (RuntimeException error) {
-            return 0xFFFFFF;
-        }
-    }
-
-    private static void drawGuides(BlueprintEditor editor, Blueprint model, BlueprintEditor.Hit hover) {
+    private static void drawGuides(BlueprintEditor editor, Blueprint model, BlueprintTrace.Hit hover) {
         GL11.glDisable(GL11.GL_TEXTURE_2D);
         GL11.glDisable(GL11.GL_LIGHTING);
         GL11.glDisable(GL11.GL_CULL_FACE);
