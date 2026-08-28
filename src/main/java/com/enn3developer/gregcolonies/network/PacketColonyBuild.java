@@ -1,10 +1,9 @@
 package com.enn3developer.gregcolonies.network;
 
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.util.ChatComponentText;
-import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
+import com.enn3developer.gregcolonies.Chat;
 import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.colony.BuildSite;
 import com.enn3developer.gregcolonies.colony.Colony;
@@ -62,27 +61,24 @@ public class PacketColonyBuild implements IMessage {
             ColonyManager manager = ColonyManager.get(player.worldObj);
             if (message.clear) {
                 manager.setBuildSite(colony.getId(), null);
-                player.addChatMessage(new ChatComponentText("Build site cleared"));
+                Chat.info(player, "Build site cleared");
                 GCNetwork.sendColony(player, colony);
                 return;
             }
 
             World world = player.worldObj;
             if (colony.getDimension() != world.provider.dimensionId) {
-                player.addChatMessage(
-                    new ChatComponentText(EnumChatFormatting.RED + "The build site must be in the colony dimension"));
+                Chat.error(player, "The build site must be in the colony dimension");
                 return;
             }
             Blueprint blueprint = colony.getActiveBlueprint();
             if (blueprint == null) {
-                player.addChatMessage(
-                    new ChatComponentText(EnumChatFormatting.RED + "Capture a blueprint before starting a build"));
+                Chat.error(player, "Capture a blueprint before starting a build");
                 return;
             }
             if (!colony.site(ColonySiteKind.MATERIALS)
                 .isPresent()) {
-                player.addChatMessage(
-                    new ChatComponentText(EnumChatFormatting.RED + "Set a materials chest before starting a build"));
+                Chat.error(player, "Set a materials chest before starting a build");
                 return;
             }
 
@@ -95,16 +91,16 @@ public class PacketColonyBuild implements IMessage {
                 colony.getPlaceRotation(),
                 colony.isPlaceMirror());
             manager.setBuildSite(colony.getId(), site);
-            player.addChatMessage(
-                new ChatComponentText(
-                    "Build site set at " + message.x
-                        + "/"
-                        + y
-                        + "/"
-                        + message.z
-                        + ", "
-                        + site.remaining(world)
-                        + " blocks to place"));
+            Chat.info(
+                player,
+                "Build site set at " + message.x
+                    + "/"
+                    + y
+                    + "/"
+                    + message.z
+                    + ", "
+                    + site.remaining(world)
+                    + " blocks to place");
             GCNetwork.sendColony(player, colony);
         }
     }

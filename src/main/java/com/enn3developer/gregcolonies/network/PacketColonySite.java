@@ -1,10 +1,9 @@
 package com.enn3developer.gregcolonies.network;
 
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.util.ChatComponentText;
-import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
+import com.enn3developer.gregcolonies.Chat;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
 import com.enn3developer.gregcolonies.colony.ColonySiteKind;
@@ -69,27 +68,23 @@ public class PacketColonySite implements IMessage {
             ColonyManager manager = ColonyManager.get(player.worldObj);
             if (message.clear) {
                 manager.clearSite(colony.getId(), kind);
-                player.addChatMessage(new ChatComponentText("Colony " + kind.getLabel() + " cleared"));
+                Chat.info(player, "Colony " + kind.getLabel() + " cleared");
                 GCNetwork.sendColony(player, colony);
                 return;
             }
 
             World world = player.worldObj;
             if (colony.getDimension() != world.provider.dimensionId) {
-                player.addChatMessage(
-                    new ChatComponentText(
-                        EnumChatFormatting.RED + "The " + kind.getLabel() + " must be in the colony dimension"));
+                Chat.error(player, "The " + kind.getLabel() + " must be in the colony dimension");
                 return;
             }
             if (Inventories.at(world, message.x, message.y, message.z) == null) {
-                player.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "That block has no inventory"));
+                Chat.error(player, "That block has no inventory");
                 return;
             }
 
             manager.setSite(colony.getId(), kind, message.x, message.y, message.z);
-            player.addChatMessage(
-                new ChatComponentText(
-                    "Colony " + kind.getLabel() + " set to " + message.x + "/" + message.y + "/" + message.z));
+            Chat.info(player, "Colony " + kind.getLabel() + " set to " + message.x + "/" + message.y + "/" + message.z);
             GCNetwork.sendColony(player, colony);
         }
     }

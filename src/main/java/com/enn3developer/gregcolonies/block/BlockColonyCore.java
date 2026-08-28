@@ -7,10 +7,10 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
+import com.enn3developer.gregcolonies.Chat;
 import com.enn3developer.gregcolonies.Config;
 import com.enn3developer.gregcolonies.GregColonies;
 import com.enn3developer.gregcolonies.colony.Colony;
@@ -49,13 +49,12 @@ public class BlockColonyCore extends BlockContainer {
         Colony nearest = manager.getNearestColony(dimension, x, z);
         int minDistance = Config.minColonyDistance;
         if (nearest != null && nearest.distanceSqTo(dimension, x, z) < (double) minDistance * minDistance) {
-            player.addChatMessage(
-                new ChatComponentText(
-                    EnumChatFormatting.RED + "Too close to colony "
-                        + nearest.getName()
-                        + ", colonies must be at least "
-                        + minDistance
-                        + " blocks apart"));
+            Chat.error(
+                player,
+                "Too close to colony " + nearest.getName()
+                    + ", colonies must be at least "
+                    + minDistance
+                    + " blocks apart");
             dropBlockAsItem(world, x, y, z, world.getBlockMetadata(x, y, z), 0);
             world.setBlockToAir(x, y, z);
             return;
@@ -71,9 +70,9 @@ public class BlockColonyCore extends BlockContainer {
         }
 
         GregColonies.LOG.info("Created " + colony);
-        player.addChatMessage(
-            new ChatComponentText(
-                EnumChatFormatting.GREEN + "Founded colony " + colony.getName() + " (#" + colony.getId() + ")"));
+        Chat.info(
+            player,
+            EnumChatFormatting.GREEN + "Founded colony " + colony.getName() + " (#" + colony.getId() + ")");
     }
 
     @Override
@@ -81,9 +80,7 @@ public class BlockColonyCore extends BlockContainer {
         if (!world.isRemote && !player.capabilities.isCreativeMode) {
             Colony colony = colonyAt(world, x, y, z);
             if (colony != null && !colony.canAccess(player)) {
-                player.addChatMessage(
-                    new ChatComponentText(
-                        EnumChatFormatting.RED + "Only " + colony.getOwnerName() + " can remove this colony core"));
+                Chat.error(player, "Only " + colony.getOwnerName() + " can remove this colony core");
                 return false;
             }
         }

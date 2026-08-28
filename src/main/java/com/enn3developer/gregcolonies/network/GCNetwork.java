@@ -13,10 +13,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import net.minecraft.block.Block;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.inventory.IInventory;
-import net.minecraft.util.ChatComponentText;
-import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
+import com.enn3developer.gregcolonies.Chat;
 import com.enn3developer.gregcolonies.GregColonies;
 import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.colony.Colony;
@@ -96,7 +95,7 @@ public final class GCNetwork {
         return colony != null && colony.canAccess(player) ? colony : null;
     }
 
-    static Map<UUID, EntityCitizen> loadedCitizens(World world, int colonyId) {
+    public static Map<UUID, EntityCitizen> loadedCitizens(World world, int colonyId) {
         Map<UUID, EntityCitizen> loaded = new HashMap<>();
         for (Object object : world.loadedEntityList) {
             if (!(object instanceof EntityCitizen)) {
@@ -113,8 +112,7 @@ public final class GCNetwork {
     static void sendColony(EntityPlayerMP player) {
         Colony colony = nearestColony(player);
         if (colony == null) {
-            player.addChatMessage(
-                new ChatComponentText(EnumChatFormatting.RED + "You do not own a colony in this dimension"));
+            Chat.error(player, "You do not own a colony in this dimension");
             return;
         }
         sendColony(player, colony);

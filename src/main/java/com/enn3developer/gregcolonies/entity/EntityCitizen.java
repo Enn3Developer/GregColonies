@@ -19,9 +19,7 @@ import net.minecraft.item.ItemArmor;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.pathfinding.PathNavigate;
-import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.DamageSource;
-import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 
@@ -31,6 +29,7 @@ import com.cleanroommc.modularui.factory.GuiFactories;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.UISettings;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
+import com.enn3developer.gregcolonies.Chat;
 import com.enn3developer.gregcolonies.Config;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
@@ -647,8 +646,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
             return true;
         }
         if (!canAccessInventory(player)) {
-            player.addChatMessage(
-                new ChatComponentText(EnumChatFormatting.RED + "You are not allowed to access this citizen"));
+            Chat.error(player, "You are not allowed to access this citizen");
             return true;
         }
         GuiFactories.entity()

@@ -35,8 +35,6 @@ public class PacketCitizenCommand implements IMessage {
 
     public static final byte FARM = 5;
 
-    private static final int MAX_CITIZENS = 512;
-
     private int colonyId;
     private byte action;
     private boolean append;
@@ -80,10 +78,7 @@ public class PacketCitizenCommand implements IMessage {
         x2 = buf.readInt();
         y2 = buf.readInt();
         z2 = buf.readInt();
-        int count = Math.min(buf.readInt(), MAX_CITIZENS);
-        for (int i = 0; i < count; i++) {
-            citizens.add(new UUID(buf.readLong(), buf.readLong()));
-        }
+        PacketBuffers.readIds(buf, citizens);
     }
 
     @Override
@@ -97,12 +92,7 @@ public class PacketCitizenCommand implements IMessage {
         buf.writeInt(x2);
         buf.writeInt(y2);
         buf.writeInt(z2);
-        buf.writeInt(Math.min(citizens.size(), MAX_CITIZENS));
-        for (int i = 0; i < Math.min(citizens.size(), MAX_CITIZENS); i++) {
-            UUID id = citizens.get(i);
-            buf.writeLong(id.getMostSignificantBits());
-            buf.writeLong(id.getLeastSignificantBits());
-        }
+        PacketBuffers.writeIds(buf, citizens);
     }
 
     public static class Handler extends ColonyPacketHandler<PacketCitizenCommand> {

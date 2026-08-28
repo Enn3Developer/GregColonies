@@ -11,6 +11,7 @@ import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
+import com.enn3developer.gregcolonies.Chat;
 import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
@@ -144,10 +145,10 @@ public class PacketBlueprintSave implements IMessage {
             }
             Blueprint blueprint = decoded == null ? null : decoded.trimmed();
             if (blueprint == null || !blueprint.isPlaceable()) {
-                player.addChatMessage(
-                    new ChatComponentText(
-                        EnumChatFormatting.RED
-                            + "That design holds no buildable blocks, or uses blocks this server does not have"));
+                Chat.info(
+                    player,
+                    EnumChatFormatting.RED
+                        + "That design holds no buildable blocks, or uses blocks this server does not have");
                 return;
             }
 
@@ -161,11 +162,9 @@ public class PacketBlueprintSave implements IMessage {
             } else {
                 if (colony.getBlueprints()
                     .size() >= Colony.MAX_BLUEPRINTS) {
-                    player.addChatMessage(
-                        new ChatComponentText(
-                            EnumChatFormatting.RED + "The blueprint library is full ("
-                                + Colony.MAX_BLUEPRINTS
-                                + "), delete one first"));
+                    Chat.error(
+                        player,
+                        "The blueprint library is full (" + Colony.MAX_BLUEPRINTS + "), delete one first");
                     return;
                 }
                 index = manager.addBlueprint(colony.getId(), blueprint);
@@ -174,16 +173,16 @@ public class PacketBlueprintSave implements IMessage {
                 }
             }
 
-            player.addChatMessage(
-                new ChatComponentText(
-                    "Blueprint saved: " + blueprint.getSizeX()
-                        + "x"
-                        + blueprint.getSizeY()
-                        + "x"
-                        + blueprint.getSizeZ()
-                        + ", "
-                        + blueprint.blockCount()
-                        + " blocks"));
+            Chat.info(
+                player,
+                "Blueprint saved: " + blueprint.getSizeX()
+                    + "x"
+                    + blueprint.getSizeY()
+                    + "x"
+                    + blueprint.getSizeZ()
+                    + ", "
+                    + blueprint.blockCount()
+                    + " blocks");
             GCNetwork.sendColony(player, colony);
             GCNetwork.sendBlueprint(player, colony, index);
         }

@@ -1,7 +1,7 @@
 package com.enn3developer.gregcolonies.command;
 
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,12 +17,14 @@ import net.minecraft.util.ChunkCoordinates;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
+import com.enn3developer.gregcolonies.Chat;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandGuard;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandMoveTo;
+import com.enn3developer.gregcolonies.network.GCNetwork;
 
 public class ColonyCommand extends CommandBase {
 
@@ -71,27 +73,26 @@ public class ColonyCommand extends CommandBase {
 
         if ("list".equals(args[0])) {
             if (manager.getColonyCount() == 0) {
-                sender.addChatMessage(new ChatComponentText("No colonies"));
+                Chat.info(sender, "No colonies");
                 return;
             }
-            sender.addChatMessage(
-                new ChatComponentText(EnumChatFormatting.GOLD + "Colonies: " + manager.getColonyCount()));
+            Chat.info(sender, EnumChatFormatting.GOLD + "Colonies: " + manager.getColonyCount());
             for (Colony colony : manager.getColonies()) {
-                sender.addChatMessage(
-                    new ChatComponentText(
-                        "#" + colony.getId()
-                            + " "
-                            + colony.getName()
-                            + " ("
-                            + colony.getOwnerName()
-                            + ") dim "
-                            + colony.getDimension()
-                            + " at "
-                            + colony.getX()
-                            + "/"
-                            + colony.getY()
-                            + "/"
-                            + colony.getZ()));
+                Chat.info(
+                    sender,
+                    "#" + colony.getId()
+                        + " "
+                        + colony.getName()
+                        + " ("
+                        + colony.getOwnerName()
+                        + ") dim "
+                        + colony.getDimension()
+                        + " at "
+                        + colony.getX()
+                        + "/"
+                        + colony.getY()
+                        + "/"
+                        + colony.getZ());
             }
             return;
         }
@@ -102,25 +103,25 @@ public class ColonyCommand extends CommandBase {
             }
             Colony colony = manager.getColony(parseInt(sender, args[1]));
             if (colony == null) {
-                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No such colony"));
+                Chat.error(sender, "No such colony");
                 return;
             }
-            sender.addChatMessage(new ChatComponentText(EnumChatFormatting.GOLD + colony.getName()));
-            sender.addChatMessage(new ChatComponentText("id: " + colony.getId()));
-            sender.addChatMessage(new ChatComponentText("owner: " + colony.getOwnerName() + " " + colony.getOwner()));
-            sender.addChatMessage(new ChatComponentText("citizens: " + colony.getCitizenCount()));
-            sender.addChatMessage(new ChatComponentText("pending orders: " + colony.getOrderCount()));
-            sender.addChatMessage(
-                new ChatComponentText(
-                    "center: dim " + colony
-                        .getDimension() + " " + colony.getX() + "/" + colony.getY() + "/" + colony.getZ()));
+            Chat.info(sender, EnumChatFormatting.GOLD + colony.getName());
+            Chat.info(sender, "id: " + colony.getId());
+            Chat.info(sender, "owner: " + colony.getOwnerName() + " " + colony.getOwner());
+            Chat.info(sender, "citizens: " + colony.getCitizenCount());
+            Chat.info(sender, "pending orders: " + colony.getOrderCount());
+            Chat.info(
+                sender,
+                "center: dim " + colony
+                    .getDimension() + " " + colony.getX() + "/" + colony.getY() + "/" + colony.getZ());
             return;
         }
 
         if ("spawn".equals(args[0])) {
             Colony colony = findColony(sender, manager, args.length >= 2 ? parseInt(sender, args[1]) : 0);
             if (colony == null) {
-                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                Chat.error(sender, "No colony found");
                 return;
             }
             if (!canManage(sender, colony)) {
@@ -132,12 +133,7 @@ public class ColonyCommand extends CommandBase {
             int z;
             if (args.length >= 2) {
                 if (colony.getDimension() != world.provider.dimensionId) {
-                    sender.addChatMessage(
-                        new ChatComponentText(
-                            EnumChatFormatting.RED + "Colony #"
-                                + colony.getId()
-                                + " is in dim "
-                                + colony.getDimension()));
+                    Chat.error(sender, "Colony #" + colony.getId() + " is in dim " + colony.getDimension());
                     return;
                 }
                 x = colony.getX();
@@ -156,10 +152,10 @@ public class ColonyCommand extends CommandBase {
             citizen.ensureName();
             world.spawnEntityInWorld(citizen);
 
-            sender.addChatMessage(
-                new ChatComponentText(
-                    "Spawned " + citizen
-                        .getCitizenName() + " at " + x + "/" + y + "/" + z + " for colony #" + colony.getId()));
+            Chat.info(
+                sender,
+                "Spawned " + citizen
+                    .getCitizenName() + " at " + x + "/" + y + "/" + z + " for colony #" + colony.getId());
             return;
         }
 
@@ -169,7 +165,7 @@ public class ColonyCommand extends CommandBase {
             }
             Colony colony = findColony(sender, manager, args.length >= 5 ? parseInt(sender, args[4]) : 0);
             if (colony == null) {
-                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                Chat.error(sender, "No colony found");
                 return;
             }
             if (!canManage(sender, colony)) {
@@ -181,19 +177,16 @@ public class ColonyCommand extends CommandBase {
             int z = parseInt(sender, args[3]);
             manager.enqueueOrder(colony.getId(), new CitizenCommandMoveTo(x, y, z));
 
-            sender.addChatMessage(
-                new ChatComponentText(
-                    "Queued move_to for colony #" + colony.getId()
-                        + " ("
-                        + colony.getOrderCount()
-                        + " order(s) pending)"));
+            Chat.info(
+                sender,
+                "Queued move_to for colony #" + colony.getId() + " (" + colony.getOrderCount() + " order(s) pending)");
             return;
         }
 
         if ("guard".equals(args[0])) {
             Colony colony = findColony(sender, manager, args.length >= 2 ? parseInt(sender, args[1]) : 0);
             if (colony == null) {
-                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                Chat.error(sender, "No colony found");
                 return;
             }
             if (!canManage(sender, colony)) {
@@ -201,12 +194,9 @@ public class ColonyCommand extends CommandBase {
             }
 
             manager.enqueueOrder(colony.getId(), new CitizenCommandGuard());
-            sender.addChatMessage(
-                new ChatComponentText(
-                    "Queued guard for colony #" + colony.getId()
-                        + " ("
-                        + colony.getOrderCount()
-                        + " order(s) pending)"));
+            Chat.info(
+                sender,
+                "Queued guard for colony #" + colony.getId() + " (" + colony.getOrderCount() + " order(s) pending)");
             return;
         }
 
@@ -218,7 +208,7 @@ public class ColonyCommand extends CommandBase {
         if ("cancel".equals(args[0])) {
             Colony colony = findColony(sender, manager, args.length >= 2 ? parseInt(sender, args[1]) : 0);
             if (colony == null) {
-                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                Chat.error(sender, "No colony found");
                 return;
             }
             if (!canManage(sender, colony)) {
@@ -232,8 +222,7 @@ public class ColonyCommand extends CommandBase {
                     .clear(citizen);
                 stopped++;
             }
-            sender.addChatMessage(
-                new ChatComponentText("Dropped " + cleared + " pending order(s), stopped " + stopped + " citizen(s)"));
+            Chat.info(sender, "Dropped " + cleared + " pending order(s), stopped " + stopped + " citizen(s)");
             return;
         }
 
@@ -249,7 +238,7 @@ public class ColonyCommand extends CommandBase {
             Colony colony = findColony(sender, manager, args.length >= 3 ? parseInt(sender, args[2]) : 0);
             if (colony == null || !canManage(sender, colony)) {
                 if (colony == null) {
-                    sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                    Chat.error(sender, "No colony found");
                 }
                 return;
             }
@@ -260,19 +249,19 @@ public class ColonyCommand extends CommandBase {
                 counts.put(group, counts.getOrDefault(group, 0) + 1);
             }
             if (counts.isEmpty()) {
-                sender.addChatMessage(new ChatComponentText("No citizens"));
+                Chat.info(sender, "No citizens");
                 return;
             }
             sender
                 .addChatMessage(new ChatComponentText(EnumChatFormatting.GOLD + "Groups of colony #" + colony.getId()));
             for (Map.Entry<String, Integer> entry : counts.entrySet()) {
-                sender.addChatMessage(
-                    new ChatComponentText(
-                        entry.getKey() + ": "
-                            + entry.getValue()
-                            + " citizen(s), "
-                            + colony.getOrderCount("(none)".equals(entry.getKey()) ? "" : entry.getKey())
-                            + " order(s) pending"));
+                Chat.info(
+                    sender,
+                    entry.getKey() + ": "
+                        + entry.getValue()
+                        + " citizen(s), "
+                        + colony.getOrderCount("(none)".equals(entry.getKey()) ? "" : entry.getKey())
+                        + " order(s) pending");
             }
             return;
         }
@@ -283,7 +272,7 @@ public class ColonyCommand extends CommandBase {
                 throw new WrongUsageException(getGroupUsage());
             }
             if (!(sender instanceof EntityPlayer)) {
-                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "Only a player can do this"));
+                Chat.error(sender, "Only a player can do this");
                 return;
             }
 
@@ -293,7 +282,7 @@ public class ColonyCommand extends CommandBase {
 
             Colony colony = findColony(sender, manager, 0);
             if (colony == null) {
-                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                Chat.error(sender, "No colony found");
                 return;
             }
             if (!canManage(sender, colony)) {
@@ -323,8 +312,7 @@ public class ColonyCommand extends CommandBase {
                 changed++;
             }
             manager.markDirty();
-            sender.addChatMessage(
-                new ChatComponentText(changed + " citizen(s) " + (clearing ? "ungrouped" : "put into group " + group)));
+            Chat.info(sender, changed + " citizen(s) " + (clearing ? "ungrouped" : "put into group " + group));
             return;
         }
 
@@ -339,7 +327,7 @@ public class ColonyCommand extends CommandBase {
             }
             Colony colony = findColony(sender, manager, args.length >= 7 ? parseInt(sender, args[6]) : 0);
             if (colony == null) {
-                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                Chat.error(sender, "No colony found");
                 return;
             }
             if (!canManage(sender, colony)) {
@@ -352,21 +340,21 @@ public class ColonyCommand extends CommandBase {
                 parseInt(sender, args[5]));
             command.setTargetGroup(group);
             manager.enqueueOrder(colony.getId(), command);
-            sender.addChatMessage(
-                new ChatComponentText(
-                    "Queued move_to for group " + group
-                        + " of colony #"
-                        + colony.getId()
-                        + " ("
-                        + colony.getOrderCount(group)
-                        + " order(s) pending)"));
+            Chat.info(
+                sender,
+                "Queued move_to for group " + group
+                    + " of colony #"
+                    + colony.getId()
+                    + " ("
+                    + colony.getOrderCount(group)
+                    + " order(s) pending)");
             return;
         }
 
         if ("guard".equals(args[1])) {
             Colony colony = findColony(sender, manager, args.length >= 4 ? parseInt(sender, args[3]) : 0);
             if (colony == null) {
-                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                Chat.error(sender, "No colony found");
                 return;
             }
             if (!canManage(sender, colony)) {
@@ -376,21 +364,21 @@ public class ColonyCommand extends CommandBase {
             CitizenCommandGuard command = new CitizenCommandGuard();
             command.setTargetGroup(group);
             manager.enqueueOrder(colony.getId(), command);
-            sender.addChatMessage(
-                new ChatComponentText(
-                    "Queued guard for group " + group
-                        + " of colony #"
-                        + colony.getId()
-                        + " ("
-                        + colony.getOrderCount(group)
-                        + " order(s) pending)"));
+            Chat.info(
+                sender,
+                "Queued guard for group " + group
+                    + " of colony #"
+                    + colony.getId()
+                    + " ("
+                    + colony.getOrderCount(group)
+                    + " order(s) pending)");
             return;
         }
 
         if ("cancel".equals(args[1])) {
             Colony colony = findColony(sender, manager, args.length >= 4 ? parseInt(sender, args[3]) : 0);
             if (colony == null) {
-                sender.addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "No colony found"));
+                Chat.error(sender, "No colony found");
                 return;
             }
             if (!canManage(sender, colony)) {
@@ -407,9 +395,9 @@ public class ColonyCommand extends CommandBase {
                     .clear(citizen);
                 stopped++;
             }
-            sender.addChatMessage(
-                new ChatComponentText(
-                    "Dropped " + cleared + " order(s) for group " + group + ", stopped " + stopped + " citizen(s)"));
+            Chat.info(
+                sender,
+                "Dropped " + cleared + " order(s) for group " + group + ", stopped " + stopped + " citizen(s)");
             return;
         }
 
@@ -440,18 +428,12 @@ public class ColonyCommand extends CommandBase {
         if (!(sender instanceof EntityPlayer) || colony.canAccess((EntityPlayer) sender)) {
             return true;
         }
-        sender.addChatMessage(
-            new ChatComponentText(EnumChatFormatting.RED + "Colony #" + colony.getId() + " is not yours"));
+        Chat.error(sender, "Colony #" + colony.getId() + " is not yours");
         return false;
     }
 
-    private List<EntityCitizen> findCitizens(World world, int colonyId) {
-        List<EntityCitizen> citizens = new ArrayList<>();
-        for (Object entity : world.loadedEntityList) {
-            if (entity instanceof EntityCitizen && ((EntityCitizen) entity).getColonyId() == colonyId) {
-                citizens.add((EntityCitizen) entity);
-            }
-        }
-        return citizens;
+    private Collection<EntityCitizen> findCitizens(World world, int colonyId) {
+        return GCNetwork.loadedCitizens(world, colonyId)
+            .values();
     }
 }

@@ -137,8 +137,7 @@ public class CitizenSnapshot {
     }
 
     public void write(ByteBuf buf) {
-        buf.writeLong(id.getMostSignificantBits());
-        buf.writeLong(id.getLeastSignificantBits());
+        PacketBuffers.writeId(buf, id);
         buf.writeInt(entityId);
         ByteBufUtils.writeUTF8String(buf, name);
         ByteBufUtils.writeUTF8String(buf, group);
@@ -157,7 +156,7 @@ public class CitizenSnapshot {
 
     public static CitizenSnapshot read(ByteBuf buf) {
         CitizenSnapshot snapshot = new CitizenSnapshot();
-        snapshot.id = new UUID(buf.readLong(), buf.readLong());
+        snapshot.id = PacketBuffers.readId(buf);
         snapshot.entityId = buf.readInt();
         snapshot.name = ByteBufUtils.readUTF8String(buf);
         snapshot.group = ByteBufUtils.readUTF8String(buf);

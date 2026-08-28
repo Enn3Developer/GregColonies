@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -98,6 +99,15 @@ public class ColonyManager extends WorldSavedData {
         return colony;
     }
 
+    private boolean mutate(int colonyId, Predicate<Colony> change) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null || !change.test(colony)) {
+            return false;
+        }
+        markDirty();
+        return true;
+    }
+
     public ColonyCitizen registerCitizen(int colonyId, EntityCitizen citizen) {
         Colony colony = colonies.get(colonyId);
         if (colony == null) {
@@ -109,63 +119,48 @@ public class ColonyManager extends WorldSavedData {
     }
 
     public boolean removeCitizen(int colonyId, UUID id) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null || !colony.removeCitizen(id)) {
-            return false;
-        }
-        markDirty();
-        return true;
+        return mutate(colonyId, colony -> colony.removeCitizen(id));
     }
 
     public boolean setCitizenGroup(int colonyId, UUID id, String group) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null) {
-            return false;
-        }
-        ColonyCitizen entry = colony.getCitizen(id);
-        if (entry == null) {
-            return false;
-        }
-        entry.setGroup(group);
-        markDirty();
-        return true;
+        return mutate(colonyId, colony -> {
+            ColonyCitizen entry = colony.getCitizen(id);
+            if (entry == null) {
+                return false;
+            }
+            entry.setGroup(group);
+            return true;
+        });
     }
 
     public boolean setCitizenJob(int colonyId, UUID id, CitizenJob job) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null) {
-            return false;
-        }
-        ColonyCitizen entry = colony.getCitizen(id);
-        if (entry == null) {
-            return false;
-        }
-        entry.setJob(job);
-        markDirty();
-        return true;
+        return mutate(colonyId, colony -> {
+            ColonyCitizen entry = colony.getCitizen(id);
+            if (entry == null) {
+                return false;
+            }
+            entry.setJob(job);
+            return true;
+        });
     }
 
     public boolean setSite(int colonyId, ColonySiteKind kind, int x, int y, int z) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null) {
-            return false;
-        }
-        colony.site(kind)
-            .set(x, y, z);
-        markDirty();
-        return true;
+        return mutate(colonyId, colony -> {
+            colony.site(kind)
+                .set(x, y, z);
+            return true;
+        });
     }
 
     public boolean clearSite(int colonyId, ColonySiteKind kind) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null || !colony.site(kind)
-            .isPresent()) {
-            return false;
-        }
-        colony.site(kind)
-            .clear();
-        markDirty();
-        return true;
+        return mutate(colonyId, colony -> {
+            ColonySite site = colony.site(kind);
+            if (!site.isPresent()) {
+                return false;
+            }
+            site.clear();
+            return true;
+        });
     }
 
     public int addBlueprint(int colonyId, Blueprint blueprint) {
@@ -181,60 +176,34 @@ public class ColonyManager extends WorldSavedData {
     }
 
     public boolean replaceBlueprint(int colonyId, int index, Blueprint blueprint) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null || !colony.replaceBlueprint(index, blueprint)) {
-            return false;
-        }
-        markDirty();
-        return true;
+        return mutate(colonyId, colony -> colony.replaceBlueprint(index, blueprint));
     }
 
     public boolean removeBlueprint(int colonyId, int index) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null || !colony.removeBlueprint(index)) {
-            return false;
-        }
-        markDirty();
-        return true;
+        return mutate(colonyId, colony -> colony.removeBlueprint(index));
     }
 
     public boolean renameBlueprint(int colonyId, int index, String name) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null || !colony.renameBlueprint(index, name)) {
-            return false;
-        }
-        markDirty();
-        return true;
+        return mutate(colonyId, colony -> colony.renameBlueprint(index, name));
     }
 
     public boolean setActiveBlueprint(int colonyId, int index) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null || !colony.setActiveBlueprint(index)) {
-            return false;
-        }
-        markDirty();
-        return true;
+        return mutate(colonyId, colony -> colony.setActiveBlueprint(index));
     }
 
     public boolean setPlacement(int colonyId, int rotation, boolean mirror) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null) {
-            return false;
-        }
-        colony.setPlaceRotation(rotation);
-        colony.setPlaceMirror(mirror);
-        markDirty();
-        return true;
+        return mutate(colonyId, colony -> {
+            colony.setPlaceRotation(rotation);
+            colony.setPlaceMirror(mirror);
+            return true;
+        });
     }
 
     public boolean setBuildSite(int colonyId, BuildSite site) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null) {
-            return false;
-        }
-        colony.setBuildSite(site);
-        markDirty();
-        return true;
+        return mutate(colonyId, colony -> {
+            colony.setBuildSite(site);
+            return true;
+        });
     }
 
     public boolean claimBuildSite(int colonyId, UUID id, long time) {
@@ -250,31 +219,21 @@ public class ColonyManager extends WorldSavedData {
     }
 
     public boolean claimBed(int colonyId, UUID id, int x, int y, int z) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null || !colony.claimBed(id, x, y, z)) {
-            return false;
-        }
-        markDirty();
-        return true;
+        return mutate(colonyId, colony -> colony.claimBed(id, x, y, z));
     }
 
     public void releaseBed(int colonyId, UUID id) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null) {
-            return;
-        }
-        colony.releaseBed(id);
-        markDirty();
+        mutate(colonyId, colony -> {
+            colony.releaseBed(id);
+            return true;
+        });
     }
 
     public boolean enqueueOrder(int colonyId, CitizenCommand command) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null) {
-            return false;
-        }
-        colony.enqueueOrder(command);
-        markDirty();
-        return true;
+        return mutate(colonyId, colony -> {
+            colony.enqueueOrder(command);
+            return true;
+        });
     }
 
     public CitizenCommand pollOrder(int colonyId, EntityCitizen citizen) {
