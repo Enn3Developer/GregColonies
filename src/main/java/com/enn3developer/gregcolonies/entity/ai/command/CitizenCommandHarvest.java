@@ -14,8 +14,11 @@ import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonySite;
 import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
+import com.enn3developer.gregcolonies.entity.ai.ApproachTracker;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandResult;
+import com.enn3developer.gregcolonies.entity.ai.TravelLeg;
+import com.enn3developer.gregcolonies.entity.ai.WorkArea;
 import com.enn3developer.gregcolonies.entity.ai.work.BlockBreaker;
 import com.enn3developer.gregcolonies.entity.ai.work.DigResult;
 import com.enn3developer.gregcolonies.entity.ai.work.Inventories;
@@ -39,8 +42,6 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
 
     private static final int APPROACH_TIMEOUT = 400;
 
-    private static final double APPROACH_EPSILON = 0.5D;
-
     private static final int MAX_SKIPS = 24;
 
     private static final double HOME_REACH_SQ = 9.0D;
@@ -55,17 +56,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
 
     private static final int PILLAR_CLIMB = 2;
 
-    protected int minX;
-
-    protected int minY;
-
-    protected int minZ;
-
-    protected int maxX;
-
-    protected int maxY;
-
-    protected int maxZ;
+    protected final WorkArea area = new WorkArea();
 
     private final BlockBreaker breaker = new BlockBreaker();
 
@@ -73,7 +64,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
 
     private int phase = PHASE_TRAVEL;
 
-    private CitizenCommandMoveTo leg;
+    private final TravelLeg leg = new TravelLeg();
 
     private String reason = "";
 
@@ -97,26 +88,21 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
 
     private int anchorZ;
 
-    private int approachTicks;
-
-    private double bestApproachSq = Double.MAX_VALUE;
+    private final ApproachTracker approach = new ApproachTracker(APPROACH_TIMEOUT);
 
     private int skips;
 
     private int homeTicks;
+
+    private int travelY;
 
     private int pillarCooldown;
 
     protected CitizenCommandHarvest() {}
 
     protected CitizenCommandHarvest(int x1, int y1, int z1, int x2, int y2, int z2) {
-        minX = Math.min(x1, x2);
-        minY = Math.min(y1, y2);
-        minZ = Math.min(z1, z2);
-        maxX = Math.max(x1, x2);
-        maxY = Math.max(y1, y2);
-        maxZ = Math.max(z1, z2);
-        maxY = Math.min(maxY, minY + MAX_HEIGHT - 1);
+        area.set(x1, y1, z1, x2, y2, z2);
+        area.capHeight(MAX_HEIGHT);
     }
 
     protected abstract Block referenceBlock();
@@ -141,8 +127,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
         anchorY = ay;
         anchorZ = az;
         hasTarget = true;
-        approachTicks = 0;
-        bestApproachSq = Double.MAX_VALUE;
+        approach.reset();
     }
 
     protected boolean isSkipped(int x, int y, int z) {
@@ -155,9 +140,9 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
 
     @Override
     public void start(EntityCitizen citizen) {
-        leg = null;
+        leg.clear(citizen);
         hasTarget = false;
-        approachTicks = 0;
+        approach.reset();
         skips = 0;
         homeTicks = 0;
         pillarCooldown = 0;
@@ -180,19 +165,14 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
     }
 
     private CitizenCommandResult travel(EntityCitizen citizen) {
-        if (leg == null) {
-            int x = (minX + maxX) / 2;
-            int z = (minZ + maxZ) / 2;
-            leg = new CitizenCommandMoveTo(x, surfaceY(citizen.worldObj, x, z), z);
-            leg.start(citizen);
+        int x = area.getCenterX();
+        int z = area.getCenterZ();
+        if (!leg.isActive()) {
+            travelY = surfaceY(citizen.worldObj, x, z);
         }
-        CitizenCommandResult result = leg.update(citizen);
-        if (result == CitizenCommandResult.RUNNING) {
-            return CitizenCommandResult.RUNNING;
+        if (leg.walk(citizen, x, travelY, z) != TravelLeg.Step.RUNNING) {
+            phase = PHASE_WORK;
         }
-        leg.finish(citizen);
-        leg = null;
-        phase = PHASE_WORK;
         return CitizenCommandResult.RUNNING;
     }
 
@@ -212,7 +192,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
             return startReturn(citizen);
         }
         hadTool = true;
-        if (!citizen.worldObj.blockExists((minX + maxX) / 2, 64, (minZ + maxZ) / 2)) {
+        if (!citizen.worldObj.blockExists(area.getCenterX(), 64, area.getCenterZ())) {
             reason = "out of range";
             return startReturn(citizen);
         }
@@ -224,18 +204,14 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
         if (citizen.getDistanceSq(anchorX + 0.5D, anchorY + 0.5D, anchorZ + 0.5D) > WORK_REACH_SQ) {
             return approach(citizen);
         }
-        approachTicks = 0;
+        approach.restart();
         citizen.getNavigator()
             .clearPathEntity();
         return dig(citizen, targetX, targetY, targetZ, false);
     }
 
     private CitizenCommandResult approach(EntityCitizen citizen) {
-        double distanceSq = citizen.getDistanceSq(anchorX + 0.5D, anchorY + 0.5D, anchorZ + 0.5D);
-        if (distanceSq < bestApproachSq - APPROACH_EPSILON) {
-            bestApproachSq = distanceSq;
-            approachTicks = 0;
-        } else if (++approachTicks > APPROACH_TIMEOUT) {
+        if (approach.stalled(citizen.getDistanceSq(anchorX + 0.5D, anchorY + 0.5D, anchorZ + 0.5D))) {
             return abandonTarget(citizen);
         }
         return move(citizen, canTunnel());
@@ -394,7 +370,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
                 reason = "tool broken";
                 return startReturn(citizen);
             case BROKEN:
-                approachTicks = 0;
+                approach.restart();
                 if (!tunnelling) {
                     harvested++;
                     onHarvested(citizen, x, y, z);
@@ -419,7 +395,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
         skipped.add(WorkBlocks.pack(anchorX, anchorY, anchorZ));
         onAbandon(citizen);
         hasTarget = false;
-        approachTicks = 0;
+        approach.restart();
         if (++skips > MAX_SKIPS) {
             reason = "unreachable";
             return startReturn(citizen);
@@ -432,10 +408,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
         hasTarget = false;
         phase = PHASE_RETURN;
         homeTicks = 0;
-        if (leg != null) {
-            leg.finish(citizen);
-            leg = null;
-        }
+        leg.clear(citizen);
         return goHome(citizen);
     }
 
@@ -463,29 +436,18 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
             return CitizenCommandResult.DONE;
         }
 
-        if (leg == null && homeTicks % LEG_RETRY == 1) {
-            leg = new CitizenCommandMoveTo(anchorX, anchorY, anchorZ);
-            leg.start(citizen);
+        TravelLeg.Step step = leg.walk(citizen, anchorX, anchorY, anchorZ, homeTicks % LEG_RETRY == 1);
+        if (step == TravelLeg.Step.RUNNING && leg.isActive()) {
+            return CitizenCommandResult.RUNNING;
         }
-        if (leg != null) {
-            CitizenCommandResult result = leg.update(citizen);
-            if (result == CitizenCommandResult.RUNNING) {
-                return CitizenCommandResult.RUNNING;
-            }
-            leg.finish(citizen);
-            leg = null;
-            if (result == CitizenCommandResult.DONE) {
-                return arrive(citizen, dropOff);
-            }
+        if (step == TravelLeg.Step.ARRIVED) {
+            return arrive(citizen, dropOff);
         }
         return move(citizen, true);
     }
 
     private CitizenCommandResult arrive(EntityCitizen citizen, boolean dropOff) {
-        if (leg != null) {
-            leg.finish(citizen);
-            leg = null;
-        }
+        leg.clear(citizen);
         citizen.getNavigator()
             .clearPathEntity();
         return dropOff ? deposit(citizen) : CitizenCommandResult.DONE;
@@ -522,22 +484,14 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
     @Override
     public void finish(EntityCitizen citizen) {
         breaker.clear(citizen);
-        if (leg != null) {
-            leg.finish(citizen);
-            leg = null;
-        }
+        leg.clear(citizen);
         citizen.getNavigator()
             .clearPathEntity();
     }
 
     @Override
     public void readFromNBT(NBTTagCompound tag) {
-        minX = tag.getInteger("x1");
-        minY = tag.getInteger("y1");
-        minZ = tag.getInteger("z1");
-        maxX = tag.getInteger("x2");
-        maxY = tag.getInteger("y2");
-        maxZ = tag.getInteger("z2");
+        area.readFromNBT(tag);
         phase = tag.getInteger("phase");
         harvested = tag.getInteger("harvested");
         reason = tag.getString("reason");
@@ -546,12 +500,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
 
     @Override
     public void writeToNBT(NBTTagCompound tag) {
-        tag.setInteger("x1", minX);
-        tag.setInteger("y1", minY);
-        tag.setInteger("z1", minZ);
-        tag.setInteger("x2", maxX);
-        tag.setInteger("y2", maxY);
-        tag.setInteger("z2", maxZ);
+        area.writeToNBT(tag);
         tag.setInteger("phase", phase);
         tag.setInteger("harvested", harvested);
         tag.setString("reason", reason);

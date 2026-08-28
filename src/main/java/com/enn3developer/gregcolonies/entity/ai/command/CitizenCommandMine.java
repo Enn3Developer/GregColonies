@@ -59,7 +59,7 @@ public class CitizenCommandMine extends CitizenCommandHarvest {
     protected boolean acquireTarget(EntityCitizen citizen) {
         World world = citizen.worldObj;
         if (!scanned) {
-            if (!world.blockExists(minX, 64, minZ)) {
+            if (!world.blockExists(area.getMinX(), 64, area.getMinZ())) {
                 return false;
             }
             scanOres(world);
@@ -81,12 +81,12 @@ public class CitizenCommandMine extends CitizenCommandHarvest {
     private void scanOres(World world) {
         ores.clear();
         int top = Math.min(
-            maxY,
-            world.getChunkFromBlockCoords(minX, minZ)
+            area.getMaxY(),
+            world.getChunkFromBlockCoords(area.getMinX(), area.getMinZ())
                 .getTopFilledSegment() + 15);
-        for (int y = top; y >= minY; y--) {
-            for (int x = minX; x <= maxX; x++) {
-                for (int z = minZ; z <= maxZ; z++) {
+        for (int y = top; y >= area.getMinY(); y--) {
+            for (int x = area.getMinX(); x <= area.getMaxX(); x++) {
+                for (int z = area.getMinZ(); z <= area.getMaxZ(); z++) {
                     if (WorkBlocks.isBigOre(world, x, y, z)) {
                         ores.add(new int[] { x, y, z });
                     }

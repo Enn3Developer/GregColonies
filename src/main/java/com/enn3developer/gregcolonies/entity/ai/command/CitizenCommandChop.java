@@ -45,8 +45,7 @@ public class CitizenCommandChop extends CitizenCommandHarvest {
 
     public CitizenCommandChop(int x1, int y1, int z1, int x2, int y2, int z2) {
         super(x1, y1, z1, x2, y2, z2);
-        maxX = Math.min(maxX, minX + MAX_SIDE - 1);
-        maxZ = Math.min(maxZ, minZ + MAX_SIDE - 1);
+        area.capSide(MAX_SIDE);
     }
 
     @Override
@@ -120,8 +119,8 @@ public class CitizenCommandChop extends CitizenCommandHarvest {
     private void scanBases(EntityCitizen citizen) {
         World world = citizen.worldObj;
         bases.clear();
-        for (int x = minX; x <= maxX; x++) {
-            for (int z = minZ; z <= maxZ; z++) {
+        for (int x = area.getMinX(); x <= area.getMaxX(); x++) {
+            for (int z = area.getMinZ(); z <= area.getMaxZ(); z++) {
                 if (!world.blockExists(x, 64, z)) {
                     continue;
                 }
