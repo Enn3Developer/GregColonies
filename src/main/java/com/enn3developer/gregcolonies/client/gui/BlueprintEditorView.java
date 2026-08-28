@@ -5,15 +5,19 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.item.ItemStack;
 
 import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.cleanroommc.modularui.api.drawable.IKey;
 import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.drawable.GuiDraw;
+import com.cleanroommc.modularui.drawable.Rectangle;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.utils.Alignment;
 import com.cleanroommc.modularui.widget.scroll.VerticalScrollData;
+import com.cleanroommc.modularui.widget.sizer.Unit;
 import com.cleanroommc.modularui.widgets.ButtonWidget;
 import com.cleanroommc.modularui.widgets.ListWidget;
 import com.cleanroommc.modularui.widgets.TextWidget;
@@ -45,7 +49,13 @@ public class BlueprintEditorView {
 
     private static final float FIT_DISTANCE = 2.4F;
 
-    private static final int CONFIRM_WIDTH = 210;
+    private static final int CONFIRM_WIDTH = 168;
+
+    private static final int CONFIRM_MIN_WIDTH = 118;
+
+    private static final int CONFIRM_GAP = 4;
+
+    private static final int SHADE_COLOR = 0xB4060810;
 
     private static final String PAINT_HINT = "LMB paint   RMB erase   RMB drag pan";
     private static final String CAMERA_HINT = "MMB drag turn   wheel zoom   WASD pan   R recenter";
@@ -171,23 +181,39 @@ public class BlueprintEditorView {
     }
 
     private Flow buildConfirm() {
-        Flow prompt = Flow.column()
-            .coverChildrenHeight()
-            .childPadding(GuiStyle.ROW_GAP)
-            .padding(GuiStyle.PADDING)
-            .width(CONFIRM_WIDTH)
-            .posRel(Alignment.Center)
-            .crossAxisAlignment(Alignment.CrossAxis.START)
-            .background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER))
-            .child(GuiStyle.label(IKey.str("Unsaved changes"), GuiStyle.TITLE_COLOR))
-            .child(GuiStyle.label(IKey.dynamic(this::confirmValue), GuiStyle.HINT_COLOR))
-            .child(
-                GuiStyle.row()
-                    .child(GuiStyle.button("Save", GuiStyle.EXPAND, this::canSave, this::save))
-                    .child(GuiStyle.button("Discard", GuiStyle.EXPAND, () -> true, this::discard))
-                    .child(GuiStyle.button("Cancel", GuiStyle.EXPAND, () -> true, () -> confirming = false)));
-        prompt.setEnabledIf(widget -> confirming);
-        return prompt;
+        Flow prompt = Flow.column();
+        prompt.width(this::confirmWidth, Unit.Measure.PIXEL);
+        prompt.coverChildrenHeight();
+        prompt.padding(GuiStyle.PADDING);
+        prompt.childPadding(GuiStyle.ROW_GAP);
+        prompt.crossAxisAlignment(Alignment.CrossAxis.START);
+        prompt.background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER));
+        prompt.child(GuiStyle.label(IKey.str("Unsaved changes"), GuiStyle.TITLE_COLOR));
+        prompt.child(GuiStyle.label(IKey.dynamic(this::confirmValue), GuiStyle.HINT_COLOR));
+        prompt.child(
+            GuiStyle.row()
+                .child(GuiStyle.button("Save", GuiStyle.EXPAND, this::canSave, this::save))
+                .child(GuiStyle.button("Discard", GuiStyle.EXPAND, () -> true, this::discard)));
+        prompt.child(
+            GuiStyle.row()
+                .child(GuiStyle.button("Cancel", GuiStyle.EXPAND, () -> true, () -> confirming = false)));
+
+        Flow overlay = Flow.row();
+        overlay.full();
+        overlay.mainAxisAlignment(Alignment.MainAxis.CENTER);
+        overlay.crossAxisAlignment(Alignment.CrossAxis.CENTER);
+        overlay.background(new Rectangle().color(SHADE_COLOR));
+        overlay.child(prompt);
+        overlay.setEnabledIf(widget -> confirming);
+        return overlay;
+    }
+
+    // the prompt is centred on the screen, so it must stay clear of the palette column
+    private double confirmWidth() {
+        Minecraft mc = Minecraft.getMinecraft();
+        double screen = new ScaledResolution(mc, mc.displayWidth, mc.displayHeight).getScaledWidth();
+        double room = (screen / 2.0D - GuiStyle.SCREEN_MARGIN - PALETTE_WIDTH - CONFIRM_GAP) * 2.0D;
+        return Math.max(CONFIRM_MIN_WIDTH, Math.min(CONFIRM_WIDTH, room));
     }
 
     private void discard() {
