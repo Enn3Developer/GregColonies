@@ -11,3 +11,7 @@ jobs:
   build-and-test:
     uses: GTNewHorizons/GTNH-Actions-Workflows/.github/workflows/build-and-test.yml@master
     secrets: inherit
+    with:
+      horizonqa: true
+      horizonqa-tests: gregcolonies_tests
+      timeout: 600

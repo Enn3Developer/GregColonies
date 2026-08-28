@@ -4,7 +4,15 @@ plugins {
     id("com.gtnewhorizons.gtnhconvention")
 }
 
+sourceSets {
+    test {
+        compileClasspath += sourceSets["main"].compileClasspath
+        runtimeClasspath += sourceSets["main"].compileClasspath
+    }
+}
+
 tasks.test.configure {
+    systemProperty("java.awt.headless", "true")
     useJUnitPlatform()
     testLogging {
         events("passed", "skipped", "failed")
