@@ -15,6 +15,8 @@ import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.colony.BuildSite;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.colony.ColonySite;
+import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.entity.CitizenJob;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.auto.AutoTask;
@@ -124,7 +126,8 @@ public class IdleTaskBuild extends AutoTask {
         if (world.provider.dimensionId != colony.getDimension() || citizen.getJob() != CitizenJob.BUILDER) {
             return false;
         }
-        return colony.getBuildSite() != null && colony.hasMaterials();
+        return colony.getBuildSite() != null && colony.site(ColonySiteKind.MATERIALS)
+            .isPresent();
     }
 
     @Override
@@ -264,17 +267,13 @@ public class IdleTaskBuild extends AutoTask {
         if (colony.getX() == x && colony.getY() == y && colony.getZ() == z) {
             return true;
         }
-        if (colony.hasMaterials() && colony.getMaterialsX() == x
-            && colony.getMaterialsY() == y
-            && colony.getMaterialsZ() == z) {
-            return true;
+        for (ColonySiteKind kind : ColonySiteKind.values()) {
+            if (colony.site(kind)
+                .isAt(x, y, z)) {
+                return true;
+            }
         }
-        if (colony.hasDropOff() && colony.getDropOffX() == x
-            && colony.getDropOffY() == y
-            && colony.getDropOffZ() == z) {
-            return true;
-        }
-        return colony.hasPickUp() && colony.getPickUpX() == x && colony.getPickUpY() == y && colony.getPickUpZ() == z;
+        return false;
     }
 
     private boolean build(EntityCitizen citizen, Colony colony, BuildSite site) {
@@ -348,7 +347,8 @@ public class IdleTaskBuild extends AutoTask {
 
     private boolean fetch(EntityCitizen citizen, Colony colony, Blueprint blueprint, int cell) {
         activity = "fetching materials";
-        if (!colony.hasMaterials()) {
+        ColonySite chest = colony.site(ColonySiteKind.MATERIALS);
+        if (!chest.isPresent()) {
             missing.add(cell);
             skipCell();
             return true;
@@ -358,9 +358,9 @@ public class IdleTaskBuild extends AutoTask {
             storing = true;
             return true;
         }
-        int x = colony.getMaterialsX();
-        int y = colony.getMaterialsY();
-        int z = colony.getMaterialsZ();
+        int x = chest.getX();
+        int y = chest.getY();
+        int z = chest.getZ();
         if (!inReach(citizen, x, y, z)) {
             return travel(citizen, x, y + 1, z);
         }
@@ -542,7 +542,8 @@ public class IdleTaskBuild extends AutoTask {
 
     private boolean fetchScaffold(EntityCitizen citizen, Colony colony, BuildSite site) {
         activity = "fetching scaffolding";
-        if (!colony.hasMaterials()) {
+        ColonySite chest = colony.site(ColonySiteKind.MATERIALS);
+        if (!chest.isPresent()) {
             skipTarget();
             return true;
         }
@@ -551,9 +552,9 @@ public class IdleTaskBuild extends AutoTask {
             storing = true;
             return true;
         }
-        int x = colony.getMaterialsX();
-        int y = colony.getMaterialsY();
-        int z = colony.getMaterialsZ();
+        int x = chest.getX();
+        int y = chest.getY();
+        int z = chest.getZ();
         if (!inReach(citizen, x, y, z)) {
             return travel(citizen, x, y + 1, z);
         }
@@ -671,13 +672,14 @@ public class IdleTaskBuild extends AutoTask {
 
     private boolean store(EntityCitizen citizen, Colony colony) {
         activity = "storing materials";
-        if (!colony.hasMaterials()) {
+        ColonySite chest = colony.site(ColonySiteKind.MATERIALS);
+        if (!chest.isPresent()) {
             storing = false;
             return false;
         }
-        int x = colony.getMaterialsX();
-        int y = colony.getMaterialsY();
-        int z = colony.getMaterialsZ();
+        int x = chest.getX();
+        int y = chest.getY();
+        int z = chest.getZ();
         if (!inReach(citizen, x, y, z)) {
             return travel(citizen, x, y + 1, z);
         }

@@ -29,6 +29,8 @@ import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
 import com.enn3developer.gregcolonies.client.ControllingCompat;
 import com.enn3developer.gregcolonies.client.GCKeyBindings;
+import com.enn3developer.gregcolonies.colony.ColonySite;
+import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.entity.CitizenJob;
 import com.enn3developer.gregcolonies.network.CitizenSnapshot;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
@@ -37,9 +39,7 @@ import com.enn3developer.gregcolonies.network.PacketCitizenCommand;
 import com.enn3developer.gregcolonies.network.PacketCitizenGroup;
 import com.enn3developer.gregcolonies.network.PacketCitizenJob;
 import com.enn3developer.gregcolonies.network.PacketColonyBuild;
-import com.enn3developer.gregcolonies.network.PacketColonyDropOff;
-import com.enn3developer.gregcolonies.network.PacketColonyMaterials;
-import com.enn3developer.gregcolonies.network.PacketColonyPickUp;
+import com.enn3developer.gregcolonies.network.PacketColonySite;
 import com.enn3developer.gregcolonies.network.PacketOpenCitizen;
 
 public class ColonyView {
@@ -245,19 +245,10 @@ public class ColonyView {
             .sendToServer(new PacketCitizenCommand(colony.getId(), action, append, x1, y1, z1, x2, y2, z2, selection));
     }
 
-    public void sendDropOff(int x, int y, int z) {
-        boolean clear = colony.isDropOffAt(x, y, z);
-        GCNetwork.CHANNEL.sendToServer(new PacketColonyDropOff(colony.getId(), x, y, z, clear));
-    }
-
-    public void sendPickUp(int x, int y, int z) {
-        boolean clear = colony.isPickUpAt(x, y, z);
-        GCNetwork.CHANNEL.sendToServer(new PacketColonyPickUp(colony.getId(), x, y, z, clear));
-    }
-
-    public void sendMaterials(int x, int y, int z) {
-        boolean clear = colony.isMaterialsAt(x, y, z);
-        GCNetwork.CHANNEL.sendToServer(new PacketColonyMaterials(colony.getId(), x, y, z, clear));
+    public void sendSite(ColonySiteKind kind, int x, int y, int z) {
+        boolean clear = colony.site(kind)
+            .isAt(x, y, z);
+        GCNetwork.CHANNEL.sendToServer(new PacketColonySite(colony.getId(), kind, x, y, z, clear));
     }
 
     public void openBlueprints() {
@@ -458,9 +449,9 @@ public class ColonyView {
         list.child(
             GuiStyle.row()
                 .child(modeButton("Materials", GuiStyle.EXPAND, TARGET_MATERIALS)));
-        list.child(entry("drop-off", this::dropOffValue, DROP_OFF_COLOR));
-        list.child(entry("pick-up", this::pickUpValue, PICK_UP_COLOR));
-        list.child(entry("materials", this::materialsValue, MATERIALS_COLOR));
+        list.child(entry("drop-off", () -> siteValue(ColonySiteKind.DROP_OFF), DROP_OFF_COLOR));
+        list.child(entry("pick-up", () -> siteValue(ColonySiteKind.PICK_UP), PICK_UP_COLOR));
+        list.child(entry("materials", () -> siteValue(ColonySiteKind.MATERIALS), MATERIALS_COLOR));
 
         list.child(GuiStyle.section("Build", this::buildValue, GuiStyle.SECTION_GAP));
         list.child(
@@ -541,25 +532,9 @@ public class ColonyView {
         return "";
     }
 
-    private String dropOffValue() {
-        if (!colony.hasDropOff()) {
-            return "not set";
-        }
-        return colony.getDropOffX() + "/" + colony.getDropOffY() + "/" + colony.getDropOffZ();
-    }
-
-    private String pickUpValue() {
-        if (!colony.hasPickUp()) {
-            return "not set";
-        }
-        return colony.getPickUpX() + "/" + colony.getPickUpY() + "/" + colony.getPickUpZ();
-    }
-
-    private String materialsValue() {
-        if (!colony.hasMaterials()) {
-            return "not set";
-        }
-        return colony.getMaterialsX() + "/" + colony.getMaterialsY() + "/" + colony.getMaterialsZ();
+    private String siteValue(ColonySiteKind kind) {
+        ColonySite site = colony.site(kind);
+        return site.isPresent() ? site.describe() : "not set";
     }
 
     private String blueprintValue() {

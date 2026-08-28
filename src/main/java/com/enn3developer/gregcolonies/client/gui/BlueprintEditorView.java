@@ -24,6 +24,7 @@ import com.cleanroommc.modularui.widgets.TextWidget;
 import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
 import com.enn3developer.gregcolonies.colony.Blueprint;
+import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
 import com.enn3developer.gregcolonies.network.PacketColonyPalette;
 
@@ -376,7 +377,8 @@ public class BlueprintEditorView {
     }
 
     private String paletteHint() {
-        return getColony().hasMaterials() ? "chest is empty" : "no materials chest set";
+        return getColony().site(ColonySiteKind.MATERIALS)
+            .isPresent() ? "chest is empty" : "no materials chest set";
     }
 
     private ListWidget<IWidget, ?> buildSidePanel() {

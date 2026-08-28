@@ -7,6 +7,7 @@ import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.entity.ai.work.Inventories;
 
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -14,18 +15,20 @@ import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 
-public class PacketColonyPickUp implements IMessage {
+public class PacketColonySite implements IMessage {
 
     private int colonyId;
+    private byte kind;
     private int x;
     private int y;
     private int z;
     private boolean clear;
 
-    public PacketColonyPickUp() {}
+    public PacketColonySite() {}
 
-    public PacketColonyPickUp(int colonyId, int x, int y, int z, boolean clear) {
+    public PacketColonySite(int colonyId, ColonySiteKind kind, int x, int y, int z, boolean clear) {
         this.colonyId = colonyId;
+        this.kind = (byte) kind.ordinal();
         this.x = x;
         this.y = y;
         this.z = z;
@@ -35,6 +38,7 @@ public class PacketColonyPickUp implements IMessage {
     @Override
     public void fromBytes(ByteBuf buf) {
         colonyId = buf.readInt();
+        kind = buf.readByte();
         x = buf.readInt();
         y = buf.readInt();
         z = buf.readInt();
@@ -44,30 +48,35 @@ public class PacketColonyPickUp implements IMessage {
     @Override
     public void toBytes(ByteBuf buf) {
         buf.writeInt(colonyId);
+        buf.writeByte(kind);
         buf.writeInt(x);
         buf.writeInt(y);
         buf.writeInt(z);
         buf.writeBoolean(clear);
     }
 
-    public static class Handler implements IMessageHandler<PacketColonyPickUp, IMessage> {
+    public static class Handler implements IMessageHandler<PacketColonySite, IMessage> {
 
         @Override
-        public IMessage onMessage(PacketColonyPickUp message, MessageContext ctx) {
+        public IMessage onMessage(PacketColonySite message, MessageContext ctx) {
             EntityPlayerMP player = ctx.getServerHandler().playerEntity;
             GCNetwork.enqueue(() -> apply(player, message));
             return null;
         }
 
-        private static void apply(EntityPlayerMP player, PacketColonyPickUp message) {
+        private static void apply(EntityPlayerMP player, PacketColonySite message) {
             Colony colony = GCNetwork.accessibleColony(player, message.colonyId);
             if (colony == null) {
                 return;
             }
+            ColonySiteKind kind = ColonySiteKind.byId(message.kind);
+            if (kind == null) {
+                return;
+            }
             ColonyManager manager = ColonyManager.get(player.worldObj);
             if (message.clear) {
-                manager.clearPickUp(colony.getId());
-                player.addChatMessage(new ChatComponentText("Colony pick-up cleared"));
+                manager.clearSite(colony.getId(), kind);
+                player.addChatMessage(new ChatComponentText("Colony " + kind.getLabel() + " cleared"));
                 GCNetwork.sendColony(player, colony);
                 return;
             }
@@ -75,7 +84,8 @@ public class PacketColonyPickUp implements IMessage {
             World world = player.worldObj;
             if (colony.getDimension() != world.provider.dimensionId) {
                 player.addChatMessage(
-                    new ChatComponentText(EnumChatFormatting.RED + "The pick-up must be in the colony dimension"));
+                    new ChatComponentText(
+                        EnumChatFormatting.RED + "The " + kind.getLabel() + " must be in the colony dimension"));
                 return;
             }
             if (Inventories.at(world, message.x, message.y, message.z) == null) {
@@ -83,9 +93,10 @@ public class PacketColonyPickUp implements IMessage {
                 return;
             }
 
-            manager.setPickUp(colony.getId(), message.x, message.y, message.z);
+            manager.setSite(colony.getId(), kind, message.x, message.y, message.z);
             player.addChatMessage(
-                new ChatComponentText("Colony pick-up set to " + message.x + "/" + message.y + "/" + message.z));
+                new ChatComponentText(
+                    "Colony " + kind.getLabel() + " set to " + message.x + "/" + message.y + "/" + message.z));
             GCNetwork.sendColony(player, colony);
         }
     }

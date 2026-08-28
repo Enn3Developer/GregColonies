@@ -4,6 +4,8 @@ import net.minecraft.inventory.IInventory;
 import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.colony.Colony;
+import com.enn3developer.gregcolonies.colony.ColonySite;
+import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.auto.AutoTask;
 import com.enn3developer.gregcolonies.entity.ai.work.Inventories;
@@ -40,7 +42,8 @@ public class LivingTaskFood extends AutoTask {
     @Override
     public boolean shouldStart(EntityCitizen citizen, Colony colony) {
         World world = citizen.worldObj;
-        if (world.getTotalWorldTime() < nextAttempt || !colony.hasPickUp()) {
+        if (world.getTotalWorldTime() < nextAttempt || !colony.site(ColonySiteKind.PICK_UP)
+            .isPresent()) {
             return false;
         }
         if (world.provider.dimensionId != colony.getDimension()) {
@@ -58,13 +61,14 @@ public class LivingTaskFood extends AutoTask {
 
     @Override
     public boolean update(EntityCitizen citizen, Colony colony) {
-        if (!colony.hasPickUp()) {
+        ColonySite site = colony.site(ColonySiteKind.PICK_UP);
+        if (!site.isPresent()) {
             return false;
         }
 
-        int x = colony.getPickUpX();
-        int y = colony.getPickUpY();
-        int z = colony.getPickUpZ();
+        int x = site.getX();
+        int y = site.getY();
+        int z = site.getZ();
         if (citizen.getDistanceSq(x + 0.5D, y, z + 0.5D) <= REACH_SQ) {
             return take(citizen, x, y, z);
         }
@@ -105,7 +109,8 @@ public class LivingTaskFood extends AutoTask {
     }
 
     private static boolean pathToPickUp(EntityCitizen citizen, Colony colony) {
-        return pathTowards(citizen, colony.getPickUpX() + 0.5D, colony.getPickUpY(), colony.getPickUpZ() + 0.5D, SPEED);
+        ColonySite site = colony.site(ColonySiteKind.PICK_UP);
+        return pathTowards(citizen, site.getX() + 0.5D, site.getY(), site.getZ() + 0.5D, SPEED);
     }
 
     private void delay(EntityCitizen citizen) {

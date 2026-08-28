@@ -1,15 +1,10 @@
 package com.enn3developer.gregcolonies.client.gui;
 
 import net.minecraft.block.Block;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.GLAllocation;
-import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
-import net.minecraft.client.renderer.texture.TextureMap;
 
 import org.lwjgl.opengl.GL11;
 
-import com.enn3developer.gregcolonies.GregColonies;
 import com.enn3developer.gregcolonies.colony.Blueprint;
 
 public final class BlueprintGhost {
@@ -42,35 +37,17 @@ public final class BlueprintGhost {
 
     private static int builtCeiling = -1;
 
-    private static boolean warned;
-
-    private static final int STATE_MASK = GL11.GL_ENABLE_BIT | GL11.GL_CURRENT_BIT
-        | GL11.GL_DEPTH_BUFFER_BIT
-        | GL11.GL_COLOR_BUFFER_BIT
-        | GL11.GL_LINE_BIT;
+    private static final String SUBJECT = "the blueprint ghost";
 
     private BlueprintGhost() {}
 
     public static void forget() {
         BlueprintMesh.forget();
-        if (listBase >= 0) {
-            try {
-                GLAllocation.deleteDisplayLists(listBase);
-            } catch (RuntimeException error) {
-                GL11.glDeleteLists(listBase, listCount);
-            }
-            listBase = -1;
-            listCount = 0;
-        }
+        DisplayLists.free(listBase, listCount);
+        listBase = -1;
+        listCount = 0;
         built = new int[0];
         builtCeiling = -1;
-    }
-
-    private static void warnOnce(RuntimeException error) {
-        if (!warned) {
-            warned = true;
-            GregColonies.LOG.error("Blueprint ghost failed to render", error);
-        }
     }
 
     public static void render(BlueprintEditor editor, BlueprintTrace.Hit hover, double cameraX, double cameraY,
@@ -79,40 +56,18 @@ public final class BlueprintGhost {
         if (model == null) {
             return;
         }
-        GL11.glPushAttrib(STATE_MASK);
-        GL11.glPushMatrix();
-        try {
+        GLScope.run(SUBJECT, () -> {
             GL11.glTranslated(-cameraX, -cameraY, -cameraZ);
             drawBlocks(editor, model);
             drawGuides(editor, model, hover);
-        } catch (RuntimeException error) {
-            warnOnce(error);
-        } finally {
-            // glPushAttrib does not record which texture unit is selected
-            OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
-            GL11.glPopMatrix();
-            GL11.glPopAttrib();
-        }
+        });
     }
 
     private static void drawBlocks(BlueprintEditor editor, Blueprint model) {
         int top = editor.ceiling();
         compile(editor, model, top);
 
-        Minecraft.getMinecraft()
-            .getTextureManager()
-            .bindTexture(TextureMap.locationBlocksTexture);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glDisable(GL11.GL_LIGHTING);
-        GL11.glDisable(GL11.GL_CULL_FACE);
-        GL11.glEnable(GL11.GL_DEPTH_TEST);
-        GL11.glDepthMask(true);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-        OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
+        GLScope.blocks(true);
 
         for (int y = 0; y <= top && y < listCount; y++) {
             GL11.glCallList(listBase + y);
@@ -122,10 +77,8 @@ public final class BlueprintGhost {
     private static void compile(BlueprintEditor editor, Blueprint model, int top) {
         int layers = model.getSizeY();
         if (listBase < 0 || listCount < layers) {
-            if (listBase >= 0) {
-                GLAllocation.deleteDisplayLists(listBase);
-            }
-            listBase = GLAllocation.generateDisplayLists(layers);
+            DisplayLists.free(listBase, listCount);
+            listBase = DisplayLists.allocate(layers);
             listCount = layers;
             built = new int[layers];
         }
@@ -143,17 +96,10 @@ public final class BlueprintGhost {
                 continue;
             }
             built[y] = editor.layerRevision(y);
-            GL11.glNewList(listBase + y, GL11.GL_COMPILE);
-            try {
-                Tessellator tessellator = Tessellator.instance;
-                tessellator.startDrawingQuads();
-                layer(editor, model, y, top, tessellator);
-                tessellator.draw();
-            } catch (RuntimeException error) {
+            int slice = y;
+            if (!DisplayLists
+                .compileQuads(listBase + y, SUBJECT, () -> layer(editor, model, slice, top, Tessellator.instance))) {
                 built[y] = 0;
-                warnOnce(error);
-            } finally {
-                GL11.glEndList();
             }
         }
         builtCeiling = top;
@@ -192,14 +138,7 @@ public final class BlueprintGhost {
     }
 
     private static void drawGuides(BlueprintEditor editor, Blueprint model, BlueprintTrace.Hit hover) {
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glDisable(GL11.GL_LIGHTING);
-        GL11.glDisable(GL11.GL_CULL_FACE);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        GL11.glDepthMask(false);
-        GL11.glDisable(GL11.GL_DEPTH_TEST);
-        GL11.glLineWidth(LINE_WIDTH);
+        GLScope.lines(LINE_WIDTH);
 
         double baseX = editor.getAnchorX();
         double baseY = editor.getAnchorY();
@@ -236,7 +175,7 @@ public final class BlueprintGhost {
         double y = baseY + editor.getLayer() + SWELL;
         double x1 = baseX + model.getSizeX();
         double z1 = baseZ + model.getSizeZ();
-        color(PLANE_COLOR);
+        GLScope.color(PLANE_COLOR);
         GL11.glBegin(GL11.GL_QUADS);
         GL11.glVertex3d(baseX, y, baseZ);
         GL11.glVertex3d(baseX, y, z1);
@@ -244,7 +183,7 @@ public final class BlueprintGhost {
         GL11.glVertex3d(x1, y, baseZ);
         GL11.glEnd();
 
-        color(PLANE_EDGE);
+        GLScope.color(PLANE_EDGE);
         GL11.glBegin(GL11.GL_LINES);
         for (int x = 0; x <= model.getSizeX(); x++) {
             GL11.glVertex3d(baseX + x, y, baseZ);
@@ -262,7 +201,7 @@ public final class BlueprintGhost {
     }
 
     private static void outline(double x0, double y0, double z0, double x1, double y1, double z1, int rgba) {
-        color(rgba);
+        GLScope.color(rgba);
         GL11.glBegin(GL11.GL_LINES);
         edge(x0, y0, z0, x1, y0, z0);
         edge(x1, y0, z0, x1, y0, z1);
@@ -284,11 +223,4 @@ public final class BlueprintGhost {
         GL11.glVertex3d(x1, y1, z1);
     }
 
-    private static void color(int rgba) {
-        GL11.glColor4f(
-            (rgba >> 16 & 0xFF) / 255.0F,
-            (rgba >> 8 & 0xFF) / 255.0F,
-            (rgba & 0xFF) / 255.0F,
-            (rgba >>> 24) / 255.0F);
-    }
 }

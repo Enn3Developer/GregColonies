@@ -145,62 +145,25 @@ public class ColonyManager extends WorldSavedData {
         return true;
     }
 
-    public boolean setDropOff(int colonyId, int x, int y, int z) {
+    public boolean setSite(int colonyId, ColonySiteKind kind, int x, int y, int z) {
         Colony colony = colonies.get(colonyId);
         if (colony == null) {
             return false;
         }
-        colony.setDropOff(x, y, z);
+        colony.site(kind)
+            .set(x, y, z);
         markDirty();
         return true;
     }
 
-    public boolean clearDropOff(int colonyId) {
+    public boolean clearSite(int colonyId, ColonySiteKind kind) {
         Colony colony = colonies.get(colonyId);
-        if (colony == null || !colony.hasDropOff()) {
+        if (colony == null || !colony.site(kind)
+            .isPresent()) {
             return false;
         }
-        colony.clearDropOff();
-        markDirty();
-        return true;
-    }
-
-    public boolean setPickUp(int colonyId, int x, int y, int z) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null) {
-            return false;
-        }
-        colony.setPickUp(x, y, z);
-        markDirty();
-        return true;
-    }
-
-    public boolean clearPickUp(int colonyId) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null || !colony.hasPickUp()) {
-            return false;
-        }
-        colony.clearPickUp();
-        markDirty();
-        return true;
-    }
-
-    public boolean setMaterials(int colonyId, int x, int y, int z) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null) {
-            return false;
-        }
-        colony.setMaterials(x, y, z);
-        markDirty();
-        return true;
-    }
-
-    public boolean clearMaterials(int colonyId) {
-        Colony colony = colonies.get(colonyId);
-        if (colony == null || !colony.hasMaterials()) {
-            return false;
-        }
-        colony.clearMaterials();
+        colony.site(kind)
+            .clear();
         markDirty();
         return true;
     }

@@ -10,14 +10,13 @@ import org.jetbrains.annotations.NotNull;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
-import com.cleanroommc.modularui.api.UpOrDown;
 import com.cleanroommc.modularui.api.drawable.IKey;
 import com.cleanroommc.modularui.api.widget.Interactable;
 import com.cleanroommc.modularui.drawable.GuiDraw;
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext;
 import com.cleanroommc.modularui.theme.WidgetThemeEntry;
-import com.cleanroommc.modularui.widget.Widget;
 import com.enn3developer.gregcolonies.client.GCKeyBindings;
+import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandChop;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandFarm;
 import com.enn3developer.gregcolonies.network.CitizenSnapshot;
@@ -25,29 +24,15 @@ import com.enn3developer.gregcolonies.network.GCNetwork;
 import com.enn3developer.gregcolonies.network.PacketCitizenCommand;
 import com.enn3developer.gregcolonies.network.PacketRequestColony;
 
-public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Interactable {
+public class ColonyViewWidget extends CameraWidget<ColonyViewWidget> {
 
     private static final int DRAG_PICK_INTERVAL = 2;
 
     private static final int DATA_INTERVAL = 20;
 
-    private static final float ZOOM_STEP = 1.2F;
-
-    private static final float ROTATE_STEP = 45.0F;
-
-    private static final float DRAG_YAW = 0.4F;
-
-    private static final float DRAG_PITCH = 0.3F;
-
-    private static final float KEY_PAN_PIXELS = 12.0F;
-
-    private static final int CLICK_SLOP = 4;
-
     private static final long DOUBLE_CLICK_MS = 400L;
 
     private static final double HIT_RADIUS = 12.0D;
-
-    private static final double DEFAULT_FOV = 70.0D;
 
     private static final double MARKER_HEIGHT = 2.4D;
 
@@ -84,14 +69,6 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
     private final double[] projected = new double[3];
 
     private int dataTicks;
-
-    private int dragX;
-
-    private int dragY;
-
-    private int dragButton = -1;
-
-    private int dragTravel;
 
     private java.util.UUID lastClicked;
 
@@ -335,17 +312,17 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
         }
         int[] area = view.getPending();
         if (view.getTargeting() == ColonyView.TARGET_DROP_OFF) {
-            view.sendDropOff(area[0], area[1], area[2]);
+            view.sendSite(ColonySiteKind.DROP_OFF, area[0], area[1], area[2]);
             view.setTargeting(ColonyView.TARGET_NONE);
             return;
         }
         if (view.getTargeting() == ColonyView.TARGET_PICK_UP) {
-            view.sendPickUp(area[0], area[1], area[2]);
+            view.sendSite(ColonySiteKind.PICK_UP, area[0], area[1], area[2]);
             view.setTargeting(ColonyView.TARGET_NONE);
             return;
         }
         if (view.getTargeting() == ColonyView.TARGET_MATERIALS) {
-            view.sendMaterials(area[0], area[1], area[2]);
+            view.sendSite(ColonySiteKind.MATERIALS, area[0], area[1], area[2]);
             view.setTargeting(ColonyView.TARGET_NONE);
             return;
         }
@@ -398,28 +375,9 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
         keyboardPan();
     }
 
-    private void keyboardPan() {
-        ColonyCamera camera = ColonyCamera.get();
-        if (camera == null || view.isEditing()) {
-            return;
-        }
-        double x = 0.0D;
-        double y = 0.0D;
-        if (Keyboard.isKeyDown(Keyboard.KEY_A) || Keyboard.isKeyDown(Keyboard.KEY_LEFT)) {
-            x += KEY_PAN_PIXELS;
-        }
-        if (Keyboard.isKeyDown(Keyboard.KEY_D) || Keyboard.isKeyDown(Keyboard.KEY_RIGHT)) {
-            x -= KEY_PAN_PIXELS;
-        }
-        if (Keyboard.isKeyDown(Keyboard.KEY_W) || Keyboard.isKeyDown(Keyboard.KEY_UP)) {
-            y += KEY_PAN_PIXELS;
-        }
-        if (Keyboard.isKeyDown(Keyboard.KEY_S) || Keyboard.isKeyDown(Keyboard.KEY_DOWN)) {
-            y -= KEY_PAN_PIXELS;
-        }
-        if (x != 0.0D || y != 0.0D) {
-            camera.pan(x, y, panScale());
-        }
+    @Override
+    protected boolean isCameraBusy() {
+        return view.isEditing();
     }
 
     private CitizenSnapshot findHovered() {
@@ -446,17 +404,6 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             }
         }
         return best;
-    }
-
-    private double panScale() {
-        ColonyCamera camera = ColonyCamera.get();
-        if (camera == null) {
-            return 0.0D;
-        }
-        float setting = Minecraft.getMinecraft().gameSettings.fovSetting;
-        double fov = Math.toRadians(setting > 0.0F ? setting : DEFAULT_FOV);
-        double height = Math.max(1, getArea().h());
-        return 2.0D * camera.getDistance() * Math.tan(fov / 2.0D) / height;
     }
 
     private void selectBox() {
@@ -522,10 +469,7 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
 
     @Override
     public @NotNull Result onMousePressed(int mouseButton) {
-        dragButton = mouseButton;
-        dragTravel = 0;
-        dragX = getContext().getAbsMouseX();
-        dragY = getContext().getAbsMouseY();
+        beginDrag(mouseButton);
         if (mouseButton == 0 && view.getTargeting() != ColonyView.TARGET_NONE) {
             MovingObjectPosition hit = ColonyWorldOverlay.pick(getContext().getMouseX(), getContext().getMouseY());
             if (hit != null && hit.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) {
@@ -564,56 +508,27 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             areaDragging = false;
             hasAreaCorner = false;
             issueArea();
-            dragButton = -1;
+            endDrag();
             return true;
         }
-        if (mouseButton == 1 && dragTravel <= CLICK_SLOP && view.getTargeting() != ColonyView.TARGET_NONE) {
+        if (mouseButton == 1 && getDragTravel() <= CLICK_SLOP && view.getTargeting() != ColonyView.TARGET_NONE) {
             view.setTargeting(ColonyView.TARGET_NONE);
-            dragButton = -1;
+            endDrag();
             return true;
         }
         if (mouseButton == 0) {
             if (boxSelecting) {
-                if (dragTravel <= CLICK_SLOP) {
+                if (getDragTravel() <= CLICK_SLOP) {
                     selectAt(getContext().getMouseX(), getContext().getMouseY());
                 } else {
                     selectBox();
                 }
             }
             boxSelecting = false;
-        } else if (mouseButton == 1 && dragTravel <= CLICK_SLOP) {
+        } else if (mouseButton == 1 && getDragTravel() <= CLICK_SLOP) {
             issueMove(getContext().getMouseX(), getContext().getMouseY());
         }
-        dragButton = -1;
-        return true;
-    }
-
-    @Override
-    public void onMouseDrag(int mouseButton, long timeSinceClick) {
-        ColonyCamera camera = ColonyCamera.get();
-        if (camera == null || dragButton < 0) {
-            return;
-        }
-        int mouseX = getContext().getAbsMouseX();
-        int mouseY = getContext().getAbsMouseY();
-        int deltaX = mouseX - dragX;
-        int deltaY = mouseY - dragY;
-        dragX = mouseX;
-        dragY = mouseY;
-        dragTravel += Math.abs(deltaX) + Math.abs(deltaY);
-        if (dragButton == 1) {
-            camera.pan(deltaX, deltaY, panScale());
-        } else if (dragButton == 2) {
-            camera.rotate(deltaX * DRAG_YAW, -deltaY * DRAG_PITCH);
-        }
-    }
-
-    @Override
-    public boolean onMouseScroll(UpOrDown scrollDirection, int amount) {
-        ColonyCamera camera = ColonyCamera.get();
-        if (camera != null) {
-            camera.zoom(scrollDirection.isUp() ? 1.0F / ZOOM_STEP : ZOOM_STEP);
-        }
+        endDrag();
         return true;
     }
 
@@ -622,15 +537,10 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
         if (view.isEditing()) {
             return Result.IGNORE;
         }
+        if (turnKey(keyCode)) {
+            return Result.SUCCESS;
+        }
         ColonyCamera camera = ColonyCamera.get();
-        if (camera != null && keyCode == Keyboard.KEY_Q) {
-            camera.rotate(-ROTATE_STEP, 0.0F);
-            return Result.SUCCESS;
-        }
-        if (camera != null && keyCode == Keyboard.KEY_E) {
-            camera.rotate(ROTATE_STEP, 0.0F);
-            return Result.SUCCESS;
-        }
         if (camera != null && keyCode == Keyboard.KEY_R) {
             camera.reset(view.getColony());
             return Result.SUCCESS;

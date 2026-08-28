@@ -2,11 +2,7 @@ package com.enn3developer.gregcolonies.client.gui;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.material.MapColor;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.GLAllocation;
-import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
-import net.minecraft.client.renderer.texture.TextureMap;
 
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.opengl.GL11;
@@ -19,7 +15,6 @@ import com.cleanroommc.modularui.screen.viewport.ModularGuiContext;
 import com.cleanroommc.modularui.theme.WidgetThemeEntry;
 import com.cleanroommc.modularui.widget.Widget;
 import com.cleanroommc.modularui.widget.sizer.Area;
-import com.enn3developer.gregcolonies.GregColonies;
 import com.enn3developer.gregcolonies.colony.Blueprint;
 
 public class BlueprintPreview extends Widget<BlueprintPreview> implements Interactable {
@@ -60,11 +55,7 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
 
     private static boolean built;
 
-    private static boolean warned;
-
-    private static final int STATE_MASK = GL11.GL_ENABLE_BIT | GL11.GL_CURRENT_BIT
-        | GL11.GL_DEPTH_BUFFER_BIT
-        | GL11.GL_COLOR_BUFFER_BIT;
+    private static final String SUBJECT = "the blueprint preview";
 
     private final BlueprintView view;
 
@@ -98,22 +89,9 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
     }
 
     public static void forget() {
-        if (list >= 0) {
-            try {
-                GLAllocation.deleteDisplayLists(list);
-            } catch (RuntimeException error) {
-                GL11.glDeleteLists(list, 1);
-            }
-            list = -1;
-        }
+        DisplayLists.free(list, 1);
+        list = -1;
         built = false;
-    }
-
-    private static void warnOnce(RuntimeException error) {
-        if (!warned) {
-            warned = true;
-            GregColonies.LOG.error("Blueprint preview failed to render", error);
-        }
     }
 
     @Override
@@ -143,7 +121,7 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
         try {
             render(model, top, look, width / 2.0F, height / 2.0F, scale);
         } catch (RuntimeException error) {
-            warnOnce(error);
+            GLScope.warn(SUBJECT, error);
         } finally {
             Stencil.remove();
         }
@@ -189,19 +167,7 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
 
     private void render(Blueprint model, int top, double[] look, float centreX, float centreY, float scale) {
         compile(model, top, look);
-        Minecraft.getMinecraft()
-            .getTextureManager()
-            .bindTexture(TextureMap.locationBlocksTexture);
-        GL11.glPushAttrib(STATE_MASK);
-        GL11.glPushMatrix();
-        try {
-            paint3D(model, top, look, centreX, centreY, scale);
-        } finally {
-            // glPushAttrib does not record which texture unit is selected
-            OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
-            GL11.glPopMatrix();
-            GL11.glPopAttrib();
-        }
+        GLScope.run(SUBJECT, () -> paint3D(model, top, look, centreX, centreY, scale));
     }
 
     private void paint3D(Blueprint model, int top, double[] look, float centreX, float centreY, float scale) {
@@ -211,16 +177,7 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
         GL11.glRotatef(yaw, 0.0F, 1.0F, 0.0F);
         GL11.glTranslatef(-model.getSizeX() / 2.0F, -model.getSizeY() / 2.0F, -model.getSizeZ() / 2.0F);
 
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glDisable(GL11.GL_LIGHTING);
-        GL11.glDisable(GL11.GL_CULL_FACE);
-        GL11.glDisable(GL11.GL_DEPTH_TEST);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-        OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
+        GLScope.blocks(false);
 
         GL11.glCallList(list);
     }
@@ -232,22 +189,10 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
             return;
         }
         if (list < 0) {
-            list = GLAllocation.generateDisplayLists(1);
+            list = DisplayLists.allocate(1);
         }
         builtKey = key;
-        built = true;
-        GL11.glNewList(list, GL11.GL_COMPILE);
-        try {
-            Tessellator tessellator = Tessellator.instance;
-            tessellator.startDrawingQuads();
-            paint(model, top, look, tessellator);
-            tessellator.draw();
-        } catch (RuntimeException error) {
-            built = false;
-            warnOnce(error);
-        } finally {
-            GL11.glEndList();
-        }
+        built = DisplayLists.compileQuads(list, SUBJECT, () -> paint(model, top, look, Tessellator.instance));
     }
 
     private void paint(Blueprint model, int top, double[] look, Tessellator tessellator) {

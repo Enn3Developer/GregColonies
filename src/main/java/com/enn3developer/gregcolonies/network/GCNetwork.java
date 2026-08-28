@@ -22,6 +22,8 @@ import com.enn3developer.gregcolonies.GregColonies;
 import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.colony.ColonySite;
+import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.work.Inventories;
 
@@ -46,10 +48,8 @@ public final class GCNetwork {
         CHANNEL.registerMessage(PacketColonyData.Handler.class, PacketColonyData.class, 1, Side.CLIENT);
         CHANNEL.registerMessage(PacketCitizenCommand.Handler.class, PacketCitizenCommand.class, 2, Side.SERVER);
         CHANNEL.registerMessage(PacketCitizenGroup.Handler.class, PacketCitizenGroup.class, 3, Side.SERVER);
-        CHANNEL.registerMessage(PacketColonyDropOff.Handler.class, PacketColonyDropOff.class, 4, Side.SERVER);
-        CHANNEL.registerMessage(PacketColonyPickUp.Handler.class, PacketColonyPickUp.class, 5, Side.SERVER);
+        CHANNEL.registerMessage(PacketColonySite.Handler.class, PacketColonySite.class, 4, Side.SERVER);
         CHANNEL.registerMessage(PacketOpenCitizen.Handler.class, PacketOpenCitizen.class, 6, Side.SERVER);
-        CHANNEL.registerMessage(PacketColonyMaterials.Handler.class, PacketColonyMaterials.class, 7, Side.SERVER);
         CHANNEL.registerMessage(PacketBlueprintSave.Handler.class, PacketBlueprintSave.class, 8, Side.SERVER);
         CHANNEL.registerMessage(PacketColonyBuild.Handler.class, PacketColonyBuild.class, 9, Side.SERVER);
         CHANNEL.registerMessage(PacketBlueprintAction.Handler.class, PacketBlueprintAction.class, 10, Side.SERVER);
@@ -178,10 +178,11 @@ public final class GCNetwork {
     }
 
     private static IInventory materials(World world, Colony colony) {
-        if (!colony.hasMaterials()) {
+        ColonySite site = colony.site(ColonySiteKind.MATERIALS);
+        if (!site.isPresent()) {
             return null;
         }
-        return Inventories.at(world, colony.getMaterialsX(), colony.getMaterialsY(), colony.getMaterialsZ());
+        return Inventories.at(world, site.getX(), site.getY(), site.getZ());
     }
 
     private static Map<Integer, Integer> stock(World world, Colony colony, Blueprint blueprint) {

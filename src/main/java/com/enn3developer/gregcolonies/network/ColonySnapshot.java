@@ -1,6 +1,7 @@
 package com.enn3developer.gregcolonies.network;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,8 @@ import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.colony.BuildSite;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
+import com.enn3developer.gregcolonies.colony.ColonySite;
+import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 
 import cpw.mods.fml.common.network.ByteBufUtils;
@@ -29,18 +32,7 @@ public class ColonySnapshot {
     private int z;
     private int radius;
     private int orderCount;
-    private boolean hasDropOff;
-    private int dropOffX;
-    private int dropOffY;
-    private int dropOffZ;
-    private boolean hasPickUp;
-    private int pickUpX;
-    private int pickUpY;
-    private int pickUpZ;
-    private boolean hasMaterials;
-    private int materialsX;
-    private int materialsY;
-    private int materialsZ;
+    private final Map<ColonySiteKind, ColonySite> sites = new EnumMap<>(ColonySiteKind.class);
     private final List<BlueprintEntry> blueprints = new ArrayList<>();
     private int activeBlueprint = -1;
     private int placeRotation;
@@ -91,7 +83,11 @@ public class ColonySnapshot {
         }
     }
 
-    private ColonySnapshot() {}
+    private ColonySnapshot() {
+        for (ColonySiteKind kind : ColonySiteKind.values()) {
+            sites.put(kind, new ColonySite());
+        }
+    }
 
     public static ColonySnapshot of(Colony colony, World world) {
         ColonySnapshot snapshot = new ColonySnapshot();
@@ -104,18 +100,10 @@ public class ColonySnapshot {
         snapshot.z = colony.getZ();
         snapshot.radius = Config.colonyRadius;
         snapshot.orderCount = colony.getOrderCount();
-        snapshot.hasDropOff = colony.hasDropOff();
-        snapshot.dropOffX = colony.getDropOffX();
-        snapshot.dropOffY = colony.getDropOffY();
-        snapshot.dropOffZ = colony.getDropOffZ();
-        snapshot.hasPickUp = colony.hasPickUp();
-        snapshot.pickUpX = colony.getPickUpX();
-        snapshot.pickUpY = colony.getPickUpY();
-        snapshot.pickUpZ = colony.getPickUpZ();
-        snapshot.hasMaterials = colony.hasMaterials();
-        snapshot.materialsX = colony.getMaterialsX();
-        snapshot.materialsY = colony.getMaterialsY();
-        snapshot.materialsZ = colony.getMaterialsZ();
+        for (ColonySiteKind kind : ColonySiteKind.values()) {
+            snapshot.sites.get(kind)
+                .copyFrom(colony.site(kind));
+        }
         for (Blueprint blueprint : colony.getBlueprints()) {
             BlueprintEntry entry = new BlueprintEntry();
             entry.name = blueprint.getName();
@@ -192,64 +180,8 @@ public class ColonySnapshot {
         return orderCount;
     }
 
-    public boolean hasDropOff() {
-        return hasDropOff;
-    }
-
-    public int getDropOffX() {
-        return dropOffX;
-    }
-
-    public int getDropOffY() {
-        return dropOffY;
-    }
-
-    public int getDropOffZ() {
-        return dropOffZ;
-    }
-
-    public boolean isDropOffAt(int x, int y, int z) {
-        return hasDropOff && dropOffX == x && dropOffY == y && dropOffZ == z;
-    }
-
-    public boolean hasPickUp() {
-        return hasPickUp;
-    }
-
-    public int getPickUpX() {
-        return pickUpX;
-    }
-
-    public int getPickUpY() {
-        return pickUpY;
-    }
-
-    public int getPickUpZ() {
-        return pickUpZ;
-    }
-
-    public boolean isPickUpAt(int x, int y, int z) {
-        return hasPickUp && pickUpX == x && pickUpY == y && pickUpZ == z;
-    }
-
-    public boolean hasMaterials() {
-        return hasMaterials;
-    }
-
-    public int getMaterialsX() {
-        return materialsX;
-    }
-
-    public int getMaterialsY() {
-        return materialsY;
-    }
-
-    public int getMaterialsZ() {
-        return materialsZ;
-    }
-
-    public boolean isMaterialsAt(int x, int y, int z) {
-        return hasMaterials && materialsX == x && materialsY == y && materialsZ == z;
+    public ColonySite site(ColonySiteKind kind) {
+        return sites.get(kind);
     }
 
     public List<BlueprintEntry> getBlueprints() {
@@ -322,18 +254,10 @@ public class ColonySnapshot {
         buf.writeInt(z);
         buf.writeInt(radius);
         buf.writeInt(orderCount);
-        buf.writeBoolean(hasDropOff);
-        buf.writeInt(dropOffX);
-        buf.writeInt(dropOffY);
-        buf.writeInt(dropOffZ);
-        buf.writeBoolean(hasPickUp);
-        buf.writeInt(pickUpX);
-        buf.writeInt(pickUpY);
-        buf.writeInt(pickUpZ);
-        buf.writeBoolean(hasMaterials);
-        buf.writeInt(materialsX);
-        buf.writeInt(materialsY);
-        buf.writeInt(materialsZ);
+        for (ColonySiteKind kind : ColonySiteKind.values()) {
+            sites.get(kind)
+                .write(buf);
+        }
         buf.writeInt(blueprints.size());
         for (BlueprintEntry entry : blueprints) {
             ByteBufUtils.writeUTF8String(buf, entry.name);
@@ -369,18 +293,10 @@ public class ColonySnapshot {
         snapshot.z = buf.readInt();
         snapshot.radius = buf.readInt();
         snapshot.orderCount = buf.readInt();
-        snapshot.hasDropOff = buf.readBoolean();
-        snapshot.dropOffX = buf.readInt();
-        snapshot.dropOffY = buf.readInt();
-        snapshot.dropOffZ = buf.readInt();
-        snapshot.hasPickUp = buf.readBoolean();
-        snapshot.pickUpX = buf.readInt();
-        snapshot.pickUpY = buf.readInt();
-        snapshot.pickUpZ = buf.readInt();
-        snapshot.hasMaterials = buf.readBoolean();
-        snapshot.materialsX = buf.readInt();
-        snapshot.materialsY = buf.readInt();
-        snapshot.materialsZ = buf.readInt();
+        for (ColonySiteKind kind : ColonySiteKind.values()) {
+            snapshot.sites.get(kind)
+                .read(buf);
+        }
         int blueprintCount = buf.readInt();
         for (int i = 0; i < blueprintCount; i++) {
             BlueprintEntry entry = new BlueprintEntry();

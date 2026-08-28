@@ -1,7 +1,5 @@
 package com.enn3developer.gregcolonies.client.gui;
 
-import net.minecraft.client.Minecraft;
-
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.input.Keyboard;
 
@@ -9,35 +7,12 @@ import com.cleanroommc.modularui.api.UpOrDown;
 import com.cleanroommc.modularui.api.widget.Interactable;
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext;
 import com.cleanroommc.modularui.theme.WidgetThemeEntry;
-import com.cleanroommc.modularui.widget.Widget;
 
-public class BlueprintEditorWidget extends Widget<BlueprintEditorWidget> implements Interactable {
-
-    private static final float ZOOM_STEP = 1.2F;
-
-    private static final float ROTATE_STEP = 45.0F;
-
-    private static final float DRAG_YAW = 0.4F;
-
-    private static final float DRAG_PITCH = 0.3F;
-
-    private static final float KEY_PAN_PIXELS = 12.0F;
-
-    private static final int CLICK_SLOP = 4;
-
-    private static final double DEFAULT_FOV = 70.0D;
+public class BlueprintEditorWidget extends CameraWidget<BlueprintEditorWidget> {
 
     private final BlueprintEditorView view;
 
     private final double[] ray = new double[6];
-
-    private int dragX;
-
-    private int dragY;
-
-    private int dragButton = -1;
-
-    private int dragTravel;
 
     private boolean stroking;
 
@@ -60,44 +35,8 @@ public class BlueprintEditorWidget extends Widget<BlueprintEditorWidget> impleme
     }
 
     @Override
-    public void onUpdate() {
-        super.onUpdate();
-        keyboardPan();
-    }
-
-    private void keyboardPan() {
-        ColonyCamera camera = ColonyCamera.get();
-        if (camera == null || view.isEditingText() || view.isConfirming()) {
-            return;
-        }
-        double x = 0.0D;
-        double y = 0.0D;
-        if (Keyboard.isKeyDown(Keyboard.KEY_A) || Keyboard.isKeyDown(Keyboard.KEY_LEFT)) {
-            x += KEY_PAN_PIXELS;
-        }
-        if (Keyboard.isKeyDown(Keyboard.KEY_D) || Keyboard.isKeyDown(Keyboard.KEY_RIGHT)) {
-            x -= KEY_PAN_PIXELS;
-        }
-        if (Keyboard.isKeyDown(Keyboard.KEY_W) || Keyboard.isKeyDown(Keyboard.KEY_UP)) {
-            y += KEY_PAN_PIXELS;
-        }
-        if (Keyboard.isKeyDown(Keyboard.KEY_S) || Keyboard.isKeyDown(Keyboard.KEY_DOWN)) {
-            y -= KEY_PAN_PIXELS;
-        }
-        if (x != 0.0D || y != 0.0D) {
-            camera.pan(x, y, panScale());
-        }
-    }
-
-    private double panScale() {
-        ColonyCamera camera = ColonyCamera.get();
-        if (camera == null) {
-            return 0.0D;
-        }
-        float setting = Minecraft.getMinecraft().gameSettings.fovSetting;
-        double fov = Math.toRadians(setting > 0.0F ? setting : DEFAULT_FOV);
-        double height = Math.max(1, getArea().h());
-        return 2.0D * camera.getDistance() * Math.tan(fov / 2.0D) / height;
+    protected boolean isCameraBusy() {
+        return view.isEditingText() || view.isConfirming();
     }
 
     @Override
@@ -105,10 +44,7 @@ public class BlueprintEditorWidget extends Widget<BlueprintEditorWidget> impleme
         if (view.isConfirming()) {
             return Result.IGNORE;
         }
-        dragButton = mouseButton;
-        dragTravel = 0;
-        dragX = getContext().getAbsMouseX();
-        dragY = getContext().getAbsMouseY();
+        beginDrag(mouseButton);
         if (mouseButton != 0) {
             return Result.SUCCESS;
         }
@@ -130,7 +66,7 @@ public class BlueprintEditorWidget extends Widget<BlueprintEditorWidget> impleme
     public boolean onMouseRelease(int mouseButton) {
         if (mouseButton == 0) {
             stroking = false;
-        } else if (mouseButton == 1 && dragTravel <= CLICK_SLOP) {
+        } else if (mouseButton == 1 && getDragTravel() <= CLICK_SLOP) {
             BlueprintTrace.Hit hit = traceAt(getContext().getMouseX(), getContext().getMouseY());
             BlueprintEditor editor = view.getEditor();
             if (hit != null && hit.solid) {
@@ -141,55 +77,31 @@ public class BlueprintEditorWidget extends Widget<BlueprintEditorWidget> impleme
                 editor.apply(hit, true);
             }
         }
-        dragButton = -1;
+        endDrag();
         return true;
     }
 
     @Override
-    public void onMouseDrag(int mouseButton, long timeSinceClick) {
-        if (dragButton < 0) {
-            return;
+    protected boolean onPrimaryDrag() {
+        if (!stroking) {
+            return false;
         }
-        int mouseX = getContext().getAbsMouseX();
-        int mouseY = getContext().getAbsMouseY();
-        int deltaX = mouseX - dragX;
-        int deltaY = mouseY - dragY;
-        dragX = mouseX;
-        dragY = mouseY;
-        dragTravel += Math.abs(deltaX) + Math.abs(deltaY);
-        if (dragButton == 0) {
-            if (stroking) {
-                BlueprintTrace.Hit hit = traceAt(getContext().getMouseX(), getContext().getMouseY());
-                if (hit != null) {
-                    view.getEditor()
-                        .apply(hit, false);
-                    view.setHover(hit);
-                }
-            }
-            return;
+        BlueprintTrace.Hit hit = traceAt(getContext().getMouseX(), getContext().getMouseY());
+        if (hit != null) {
+            view.getEditor()
+                .apply(hit, false);
+            view.setHover(hit);
         }
-        ColonyCamera camera = ColonyCamera.get();
-        if (camera == null) {
-            return;
-        }
-        if (dragButton == 1) {
-            camera.pan(deltaX, deltaY, panScale());
-        } else if (dragButton == 2) {
-            camera.rotate(deltaX * DRAG_YAW, -deltaY * DRAG_PITCH);
-        }
+        return true;
     }
 
     @Override
-    public boolean onMouseScroll(UpOrDown scrollDirection, int amount) {
-        if (Interactable.hasShiftDown()) {
-            view.getEditor()
-                .stepLayer(scrollDirection.isUp() ? 1 : -1);
-            return true;
+    protected boolean onCameraScroll(UpOrDown scrollDirection) {
+        if (!Interactable.hasShiftDown()) {
+            return false;
         }
-        ColonyCamera camera = ColonyCamera.get();
-        if (camera != null) {
-            camera.zoom(scrollDirection.isUp() ? 1.0F / ZOOM_STEP : ZOOM_STEP);
-        }
+        view.getEditor()
+            .stepLayer(scrollDirection.isUp() ? 1 : -1);
         return true;
     }
 
@@ -210,13 +122,7 @@ public class BlueprintEditorWidget extends Widget<BlueprintEditorWidget> impleme
             }
             return Result.IGNORE;
         }
-        ColonyCamera camera = ColonyCamera.get();
-        if (camera != null && keyCode == Keyboard.KEY_Q) {
-            camera.rotate(-ROTATE_STEP, 0.0F);
-            return Result.SUCCESS;
-        }
-        if (camera != null && keyCode == Keyboard.KEY_E) {
-            camera.rotate(ROTATE_STEP, 0.0F);
+        if (turnKey(keyCode)) {
             return Result.SUCCESS;
         }
         if (keyCode == Keyboard.KEY_R) {

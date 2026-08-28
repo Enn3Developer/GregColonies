@@ -9,6 +9,7 @@ import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.colony.BuildSite;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -85,7 +86,8 @@ public class PacketColonyBuild implements IMessage {
                     new ChatComponentText(EnumChatFormatting.RED + "Capture a blueprint before starting a build"));
                 return;
             }
-            if (!colony.hasMaterials()) {
+            if (!colony.site(ColonySiteKind.MATERIALS)
+                .isPresent()) {
                 player.addChatMessage(
                     new ChatComponentText(EnumChatFormatting.RED + "Set a materials chest before starting a build"));
                 return;

@@ -15,6 +15,8 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.colony.Colony;
+import com.enn3developer.gregcolonies.colony.ColonySite;
+import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandResult;
@@ -495,7 +497,8 @@ public class CitizenCommandFarm extends CitizenCommand {
     }
 
     private boolean canDeliver(EntityCitizen citizen, Colony colony) {
-        return colony.hasDropOff() && colony.getDimension() == citizen.worldObj.provider.dimensionId
+        return colony.site(ColonySiteKind.DROP_OFF)
+            .isPresent() && colony.getDimension() == citizen.worldObj.provider.dimensionId
             && citizen.worldObj.getTotalWorldTime() >= nextDeliver;
     }
 
@@ -536,13 +539,14 @@ public class CitizenCommandFarm extends CitizenCommand {
     }
 
     private CitizenCommandResult deliver(EntityCitizen citizen, Colony colony) {
-        if (!colony.hasDropOff() || colony.getDimension() != citizen.worldObj.provider.dimensionId) {
+        ColonySite site = colony.site(ColonySiteKind.DROP_OFF);
+        if (!site.isPresent() || colony.getDimension() != citizen.worldObj.provider.dimensionId) {
             reason = "no drop-off";
             return backToWork(citizen);
         }
-        int x = colony.getDropOffX();
-        int y = colony.getDropOffY();
-        int z = colony.getDropOffZ();
+        int x = site.getX();
+        int y = site.getY();
+        int z = site.getZ();
         int walk = walkTo(citizen, x, y, z, DROP_OFF_REACH_SQ);
         if (walk == WALK_ARRIVED) {
             return unload(citizen, x, y, z);

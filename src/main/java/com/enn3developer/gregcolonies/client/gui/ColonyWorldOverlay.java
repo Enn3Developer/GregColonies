@@ -19,6 +19,8 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.glu.GLU;
 
+import com.enn3developer.gregcolonies.colony.ColonySite;
+import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.network.CitizenSnapshot;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
@@ -64,6 +66,8 @@ public class ColonyWorldOverlay {
     private static final int MATERIALS_COLOR = 0xB0FFC46B;
 
     private static final int MATERIALS_MARK_COLOR = 0x70FFC46B;
+
+    private static final int[] SITE_MARK_COLORS = { DROP_OFF_MARK_COLOR, PICK_UP_MARK_COLOR, MATERIALS_MARK_COLOR };
 
     private static final int BUILD_COLOR = 0xB09CE06B;
 
@@ -210,34 +214,17 @@ public class ColonyWorldOverlay {
             }
         }
 
-        if (colony.hasDropOff()) {
-            drawArea(
-                colony.getDropOffX(),
-                colony.getDropOffY(),
-                colony.getDropOffZ(),
-                colony.getDropOffX() + 1,
-                colony.getDropOffZ() + 1,
-                DROP_OFF_MARK_COLOR);
-        }
-
-        if (colony.hasPickUp()) {
-            drawArea(
-                colony.getPickUpX(),
-                colony.getPickUpY(),
-                colony.getPickUpZ(),
-                colony.getPickUpX() + 1,
-                colony.getPickUpZ() + 1,
-                PICK_UP_MARK_COLOR);
-        }
-
-        if (colony.hasMaterials()) {
-            drawArea(
-                colony.getMaterialsX(),
-                colony.getMaterialsY(),
-                colony.getMaterialsZ(),
-                colony.getMaterialsX() + 1,
-                colony.getMaterialsZ() + 1,
-                MATERIALS_MARK_COLOR);
+        for (ColonySiteKind kind : ColonySiteKind.values()) {
+            ColonySite site = colony.site(kind);
+            if (site.isPresent()) {
+                drawArea(
+                    site.getX(),
+                    site.getY(),
+                    site.getZ(),
+                    site.getX() + 1,
+                    site.getZ() + 1,
+                    SITE_MARK_COLORS[kind.ordinal()]);
+            }
         }
 
         if (colony.hasBuildSite()) {

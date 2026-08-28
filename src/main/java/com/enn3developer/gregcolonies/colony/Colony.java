@@ -4,6 +4,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,18 +34,7 @@ public class Colony {
     private int x;
     private int y;
     private int z;
-    private boolean hasDropOff;
-    private int dropOffX;
-    private int dropOffY;
-    private int dropOffZ;
-    private boolean hasPickUp;
-    private int pickUpX;
-    private int pickUpY;
-    private int pickUpZ;
-    private boolean hasMaterials;
-    private int materialsX;
-    private int materialsY;
-    private int materialsZ;
+    private final Map<ColonySiteKind, ColonySite> sites = new EnumMap<>(ColonySiteKind.class);
     private final List<Blueprint> blueprints = new ArrayList<>();
     private int activeBlueprint = -1;
     private int placeRotation;
@@ -55,9 +45,14 @@ public class Colony {
     private final Deque<CitizenCommand> orders = new ArrayDeque<>();
     private final Map<UUID, ColonyCitizen> citizens = new LinkedHashMap<>();
 
-    private Colony() {}
+    private Colony() {
+        for (ColonySiteKind kind : ColonySiteKind.values()) {
+            sites.put(kind, new ColonySite());
+        }
+    }
 
     public Colony(int id, String name, UUID owner, String ownerName, int dimension, int x, int y, int z) {
+        this();
         this.id = id;
         this.name = name;
         this.owner = owner;
@@ -104,106 +99,8 @@ public class Colony {
         return z;
     }
 
-    public boolean hasDropOff() {
-        return hasDropOff;
-    }
-
-    public int getDropOffX() {
-        return dropOffX;
-    }
-
-    public int getDropOffY() {
-        return dropOffY;
-    }
-
-    public int getDropOffZ() {
-        return dropOffZ;
-    }
-
-    public boolean isDropOffAt(int x, int y, int z) {
-        return hasDropOff && dropOffX == x && dropOffY == y && dropOffZ == z;
-    }
-
-    public void setDropOff(int x, int y, int z) {
-        hasDropOff = true;
-        dropOffX = x;
-        dropOffY = y;
-        dropOffZ = z;
-    }
-
-    public void clearDropOff() {
-        hasDropOff = false;
-        dropOffX = 0;
-        dropOffY = 0;
-        dropOffZ = 0;
-    }
-
-    public boolean hasPickUp() {
-        return hasPickUp;
-    }
-
-    public int getPickUpX() {
-        return pickUpX;
-    }
-
-    public int getPickUpY() {
-        return pickUpY;
-    }
-
-    public int getPickUpZ() {
-        return pickUpZ;
-    }
-
-    public boolean isPickUpAt(int x, int y, int z) {
-        return hasPickUp && pickUpX == x && pickUpY == y && pickUpZ == z;
-    }
-
-    public void setPickUp(int x, int y, int z) {
-        hasPickUp = true;
-        pickUpX = x;
-        pickUpY = y;
-        pickUpZ = z;
-    }
-
-    public void clearPickUp() {
-        hasPickUp = false;
-        pickUpX = 0;
-        pickUpY = 0;
-        pickUpZ = 0;
-    }
-
-    public boolean hasMaterials() {
-        return hasMaterials;
-    }
-
-    public int getMaterialsX() {
-        return materialsX;
-    }
-
-    public int getMaterialsY() {
-        return materialsY;
-    }
-
-    public int getMaterialsZ() {
-        return materialsZ;
-    }
-
-    public boolean isMaterialsAt(int x, int y, int z) {
-        return hasMaterials && materialsX == x && materialsY == y && materialsZ == z;
-    }
-
-    public void setMaterials(int x, int y, int z) {
-        hasMaterials = true;
-        materialsX = x;
-        materialsY = y;
-        materialsZ = z;
-    }
-
-    public void clearMaterials() {
-        hasMaterials = false;
-        materialsX = 0;
-        materialsY = 0;
-        materialsZ = 0;
+    public ColonySite site(ColonySiteKind kind) {
+        return sites.get(kind);
     }
 
     public List<Blueprint> getBlueprints() {
@@ -469,23 +366,9 @@ public class Colony {
         tag.setInteger("x", x);
         tag.setInteger("y", y);
         tag.setInteger("z", z);
-        tag.setBoolean("hasDropOff", hasDropOff);
-        if (hasDropOff) {
-            tag.setInteger("dropOffX", dropOffX);
-            tag.setInteger("dropOffY", dropOffY);
-            tag.setInteger("dropOffZ", dropOffZ);
-        }
-        tag.setBoolean("hasPickUp", hasPickUp);
-        if (hasPickUp) {
-            tag.setInteger("pickUpX", pickUpX);
-            tag.setInteger("pickUpY", pickUpY);
-            tag.setInteger("pickUpZ", pickUpZ);
-        }
-        tag.setBoolean("hasMaterials", hasMaterials);
-        if (hasMaterials) {
-            tag.setInteger("materialsX", materialsX);
-            tag.setInteger("materialsY", materialsY);
-            tag.setInteger("materialsZ", materialsZ);
+        for (ColonySiteKind kind : ColonySiteKind.values()) {
+            sites.get(kind)
+                .writeToNBT(tag, kind);
         }
 
         NBTTagList blueprintList = new NBTTagList();
@@ -524,23 +407,9 @@ public class Colony {
         colony.x = tag.getInteger("x");
         colony.y = tag.getInteger("y");
         colony.z = tag.getInteger("z");
-        colony.hasDropOff = tag.getBoolean("hasDropOff");
-        if (colony.hasDropOff) {
-            colony.dropOffX = tag.getInteger("dropOffX");
-            colony.dropOffY = tag.getInteger("dropOffY");
-            colony.dropOffZ = tag.getInteger("dropOffZ");
-        }
-        colony.hasPickUp = tag.getBoolean("hasPickUp");
-        if (colony.hasPickUp) {
-            colony.pickUpX = tag.getInteger("pickUpX");
-            colony.pickUpY = tag.getInteger("pickUpY");
-            colony.pickUpZ = tag.getInteger("pickUpZ");
-        }
-        colony.hasMaterials = tag.getBoolean("hasMaterials");
-        if (colony.hasMaterials) {
-            colony.materialsX = tag.getInteger("materialsX");
-            colony.materialsY = tag.getInteger("materialsY");
-            colony.materialsZ = tag.getInteger("materialsZ");
+        for (ColonySiteKind kind : ColonySiteKind.values()) {
+            colony.sites.get(kind)
+                .readFromNBT(tag, kind);
         }
 
         if (tag.hasKey("blueprint", 10)) {

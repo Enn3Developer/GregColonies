@@ -11,6 +11,8 @@ import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.colony.Colony;
+import com.enn3developer.gregcolonies.colony.ColonySite;
+import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandResult;
@@ -442,11 +444,12 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
         if (colony == null) {
             return CitizenCommandResult.DONE;
         }
-        boolean dropOff = colony.hasDropOff() && colony.getDimension() == citizen.worldObj.provider.dimensionId;
+        ColonySite site = colony.site(ColonySiteKind.DROP_OFF);
+        boolean dropOff = site.isPresent() && colony.getDimension() == citizen.worldObj.provider.dimensionId;
         if (dropOff) {
-            anchorX = colony.getDropOffX();
-            anchorY = colony.getDropOffY();
-            anchorZ = colony.getDropOffZ();
+            anchorX = site.getX();
+            anchorY = site.getY();
+            anchorZ = site.getZ();
         } else {
             anchorX = colony.getX();
             anchorY = colony.getY() + 1;
