@@ -133,9 +133,9 @@ public class ColonySnapshot {
             snapshot.hasBuildSite = true;
             snapshot.buildName = site.getBlueprint()
                 .getName();
-            snapshot.buildX = site.getX();
-            snapshot.buildY = site.getY();
-            snapshot.buildZ = site.getZ();
+            snapshot.buildX = site.getAnchorX();
+            snapshot.buildY = site.getAnchorY();
+            snapshot.buildZ = site.getAnchorZ();
             snapshot.buildRemaining = site.remaining(world);
             snapshot.buildTotal = site.total();
         }

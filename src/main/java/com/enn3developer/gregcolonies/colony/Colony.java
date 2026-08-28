@@ -231,6 +231,15 @@ public class Colony {
         return activeBlueprint;
     }
 
+    public boolean replaceBlueprint(int index, Blueprint blueprint) {
+        if (blueprint == null || index < 0 || index >= blueprints.size()) {
+            return false;
+        }
+        blueprints.set(index, blueprint);
+        activeBlueprint = index;
+        return true;
+    }
+
     public boolean removeBlueprint(int index) {
         if (index < 0 || index >= blueprints.size()) {
             return false;

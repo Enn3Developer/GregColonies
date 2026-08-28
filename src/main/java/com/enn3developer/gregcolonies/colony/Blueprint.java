@@ -13,7 +13,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.nbt.NBTTagString;
-import net.minecraft.world.World;
 
 import cpw.mods.fml.common.network.ByteBufUtils;
 import io.netty.buffer.ByteBuf;
@@ -22,7 +21,7 @@ public class Blueprint {
 
     public static final int MAX_SIDE = 32;
 
-    public static final int MAX_VOLUME = 8192;
+    public static final int MAX_VOLUME = MAX_SIDE * MAX_SIDE * MAX_SIDE;
 
     public static final int MAX_NAME_LENGTH = 24;
 
@@ -42,64 +41,29 @@ public class Blueprint {
     private int sizeZ;
     private final List<String> palette = new ArrayList<>();
     private int[] cells = new int[0];
-    private int skipped;
+    private int originX;
+    private int originY;
+    private int originZ;
 
     private Blueprint() {}
 
-    public static Blueprint capture(World world, String name, int x1, int y1, int z1, int x2, int y2, int z2) {
-        int minX = Math.min(x1, x2);
-        int minZ = Math.min(z1, z2);
-        int maxX = Math.min(Math.max(x1, x2), minX + MAX_SIDE - 1);
-        int maxZ = Math.min(Math.max(z1, z2), minZ + MAX_SIDE - 1);
-
-        Blueprint blueprint = new Blueprint();
-        blueprint.name = cleanName(name);
-        blueprint.sizeX = maxX - minX + 1;
-        blueprint.sizeZ = maxZ - minZ + 1;
-
-        int layers = Math.max(1, Math.min(MAX_SIDE, MAX_VOLUME / (blueprint.sizeX * blueprint.sizeZ)));
-        int minY = Math.max(0, Math.min(y1, y2));
-        int maxY = Math.min(Math.min(Math.max(y1, y2), minY + layers - 1), world.getHeight() - 1);
-        if (maxY < minY) {
+    public static Blueprint empty(String name, int sizeX, int sizeY, int sizeZ) {
+        if (!fits(sizeX, sizeY, sizeZ)) {
             return null;
         }
-        blueprint.sizeY = maxY - minY + 1;
+        Blueprint blueprint = new Blueprint();
+        blueprint.name = cleanName(name);
+        blueprint.sizeX = sizeX;
+        blueprint.sizeY = sizeY;
+        blueprint.sizeZ = sizeZ;
         blueprint.palette.add("");
         blueprint.cells = new int[blueprint.volume()];
-
-        for (int y = 0; y < blueprint.sizeY; y++) {
-            for (int z = 0; z < blueprint.sizeZ; z++) {
-                for (int x = 0; x < blueprint.sizeX; x++) {
-                    blueprint.cells[blueprint.index(x, y, z)] = blueprint.encode(world, minX + x, minY + y, minZ + z);
-                }
-            }
-        }
-        return blueprint.trimmed();
+        blueprint.centreOrigin();
+        return blueprint;
     }
 
-    public static int detectHeight(World world, int x1, int z1, int x2, int z2, int baseY) {
-        int minX = Math.min(x1, x2);
-        int maxX = Math.min(Math.max(x1, x2), minX + MAX_SIDE - 1);
-        int minZ = Math.min(z1, z2);
-        int maxZ = Math.min(Math.max(z1, z2), minZ + MAX_SIDE - 1);
-        int limit = Math.min(world.getHeight() - 1, baseY + MAX_SIDE - 1);
-
-        int top = baseY - 1;
-        for (int y = baseY; y <= limit; y++) {
-            for (int z = minZ; z <= maxZ; z++) {
-                for (int x = minX; x <= maxX; x++) {
-                    if (!world.blockExists(x, y, z)) {
-                        continue;
-                    }
-                    Block block = world.getBlock(x, y, z);
-                    if (block != null && !block.isAir(world, x, y, z)
-                        && isBuildable(block, world.getBlockMetadata(x, y, z))) {
-                        top = y;
-                    }
-                }
-            }
-        }
-        return Math.max(1, top - baseY + 1);
+    public static boolean fits(int sizeX, int sizeY, int sizeZ) {
+        return sizeX >= 1 && sizeY >= 1 && sizeZ >= 1 && sizeX <= MAX_SIDE && sizeY <= MAX_SIDE && sizeZ <= MAX_SIDE;
     }
 
     public static String cleanName(String name) {
@@ -117,7 +81,7 @@ public class Blueprint {
             .trim();
     }
 
-    private Blueprint trimmed() {
+    public Blueprint trimmed() {
         int lowX = sizeX;
         int lowY = sizeY;
         int lowZ = sizeZ;
@@ -147,7 +111,9 @@ public class Blueprint {
         }
         Blueprint trimmed = new Blueprint();
         trimmed.name = name;
-        trimmed.skipped = skipped;
+        trimmed.originX = originX - lowX;
+        trimmed.originY = originY - lowY;
+        trimmed.originZ = originZ - lowZ;
         trimmed.sizeX = highX - lowX + 1;
         trimmed.sizeY = highY - lowY + 1;
         trimmed.sizeZ = highZ - lowZ + 1;
@@ -160,6 +126,7 @@ public class Blueprint {
                 }
             }
         }
+        trimmed.clampOrigin();
         return trimmed;
     }
 
@@ -175,53 +142,39 @@ public class Blueprint {
         placed.sizeZ = steps % 2 == 0 ? sizeZ : sizeX;
         placed.palette.addAll(palette);
         placed.cells = new int[placed.volume()];
+        int[] target = new int[2];
         for (int y = 0; y < sizeY; y++) {
             for (int z = 0; z < sizeZ; z++) {
                 for (int x = 0; x < sizeX; x++) {
-                    int sourceX = mirror ? sizeX - 1 - x : x;
-                    int targetX;
-                    int targetZ;
-                    if (steps == 1) {
-                        targetX = sizeZ - 1 - z;
-                        targetZ = sourceX;
-                    } else if (steps == 2) {
-                        targetX = sizeX - 1 - sourceX;
-                        targetZ = sizeZ - 1 - z;
-                    } else if (steps == 3) {
-                        targetX = z;
-                        targetZ = sizeX - 1 - sourceX;
-                    } else {
-                        targetX = sourceX;
-                        targetZ = z;
-                    }
-                    placed.cells[placed.index(targetX, y, targetZ)] = rotateCell(cells[index(x, y, z)], steps, mirror);
+                    map(x, z, steps, mirror, target);
+                    placed.cells[placed
+                        .index(target[0], y, target[1])] = rotateCell(cells[index(x, y, z)], steps, mirror);
                 }
             }
         }
+        map(originX, originZ, steps, mirror, target);
+        placed.originX = target[0];
+        placed.originY = originY;
+        placed.originZ = target[1];
+        placed.clampOrigin();
         return placed;
     }
 
-    private int encode(World world, int x, int y, int z) {
-        Block block = world.getBlock(x, y, z);
-        if (block == null || block.isAir(world, x, y, z)) {
-            return AIR;
+    private void map(int x, int z, int steps, boolean mirror, int[] target) {
+        int sourceX = mirror ? sizeX - 1 - x : x;
+        if (steps == 1) {
+            target[0] = sizeZ - 1 - z;
+            target[1] = sourceX;
+        } else if (steps == 2) {
+            target[0] = sizeX - 1 - sourceX;
+            target[1] = sizeZ - 1 - z;
+        } else if (steps == 3) {
+            target[0] = z;
+            target[1] = sizeX - 1 - sourceX;
+        } else {
+            target[0] = sourceX;
+            target[1] = z;
         }
-        int meta = world.getBlockMetadata(x, y, z);
-        if (!isBuildable(block, meta)) {
-            skipped++;
-            return AIR;
-        }
-        String name = Block.blockRegistry.getNameForObject(block);
-        if (name == null || name.isEmpty()) {
-            skipped++;
-            return AIR;
-        }
-        int slot = palette.indexOf(name);
-        if (slot < 0) {
-            slot = palette.size();
-            palette.add(name);
-        }
-        return (slot << META_BITS) | (meta & META_MASK);
     }
 
     public static boolean isBuildable(Block block, int meta) {
@@ -233,10 +186,6 @@ public class Blueprint {
             return false;
         }
         return Item.getItemFromBlock(block) != null;
-    }
-
-    public int getSkipped() {
-        return skipped;
     }
 
     public String getName() {
@@ -359,11 +308,131 @@ public class Blueprint {
             && stack.getItemDamage() == itemMeta(block, metaOf(cell));
     }
 
+    public int getOriginX() {
+        return originX;
+    }
+
+    public int getOriginY() {
+        return originY;
+    }
+
+    public int getOriginZ() {
+        return originZ;
+    }
+
+    public void setOrigin(int x, int y, int z) {
+        originX = x;
+        originY = y;
+        originZ = z;
+        clampOrigin();
+    }
+
+    private void centreOrigin() {
+        originX = sizeX / 2;
+        originY = 0;
+        originZ = sizeZ / 2;
+    }
+
+    private void clampOrigin() {
+        originX = clamp(originX, sizeX);
+        originY = clamp(originY, sizeY);
+        originZ = clamp(originZ, sizeZ);
+    }
+
+    private static int clamp(int value, int size) {
+        return value < 0 ? 0 : Math.min(value, size - 1);
+    }
+
+    public Blueprint copy() {
+        Blueprint clone = new Blueprint();
+        clone.name = name;
+        clone.sizeX = sizeX;
+        clone.sizeY = sizeY;
+        clone.sizeZ = sizeZ;
+        clone.palette.addAll(palette);
+        clone.cells = cells.clone();
+        clone.originX = originX;
+        clone.originY = originY;
+        clone.originZ = originZ;
+        return clone;
+    }
+
+    public Blueprint resized(int sizeX, int sizeY, int sizeZ, int shiftX, int shiftY, int shiftZ) {
+        if (!fits(sizeX, sizeY, sizeZ)) {
+            return null;
+        }
+        Blueprint resized = new Blueprint();
+        resized.name = name;
+        resized.sizeX = sizeX;
+        resized.sizeY = sizeY;
+        resized.sizeZ = sizeZ;
+        resized.palette.addAll(palette);
+        resized.cells = new int[resized.volume()];
+        for (int y = 0; y < sizeY; y++) {
+            for (int z = 0; z < sizeZ; z++) {
+                for (int x = 0; x < sizeX; x++) {
+                    resized.cells[resized.index(x, y, z)] = cellAt(x - shiftX, y - shiftY, z - shiftZ);
+                }
+            }
+        }
+        resized.originX = originX + shiftX;
+        resized.originY = originY + shiftY;
+        resized.originZ = originZ + shiftZ;
+        resized.clampOrigin();
+        return resized;
+    }
+
+    public int cellFor(Block block, int meta) {
+        if (!isBuildable(block, meta)) {
+            return AIR;
+        }
+        String key = Block.blockRegistry.getNameForObject(block);
+        if (key == null || key.isEmpty()) {
+            return AIR;
+        }
+        int slot = palette.indexOf(key);
+        if (slot < 0) {
+            slot = palette.size();
+            palette.add(key);
+        }
+        return (slot << META_BITS) | (meta & META_MASK);
+    }
+
+    public int cellFor(ItemStack stack) {
+        if (stack == null) {
+            return AIR;
+        }
+        Block block = Block.getBlockFromItem(stack.getItem());
+        return block == null ? AIR : cellFor(block, stack.getItemDamage());
+    }
+
+    public void setCell(int x, int y, int z, int cell) {
+        if (contains(x, y, z)) {
+            cells[index(x, y, z)] = cell;
+        }
+    }
+
+    public int adopt(Blueprint other, int cell) {
+        return cell == AIR ? AIR : cellFor(other.blockOf(cell), metaOf(cell));
+    }
+
+    public boolean isPlaceable() {
+        for (int cell : cells) {
+            if (cell != AIR && !isBuildable(blockOf(cell), metaOf(cell))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public void write(ByteBuf buf) {
         ByteBufUtils.writeUTF8String(buf, name);
         buf.writeShort(sizeX);
         buf.writeShort(sizeY);
         buf.writeShort(sizeZ);
+        buf.writeShort(originX);
+        buf.writeShort(originY);
+        buf.writeShort(originZ);
         buf.writeShort(palette.size());
         for (String entry : palette) {
             ByteBufUtils.writeUTF8String(buf, entry);
@@ -384,16 +453,22 @@ public class Blueprint {
 
     public static Blueprint read(ByteBuf buf) {
         Blueprint blueprint = new Blueprint();
-        blueprint.name = ByteBufUtils.readUTF8String(buf);
+        blueprint.name = cleanName(ByteBufUtils.readUTF8String(buf));
         blueprint.sizeX = buf.readShort();
         blueprint.sizeY = buf.readShort();
         blueprint.sizeZ = buf.readShort();
+        blueprint.originX = buf.readShort();
+        blueprint.originY = buf.readShort();
+        blueprint.originZ = buf.readShort();
         int slots = buf.readShort();
+        if (!fits(blueprint.sizeX, blueprint.sizeY, blueprint.sizeZ) || slots < 1 || slots > MAX_VOLUME) {
+            return null;
+        }
         for (int i = 0; i < slots; i++) {
             blueprint.palette.add(ByteBufUtils.readUTF8String(buf));
         }
         int length = ByteBufUtils.readVarInt(buf, VAR_INT_BYTES);
-        if (length <= 0 || length > MAX_VOLUME || length != blueprint.volume()) {
+        if (length != blueprint.volume()) {
             return null;
         }
         blueprint.cells = new int[length];
@@ -408,6 +483,7 @@ public class Blueprint {
                 blueprint.cells[at++] = value;
             }
         }
+        blueprint.clampOrigin();
         return blueprint;
     }
 
@@ -423,6 +499,9 @@ public class Blueprint {
         }
         tag.setTag("palette", names);
         tag.setIntArray("cells", cells);
+        tag.setInteger("ox", originX);
+        tag.setInteger("oy", originY);
+        tag.setInteger("oz", originZ);
         return tag;
     }
 
@@ -439,6 +518,14 @@ public class Blueprint {
         blueprint.cells = tag.getIntArray("cells");
         if (blueprint.volume() <= 0 || blueprint.cells.length != blueprint.volume()) {
             return null;
+        }
+        if (tag.hasKey("ox")) {
+            blueprint.originX = tag.getInteger("ox");
+            blueprint.originY = tag.getInteger("oy");
+            blueprint.originZ = tag.getInteger("oz");
+            blueprint.clampOrigin();
+        } else {
+            blueprint.centreOrigin();
         }
         return blueprint;
     }

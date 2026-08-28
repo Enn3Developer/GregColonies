@@ -11,6 +11,7 @@ import com.enn3developer.gregcolonies.entity.GCEntities;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
 import com.enn3developer.gregcolonies.network.GCNetwork;
 import com.enn3developer.gregcolonies.network.PacketBlueprintData;
+import com.enn3developer.gregcolonies.network.PacketColonyPalette;
 
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
@@ -35,6 +36,8 @@ public class CommonProxy {
     public void openColonyScreen(ColonySnapshot colony) {}
 
     public void showBlueprint(PacketBlueprintData data) {}
+
+    public void showPalette(PacketColonyPalette palette) {}
 
     public String trimText(String text, int width) {
         return text;

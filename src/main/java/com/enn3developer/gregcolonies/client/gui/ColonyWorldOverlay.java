@@ -115,7 +115,7 @@ public class ColonyWorldOverlay {
 
     @SubscribeEvent
     public void onRenderOverlay(RenderGameOverlayEvent.Pre event) {
-        if (ColonyScreen.getOpen() == null || event.type == RenderGameOverlayEvent.ElementType.ALL
+        if (!inWorld() || event.type == RenderGameOverlayEvent.ElementType.ALL
             || event.type == RenderGameOverlayEvent.ElementType.CHAT) {
             return;
         }
@@ -124,15 +124,20 @@ public class ColonyWorldOverlay {
 
     @SubscribeEvent
     public void onRenderHand(RenderHandEvent event) {
-        if (ColonyScreen.getOpen() != null) {
+        if (inWorld()) {
             event.setCanceled(true);
         }
+    }
+
+    private static boolean inWorld() {
+        return ColonyScreen.getOpen() != null || BlueprintEditorScreen.getOpen() != null;
     }
 
     @SubscribeEvent
     public void onRenderWorldLast(RenderWorldLastEvent event) {
         ColonyScreen screen = ColonyScreen.getOpen();
-        if (screen == null) {
+        BlueprintEditorScreen editor = BlueprintEditorScreen.getOpen();
+        if (screen == null && editor == null) {
             return;
         }
         ColonyCamera camera = ColonyCamera.get();
@@ -150,6 +155,18 @@ public class ColonyWorldOverlay {
         GL11.glGetFloat(GL11.GL_PROJECTION_MATRIX, PROJECTION);
         GL11.glGetInteger(GL11.GL_VIEWPORT, VIEWPORT);
         matricesValid = true;
+
+        if (editor != null) {
+            BlueprintGhost.render(
+                editor.getView()
+                    .getEditor(),
+                editor.getView()
+                    .getHover(),
+                cameraX,
+                cameraY,
+                cameraZ);
+            return;
+        }
 
         ColonySnapshot colony = screen.getView()
             .getColony();
@@ -262,7 +279,7 @@ public class ColonyWorldOverlay {
         if (targeting == ColonyView.TARGET_MATERIALS) {
             return MATERIALS_COLOR;
         }
-        if (targeting == ColonyView.TARGET_BLUEPRINT || targeting == ColonyView.TARGET_BUILD) {
+        if (targeting == ColonyView.TARGET_BUILD) {
             return BUILD_COLOR;
         }
         return targeting == ColonyView.TARGET_PICK_UP ? PICK_UP_COLOR : CHOP_COLOR;
@@ -306,6 +323,28 @@ public class ColonyWorldOverlay {
         out[1] = (minecraft.displayHeight - PROJECTED.get(1)) / scale;
         out[2] = PROJECTED.get(2);
         return out[2] > 0.0D && out[2] < 1.0D;
+    }
+
+    public static boolean ray(double guiX, double guiY, double[] out) {
+        Vec3 near = unProject(guiX, guiY, 0.0F);
+        Vec3 far = unProject(guiX, guiY, 1.0F);
+        if (near == null || far == null) {
+            return false;
+        }
+        double x = far.xCoord - near.xCoord;
+        double y = far.yCoord - near.yCoord;
+        double z = far.zCoord - near.zCoord;
+        double length = Math.sqrt(x * x + y * y + z * z);
+        if (length < 1.0E-9D) {
+            return false;
+        }
+        out[0] = near.xCoord;
+        out[1] = near.yCoord;
+        out[2] = near.zCoord;
+        out[3] = x / length;
+        out[4] = y / length;
+        out[5] = z / length;
+        return true;
     }
 
     public static void invalidate() {

@@ -13,6 +13,9 @@ public class BuildSite {
     private int x;
     private int y;
     private int z;
+    private int anchorX;
+    private int anchorY;
+    private int anchorZ;
     private int rotation;
     private boolean mirror;
     private Blueprint blueprint;
@@ -21,12 +24,15 @@ public class BuildSite {
     private BuildSite() {}
 
     public BuildSite(int x, int y, int z, Blueprint blueprint, int rotation, boolean mirror) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
+        this.anchorX = x;
+        this.anchorY = y;
+        this.anchorZ = z;
         this.rotation = ((rotation % Blueprint.ROTATIONS) + Blueprint.ROTATIONS) % Blueprint.ROTATIONS;
         this.mirror = mirror;
         this.blueprint = blueprint.transformed(this.rotation, mirror);
+        this.x = x - this.blueprint.getOriginX();
+        this.y = y - this.blueprint.getOriginY();
+        this.z = z - this.blueprint.getOriginZ();
     }
 
     public int getRotation() {
@@ -99,7 +105,19 @@ public class BuildSite {
     }
 
     public boolean isAt(int x, int y, int z) {
-        return this.x == x && this.y == y && this.z == z;
+        return anchorX == x && anchorY == y && anchorZ == z;
+    }
+
+    public int getAnchorX() {
+        return anchorX;
+    }
+
+    public int getAnchorY() {
+        return anchorY;
+    }
+
+    public int getAnchorZ() {
+        return anchorZ;
     }
 
     public int cellFor(int worldX, int worldY, int worldZ) {
@@ -152,6 +170,9 @@ public class BuildSite {
         tag.setInteger("x", x);
         tag.setInteger("y", y);
         tag.setInteger("z", z);
+        tag.setInteger("ax", anchorX);
+        tag.setInteger("ay", anchorY);
+        tag.setInteger("az", anchorZ);
         tag.setInteger("rotation", rotation);
         tag.setBoolean("mirror", mirror);
         tag.setTag("blueprint", blueprint.writeToNBT());
@@ -175,6 +196,9 @@ public class BuildSite {
         site.x = tag.getInteger("x");
         site.y = tag.getInteger("y");
         site.z = tag.getInteger("z");
+        site.anchorX = tag.hasKey("ax") ? tag.getInteger("ax") : site.x;
+        site.anchorY = tag.hasKey("ay") ? tag.getInteger("ay") : site.y;
+        site.anchorZ = tag.hasKey("az") ? tag.getInteger("az") : site.z;
         site.rotation = tag.getInteger("rotation");
         site.mirror = tag.getBoolean("mirror");
         site.blueprint = blueprint;

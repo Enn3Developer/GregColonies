@@ -10,6 +10,7 @@ import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.enn3developer.gregcolonies.client.GCClientEvents;
 import com.enn3developer.gregcolonies.client.GCKeyBindings;
 import com.enn3developer.gregcolonies.client.RenderCitizen;
+import com.enn3developer.gregcolonies.client.gui.BlueprintEditorScreen;
 import com.enn3developer.gregcolonies.client.gui.BlueprintScreen;
 import com.enn3developer.gregcolonies.client.gui.CitizenIcons;
 import com.enn3developer.gregcolonies.client.gui.ColonyScreen;
@@ -18,6 +19,7 @@ import com.enn3developer.gregcolonies.client.gui.GuiText;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
 import com.enn3developer.gregcolonies.network.PacketBlueprintData;
+import com.enn3developer.gregcolonies.network.PacketColonyPalette;
 
 import cpw.mods.fml.client.registry.RenderingRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -74,5 +76,11 @@ public class ClientProxy extends CommonProxy {
     public void showBlueprint(PacketBlueprintData data) {
         Minecraft.getMinecraft()
             .func_152344_a(() -> BlueprintScreen.accept(data));
+    }
+
+    @Override
+    public void showPalette(PacketColonyPalette palette) {
+        Minecraft.getMinecraft()
+            .func_152344_a(() -> BlueprintEditorScreen.accept(palette));
     }
 }

@@ -24,6 +24,8 @@ public class PacketBlueprintAction implements IMessage {
 
     public static final byte PLACEMENT = 4;
 
+    public static final byte PALETTE = 5;
+
     private int colonyId;
     private byte action;
     private int index;
@@ -88,6 +90,10 @@ public class PacketBlueprintAction implements IMessage {
             ColonyManager manager = ColonyManager.get(world);
             if (message.action == REQUEST) {
                 GCNetwork.sendBlueprint(player, colony, message.index);
+                return;
+            }
+            if (message.action == PALETTE) {
+                GCNetwork.sendPalette(player, colony);
                 return;
             }
             if (message.action == SELECT) {

@@ -217,6 +217,15 @@ public class ColonyManager extends WorldSavedData {
         return index;
     }
 
+    public boolean replaceBlueprint(int colonyId, int index, Blueprint blueprint) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null || !colony.replaceBlueprint(index, blueprint)) {
+            return false;
+        }
+        markDirty();
+        return true;
+    }
+
     public boolean removeBlueprint(int colonyId, int index) {
         Colony colony = colonies.get(colonyId);
         if (colony == null || !colony.removeBlueprint(index)) {

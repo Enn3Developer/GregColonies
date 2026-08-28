@@ -96,6 +96,14 @@ public class ColonyCamera extends EntityLivingBase {
         place();
     }
 
+    public void focus(double x, double y, double z, float distance) {
+        targetX = x;
+        targetY = y;
+        targetZ = z;
+        this.distance = clamp(distance, MIN_DISTANCE, MAX_DISTANCE);
+        place();
+    }
+
     public float getDistance() {
         return distance;
     }

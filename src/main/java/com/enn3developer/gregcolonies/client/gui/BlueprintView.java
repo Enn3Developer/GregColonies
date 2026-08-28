@@ -8,7 +8,6 @@ import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.item.ItemStack;
-import net.minecraft.world.World;
 
 import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.cleanroommc.modularui.api.drawable.IKey;
@@ -16,7 +15,6 @@ import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.drawable.GuiDraw;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.utils.Alignment;
-import com.cleanroommc.modularui.value.StringValue;
 import com.cleanroommc.modularui.widget.scroll.VerticalScrollData;
 import com.cleanroommc.modularui.widget.sizer.Unit;
 import com.cleanroommc.modularui.widgets.ButtonWidget;
@@ -29,7 +27,7 @@ import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
 import com.enn3developer.gregcolonies.network.GCNetwork;
 import com.enn3developer.gregcolonies.network.PacketBlueprintAction;
-import com.enn3developer.gregcolonies.network.PacketColonyBlueprint;
+import com.enn3developer.gregcolonies.network.PacketBlueprintSave;
 import com.enn3developer.gregcolonies.network.PacketRequestColony;
 
 public class BlueprintView {
@@ -44,7 +42,7 @@ public class BlueprintView {
 
     private static final int LIBRARY_MAX_HEIGHT = 208;
 
-    private static final int LEFT_FIXED = 116;
+    private static final int LEFT_FIXED = 92;
 
     private static final int MATERIALS_HEIGHT = 65;
 
@@ -61,10 +59,6 @@ public class BlueprintView {
     private static final int SCREEN_INSET = 10;
 
     private static final int SMALL_BUTTON = 13;
-
-    private static final int FIELD_WIDTH = 26;
-
-    private static final int AUTO_HEIGHT = 0;
 
     private static final int BACK_WIDTH = 34;
 
@@ -105,22 +99,6 @@ public class BlueprintView {
     private BlueprintPreview preview;
 
     private TextFieldWidget nameField;
-
-    private TextFieldWidget baseField;
-
-    private TextFieldWidget heightField;
-
-    private final StringValue baseValue = new StringValue("");
-
-    private final StringValue heightValue = new StringValue("");
-
-    private final int[] region = new int[5];
-
-    private boolean hasRegion;
-
-    private int autoHeight = 1;
-
-    private int measuredBase = Integer.MIN_VALUE;
 
     private boolean placementPending;
 
@@ -246,8 +224,7 @@ public class BlueprintView {
     }
 
     public boolean isEditing() {
-        return nameField != null && nameField.isFocused() || baseField != null && baseField.isFocused()
-            || heightField != null && heightField.isFocused();
+        return nameField != null && nameField.isFocused();
     }
 
     public ModularPanel buildPanel() {
@@ -280,7 +257,6 @@ public class BlueprintView {
     }
 
     private void tick() {
-        syncRegion();
         if (++colonyTicks >= COLONY_INTERVAL) {
             colonyTicks = 0;
             GCNetwork.CHANNEL.sendToServer(new PacketRequestColony());
@@ -289,49 +265,6 @@ public class BlueprintView {
             detailTicks = 0;
             request(colony.getActiveBlueprint());
         }
-    }
-
-    private void syncRegion() {
-        if (!colonyView.hasRegion()) {
-            hasRegion = false;
-            return;
-        }
-        int x1 = colonyView.getRegionX1();
-        int z1 = colonyView.getRegionZ1();
-        int x2 = colonyView.getRegionX2();
-        int z2 = colonyView.getRegionZ2();
-        int y = colonyView.getRegionY();
-        if (!hasRegion || region[0] != x1 || region[1] != z1 || region[2] != x2 || region[3] != z2 || region[4] != y) {
-            region[0] = x1;
-            region[1] = z1;
-            region[2] = x2;
-            region[3] = z2;
-            region[4] = y;
-            hasRegion = true;
-            measuredBase = Integer.MIN_VALUE;
-            if (baseField != null && !baseField.isFocused()) {
-                baseValue.setStringValue(String.valueOf(y));
-            }
-            if (heightField != null && !heightField.isFocused()) {
-                heightValue.setStringValue("");
-            }
-        }
-
-        int base = captureBase();
-        if (base != measuredBase) {
-            measuredBase = base;
-            World world = Minecraft.getMinecraft().theWorld;
-            autoHeight = world == null ? 1 : Blueprint.detectHeight(world, x1, z1, x2, z2, base);
-        }
-    }
-
-    private int captureBase() {
-        return parse(baseField, colonyView.getRegionY());
-    }
-
-    private int captureHeight() {
-        int typed = parse(heightField, AUTO_HEIGHT);
-        return typed > 0 ? Math.min(Blueprint.MAX_SIDE, typed) : autoHeight;
     }
 
     private double libraryHeight() {
@@ -390,40 +323,11 @@ public class BlueprintView {
                 GuiStyle.row()
                     .child(GuiStyle.button("Rename", GuiStyle.EXPAND, this::hasSelected, this::sendRename))
                     .child(GuiStyle.button("Delete", GuiStyle.EXPAND, this::hasSelected, this::sendDelete)))
-            .child(GuiStyle.section("Capture", this::captureValue, GuiStyle.SECTION_GAP))
-            .child(regionLabel())
+            .child(GuiStyle.section("Design", this::designValue, GuiStyle.SECTION_GAP))
             .child(
                 GuiStyle.row()
-                    .child(GuiStyle.label(IKey.str("base"), GuiStyle.HINT_COLOR))
-                    .child(baseField())
-                    .child(GuiStyle.label(IKey.str("high"), GuiStyle.HINT_COLOR))
-                    .child(heightField()))
-            .child(
-                GuiStyle.row()
-                    .child(GuiStyle.button("Capture", GuiStyle.EXPAND, this::canCapture, this::sendCapture)));
-    }
-
-    private TextWidget<?> regionLabel() {
-        TextWidget<?> line = GuiStyle.label(IKey.dynamic(this::regionValue), GuiStyle.HINT_COLOR);
-        line.widthRel(1.0F);
-        line.marginBottom(GuiStyle.ROW_GAP);
-        return line;
-    }
-
-    private TextFieldWidget baseField() {
-        baseValue.setStringValue(String.valueOf(colonyView.getRegionY()));
-        measuredBase = Integer.MIN_VALUE;
-        baseField = GuiStyle.field(4);
-        baseField.width(FIELD_WIDTH);
-        baseField.value(baseValue);
-        return baseField;
-    }
-
-    private TextFieldWidget heightField() {
-        heightField = GuiStyle.field(2);
-        heightField.width(FIELD_WIDTH);
-        heightField.value(heightValue);
-        return heightField;
+                    .child(GuiStyle.button("New", GuiStyle.EXPAND, this::canCreate, this::openNew))
+                    .child(GuiStyle.button("Edit", GuiStyle.EXPAND, this::hasDetail, this::openEdit)));
     }
 
     private Flow buildDetail() {
@@ -645,8 +549,8 @@ public class BlueprintView {
         return placed != null;
     }
 
-    private boolean canCapture() {
-        return colonyView.hasRegion() && colony.getBlueprints()
+    private boolean canCreate() {
+        return colony.getBlueprints()
             .size() < Colony.MAX_BLUEPRINTS;
     }
 
@@ -660,32 +564,12 @@ public class BlueprintView {
             + Colony.MAX_BLUEPRINTS;
     }
 
-    private String captureValue() {
-        if (!colonyView.hasRegion()) {
-            return "no region";
-        }
+    private String designValue() {
         if (colony.getBlueprints()
             .size() >= Colony.MAX_BLUEPRINTS) {
             return "library full";
         }
-        int width = Math.min(colonyView.getRegionWidth(), Blueprint.MAX_SIDE);
-        int depth = Math.min(colonyView.getRegionDepth(), Blueprint.MAX_SIDE);
-        int layers = Math.max(1, Math.min(Blueprint.MAX_SIDE, Blueprint.MAX_VOLUME / (width * depth)));
-        return captureHeight() > layers ? "clipped to " + layers : "ready";
-    }
-
-    private String regionValue() {
-        if (!colonyView.hasRegion()) {
-            return GuiText.trim("drag a region in Blueprint mode", LEFT_WIDTH);
-        }
-        String size = colonyView.getRegionWidth() + "x" + captureHeight() + "x" + colonyView.getRegionDepth();
-        return GuiText.trim(
-            size + (parse(heightField, AUTO_HEIGHT) > 0 ? "" : " auto")
-                + " at "
-                + colonyView.getRegionX1()
-                + "/"
-                + colonyView.getRegionZ1(),
-            LEFT_WIDTH);
+        return placed == null ? "editor" : "editor ready";
     }
 
     private String detailValue() {
@@ -757,32 +641,16 @@ public class BlueprintView {
         setPlacement(rotation(), !mirror());
     }
 
-    private void sendCapture() {
-        if (!canCapture()) {
-            return;
+    private void openNew() {
+        if (canCreate()) {
+            BlueprintEditorScreen.open(colony, PacketBlueprintSave.NEW, null);
         }
-        GCNetwork.CHANNEL.sendToServer(
-            new PacketColonyBlueprint(
-                colony.getId(),
-                colonyView.getRegionX1(),
-                colonyView.getRegionZ1(),
-                colonyView.getRegionX2(),
-                colonyView.getRegionZ2(),
-                captureBase(),
-                parse(heightField, AUTO_HEIGHT),
-                nameField.getText()));
     }
 
-    private static int parse(TextFieldWidget field, int fallback) {
-        if (field == null) {
-            return fallback;
-        }
-        try {
-            return Integer.parseInt(
-                field.getText()
-                    .trim());
-        } catch (NumberFormatException error) {
-            return fallback;
+    private void openEdit() {
+        if (source != null) {
+            BlueprintEditorScreen.open(colony, detailIndex, source);
         }
     }
+
 }

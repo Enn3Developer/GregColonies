@@ -60,8 +60,6 @@ public class ColonyView {
 
     public static final int TARGET_MATERIALS = 6;
 
-    public static final int TARGET_BLUEPRINT = 7;
-
     public static final int TARGET_BUILD = 8;
 
     private static final int MAX_GROUP_ROWS = 32;
@@ -91,10 +89,6 @@ public class ColonyView {
     private static final String GROUP_HINT = "click a group to select it   shift adds";
 
     private static final int MARKER_MARGIN = 7;
-
-    private static final int[] REGION = new int[5];
-
-    private static boolean hasRegion;
 
     private final ColonyViewWidget map = new ColonyViewWidget(this);
 
@@ -264,47 +258,6 @@ public class ColonyView {
     public void sendMaterials(int x, int y, int z) {
         boolean clear = colony.isMaterialsAt(x, y, z);
         GCNetwork.CHANNEL.sendToServer(new PacketColonyMaterials(colony.getId(), x, y, z, clear));
-    }
-
-    public void setRegion(int x1, int y, int z1, int x2, int z2) {
-        REGION[0] = Math.min(x1, x2);
-        REGION[1] = Math.min(z1, z2);
-        REGION[2] = Math.max(x1, x2);
-        REGION[3] = Math.max(z1, z2);
-        REGION[4] = y;
-        hasRegion = true;
-    }
-
-    public boolean hasRegion() {
-        return hasRegion;
-    }
-
-    public int getRegionX1() {
-        return REGION[0];
-    }
-
-    public int getRegionZ1() {
-        return REGION[1];
-    }
-
-    public int getRegionX2() {
-        return REGION[2];
-    }
-
-    public int getRegionZ2() {
-        return REGION[3];
-    }
-
-    public int getRegionY() {
-        return hasRegion ? REGION[4] : colony.getY();
-    }
-
-    public int getRegionWidth() {
-        return REGION[2] - REGION[0] + 1;
-    }
-
-    public int getRegionDepth() {
-        return REGION[3] - REGION[1] + 1;
     }
 
     public void openBlueprints() {
@@ -512,7 +465,6 @@ public class ColonyView {
         list.child(GuiStyle.section("Build", this::buildValue, GuiStyle.SECTION_GAP));
         list.child(
             GuiStyle.row()
-                .child(modeButton("Blueprint", GuiStyle.EXPAND, TARGET_BLUEPRINT))
                 .child(modeButton("Build", GuiStyle.EXPAND, TARGET_BUILD)));
         list.child(
             GuiStyle.row()
@@ -574,9 +526,6 @@ public class ColonyView {
     }
 
     private String targetingLabel() {
-        if (targeting == TARGET_BLUEPRINT) {
-            return "drag the footprint, RMB cancels";
-        }
         if (targeting == TARGET_CHOP || targeting == TARGET_FARM) {
             return "drag a region, RMB cancels";
         }

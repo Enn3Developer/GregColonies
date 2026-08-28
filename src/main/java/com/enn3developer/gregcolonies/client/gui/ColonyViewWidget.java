@@ -354,12 +354,6 @@ public class ColonyViewWidget extends Widget<ColonyViewWidget> implements Intera
             view.setTargeting(ColonyView.TARGET_NONE);
             return;
         }
-        if (view.getTargeting() == ColonyView.TARGET_BLUEPRINT) {
-            view.setRegion(area[0], area[1], area[2], area[3], area[5]);
-            view.setTargeting(ColonyView.TARGET_NONE);
-            view.openBlueprints();
-            return;
-        }
         view.sendArea(
             areaAction(view.getTargeting()),
             Interactable.hasShiftDown(),

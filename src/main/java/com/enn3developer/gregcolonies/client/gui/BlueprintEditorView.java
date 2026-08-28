@@ -1,0 +1,593 @@
+package com.enn3developer.gregcolonies.client.gui;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import net.minecraft.item.ItemStack;
+
+import com.cleanroommc.modularui.api.drawable.IDrawable;
+import com.cleanroommc.modularui.api.drawable.IKey;
+import com.cleanroommc.modularui.api.widget.IWidget;
+import com.cleanroommc.modularui.drawable.GuiDraw;
+import com.cleanroommc.modularui.screen.ModularPanel;
+import com.cleanroommc.modularui.utils.Alignment;
+import com.cleanroommc.modularui.widget.scroll.VerticalScrollData;
+import com.cleanroommc.modularui.widgets.ButtonWidget;
+import com.cleanroommc.modularui.widgets.ListWidget;
+import com.cleanroommc.modularui.widgets.TextWidget;
+import com.cleanroommc.modularui.widgets.layout.Flow;
+import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
+import com.enn3developer.gregcolonies.colony.Blueprint;
+import com.enn3developer.gregcolonies.network.ColonySnapshot;
+import com.enn3developer.gregcolonies.network.PacketColonyPalette;
+
+public class BlueprintEditorView {
+
+    private static final int SIDE_WIDTH = 118;
+
+    private static final int PALETTE_WIDTH = 132;
+
+    private static final int PALETTE_HEIGHT = 150;
+
+    private static final int MAX_PALETTE_ROWS = 64;
+
+    private static final int MAX_MATERIAL_ROWS = 24;
+
+    private static final int MATERIALS_HEIGHT = 52;
+
+    private static final int SMALL_BUTTON = 13;
+
+    private static final int ICON_WIDTH = 16;
+
+    private static final int PALETTE_INTERVAL = 40;
+
+    private static final float FIT_DISTANCE = 2.4F;
+
+    private static final int CONFIRM_WIDTH = 150;
+
+    private static final String PAINT_HINT = "LMB paint   RMB erase   RMB drag pan";
+    private static final String CAMERA_HINT = "MMB drag turn   wheel zoom   WASD pan   R recenter";
+    private static final String LAYER_HINT = "shift wheel layer   X slice   Tab tool   1-9 brush";
+    private static final String ANCHOR_HINT = "Anchor tool marks where a build order lands";
+    private static final String EDIT_HINT = "ctrl+Z undo   ctrl+Y redo";
+
+    private final BlueprintEditor editor;
+
+    private BlueprintEditor.Hit hover;
+
+    private ModularPanel panel;
+
+    private Flow header;
+
+    private Flow hints;
+
+    private ListWidget<IWidget, ?> sidePanel;
+
+    private ListWidget<IWidget, ?> palettePanel;
+
+    private TextFieldWidget nameField;
+
+    private boolean helpOpen = true;
+
+    private boolean confirming;
+
+    private int paletteTicks;
+
+    private final Map<Integer, Integer> missing = new LinkedHashMap<>();
+
+    private final List<Integer> missingCells = new ArrayList<>();
+
+    public BlueprintEditorView(BlueprintEditor editor) {
+        this.editor = editor;
+    }
+
+    public BlueprintEditor getEditor() {
+        return editor;
+    }
+
+    public ColonySnapshot getColony() {
+        return editor.getColony();
+    }
+
+    public BlueprintEditor.Hit getHover() {
+        return hover;
+    }
+
+    public void setHover(BlueprintEditor.Hit hover) {
+        this.hover = hover;
+    }
+
+    public boolean isEditingText() {
+        return nameField != null && nameField.isFocused();
+    }
+
+    public void toggleHelp() {
+        helpOpen = !helpOpen;
+    }
+
+    public boolean isConfirming() {
+        return confirming;
+    }
+
+    public boolean requestClose() {
+        if (!editor.isDirty()) {
+            return true;
+        }
+        confirming = true;
+        return false;
+    }
+
+    public void acceptPalette(PacketColonyPalette message) {
+        editor.acceptPalette(message);
+    }
+
+    public void focusCamera() {
+        ColonyCamera camera = ColonyCamera.get();
+        if (camera == null) {
+            return;
+        }
+        Blueprint model = editor.getModel();
+        float span = Math.max(model.getSizeX(), Math.max(model.getSizeY(), model.getSizeZ()));
+        camera.focus(editor.centerX(), editor.centerY(), editor.centerZ(), span * FIT_DISTANCE);
+    }
+
+    public ModularPanel buildPanel() {
+        panel = new ModularPanel("blueprint_editor").fullScreenInvisible();
+        panel.child(new BlueprintEditorWidget(this).full());
+        panel.child(buildHeader());
+        panel.child(buildPalette());
+        panel.child(buildSidePanel());
+        panel.child(buildHints());
+        panel.child(buildConfirm());
+        panel.onUpdateListener(widget -> tick());
+        return panel;
+    }
+
+    private void tick() {
+        if (paletteTicks == 0 || ++paletteTicks >= PALETTE_INTERVAL) {
+            paletteTicks = 1;
+            editor.requestPalette();
+        }
+        missing.clear();
+        missing.putAll(editor.shortfall());
+        missingCells.clear();
+        missingCells.addAll(missing.keySet());
+    }
+
+    private Flow buildHeader() {
+        header = Flow.column()
+            .coverChildren()
+            .childPadding(2)
+            .padding(GuiStyle.PADDING)
+            .pos(GuiStyle.SCREEN_MARGIN, GuiStyle.SCREEN_MARGIN)
+            .crossAxisAlignment(Alignment.CrossAxis.START)
+            .background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER))
+            .child(GuiStyle.label(IKey.dynamic(this::title), GuiStyle.TITLE_COLOR))
+            .child(GuiStyle.label(IKey.dynamic(this::sizeValue), GuiStyle.TEXT_COLOR))
+            .child(GuiStyle.label(IKey.dynamic(this::aimValue), GuiStyle.HINT_COLOR));
+        return header;
+    }
+
+    private Flow buildConfirm() {
+        Flow prompt = Flow.column()
+            .coverChildren()
+            .childPadding(GuiStyle.ROW_GAP)
+            .padding(GuiStyle.PADDING)
+            .width(CONFIRM_WIDTH)
+            .posRel(Alignment.Center)
+            .crossAxisAlignment(Alignment.CrossAxis.START)
+            .background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER))
+            .child(GuiStyle.label(IKey.str("Unsaved changes"), GuiStyle.TITLE_COLOR))
+            .child(GuiStyle.label(IKey.dynamic(this::confirmValue), GuiStyle.HINT_COLOR))
+            .child(
+                GuiStyle.row()
+                    .child(GuiStyle.button("Save", GuiStyle.EXPAND, this::canSave, this::save))
+                    .child(GuiStyle.button("Discard", GuiStyle.EXPAND, () -> true, this::discard))
+                    .child(GuiStyle.button("Cancel", GuiStyle.EXPAND, () -> true, () -> confirming = false)));
+        prompt.setEnabledIf(widget -> confirming);
+        return prompt;
+    }
+
+    private void discard() {
+        confirming = false;
+        BlueprintEditorScreen.back();
+    }
+
+    private String confirmValue() {
+        return editor.getModel()
+            .blockCount() + " blocks would be lost";
+    }
+
+    private Flow buildHints() {
+        hints = Flow.column()
+            .coverChildren()
+            .childPadding(2)
+            .padding(GuiStyle.PADDING)
+            .left(GuiStyle.SCREEN_MARGIN)
+            .bottom(GuiStyle.SCREEN_MARGIN)
+            .collapseDisabledChild()
+            .crossAxisAlignment(Alignment.CrossAxis.START)
+            .background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER))
+            .child(helpLine(IKey.str(PAINT_HINT)))
+            .child(helpLine(IKey.str(CAMERA_HINT)))
+            .child(helpLine(IKey.str(LAYER_HINT)))
+            .child(helpLine(IKey.str(EDIT_HINT)))
+            .child(helpLine(IKey.str(ANCHOR_HINT)))
+            .child(GuiStyle.label(IKey.dynamic(this::helpHint), GuiStyle.TEXT_COLOR));
+        return hints;
+    }
+
+    private TextWidget<?> helpLine(IKey key) {
+        TextWidget<?> line = GuiStyle.label(key, GuiStyle.HINT_COLOR);
+        line.setEnabledIf(widget -> helpOpen);
+        return line;
+    }
+
+    private ListWidget<IWidget, ?> buildPalette() {
+        VerticalScrollData scroll = new VerticalScrollData();
+        scroll.texture(GuiStyle.scrollHandle());
+        ListWidget<IWidget, ?> list = new ListWidget<>();
+        list.scrollDirection(scroll);
+        list.collapseDisabledChild();
+        list.crossAxisAlignment(Alignment.CrossAxis.START);
+        list.width(PALETTE_WIDTH);
+        list.height(PALETTE_HEIGHT);
+        list.left(GuiStyle.SCREEN_MARGIN);
+        list.top(GuiStyle.SCREEN_MARGIN + 46);
+        list.padding(GuiStyle.PADDING);
+        list.background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER));
+        list.getScrollArea()
+            .setScrollBarBackgroundColor(GuiStyle.SCROLL_TRACK);
+        list.child(GuiStyle.section("Materials chest", this::paletteValue, 0));
+        for (int index = 0; index < MAX_PALETTE_ROWS; index++) {
+            list.child(buildPaletteRow(index));
+        }
+        TextWidget<?> empty = GuiStyle.label(IKey.dynamic(this::paletteHint), GuiStyle.HINT_COLOR);
+        empty.widthRel(1.0F);
+        empty.setEnabledIf(
+            widget -> editor.getPalette()
+                .isEmpty());
+        list.child(empty);
+        palettePanel = list;
+        return list;
+    }
+
+    private ButtonWidget<?> buildPaletteRow(int index) {
+        ButtonWidget<?> row = new ButtonWidget<>();
+        row.widthRel(1.0F);
+        row.height(ICON_WIDTH);
+        row.background(paletteRowSkin(index, GuiStyle.ROW_BACKGROUND));
+        row.hoverBackground(paletteRowSkin(index, GuiStyle.BUTTON_HOVER));
+        row.child(
+            Flow.row()
+                .widthRel(1.0F)
+                .heightRel(1.0F)
+                .paddingLeft(ICON_WIDTH + 2)
+                .paddingRight(3)
+                .mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
+                .crossAxisAlignment(Alignment.CrossAxis.CENTER)
+                .child(
+                    IKey.dynamic(() -> paletteLabel(index))
+                        .asWidget()
+                        .color(() -> index == editor.getBrushIndex() ? GuiStyle.ACTIVE_COLOR : GuiStyle.TEXT_COLOR)
+                        .shadow(true))
+                .child(
+                    IKey.dynamic(() -> paletteCount(index))
+                        .asWidget()
+                        .color(GuiStyle.HINT_COLOR)
+                        .shadow(true)));
+        row.onMousePressed(mouseButton -> {
+            editor.setBrush(index);
+            return true;
+        });
+        row.setEnabled(
+            index < editor.getPalette()
+                .size());
+        row.onUpdateListener(
+            widget -> widget.setEnabled(
+                index < editor.getPalette()
+                    .size()));
+        return row;
+    }
+
+    private IDrawable paletteRowSkin(int index, int fill) {
+        return (context, x, y, width, height, theme) -> {
+            boolean active = index == editor.getBrushIndex();
+            GuiDraw.drawRect(x, y, width, height, active ? GuiStyle.ROW_SELECTED : fill);
+            BlueprintBrush brush = brushAt(index);
+            if (brush != null) {
+                GuiDraw.drawItem(brush.stack(), x, y, ICON_WIDTH, ICON_WIDTH, context.getCurrentDrawingZ());
+            }
+        };
+    }
+
+    private BlueprintBrush brushAt(int index) {
+        return index >= 0 && index < editor.getPalette()
+            .size() ? editor.getPalette()
+                .get(index) : null;
+    }
+
+    private String paletteLabel(int index) {
+        BlueprintBrush brush = brushAt(index);
+        if (brush == null) {
+            return "";
+        }
+        int room = PALETTE_WIDTH - GuiStyle.PADDING * 2
+            - GuiStyle.SCROLL_THICKNESS
+            - ICON_WIDTH
+            - 8
+            - GuiText.width(paletteCount(index));
+        return GuiText.trim(brush.label(), room);
+    }
+
+    private String paletteCount(int index) {
+        BlueprintBrush brush = brushAt(index);
+        return brush == null ? "" : String.valueOf(brush.getHeld());
+    }
+
+    private String paletteValue() {
+        return editor.getPalette()
+            .size() + " kinds";
+    }
+
+    private String paletteHint() {
+        return getColony().hasMaterials() ? "chest is empty" : "no materials chest set";
+    }
+
+    private ListWidget<IWidget, ?> buildSidePanel() {
+        VerticalScrollData scroll = new VerticalScrollData();
+        scroll.texture(GuiStyle.scrollHandle());
+        ListWidget<IWidget, ?> list = new ListWidget<>();
+        list.scrollDirection(scroll);
+        list.collapseDisabledChild();
+        list.crossAxisAlignment(Alignment.CrossAxis.START);
+        list.maxSizeRelOffset(1.0F, -GuiStyle.SCREEN_MARGIN * 2);
+        list.width(SIDE_WIDTH);
+        list.right(GuiStyle.SCREEN_MARGIN);
+        list.top(GuiStyle.SCREEN_MARGIN);
+        list.padding(GuiStyle.PADDING);
+        list.background(GuiStyle.skin(GuiStyle.PANEL_BACKGROUND, GuiStyle.PANEL_BORDER));
+        list.getScrollArea()
+            .setScrollBarBackgroundColor(GuiStyle.SCROLL_TRACK);
+
+        list.child(GuiStyle.section("Tool", this::toolValue, 0));
+        list.child(
+            GuiStyle.row()
+                .child(toolButton("Paint", BlueprintEditor.TOOL_PAINT))
+                .child(toolButton("Erase", BlueprintEditor.TOOL_ERASE)));
+        list.child(
+            GuiStyle.row()
+                .child(toolButton("Box", BlueprintEditor.TOOL_BOX))
+                .child(toolButton("Pick", BlueprintEditor.TOOL_PICK)));
+        list.child(
+            GuiStyle.row()
+                .child(toolButton("Anchor", BlueprintEditor.TOOL_ANCHOR)));
+        list.child(
+            GuiStyle.row()
+                .child(GuiStyle.button("Undo", GuiStyle.EXPAND, editor::hasUndo, editor::undo))
+                .child(GuiStyle.button("Redo", GuiStyle.EXPAND, editor::hasRedo, editor::redo)));
+
+        list.child(GuiStyle.section("Layer", this::layerValue, GuiStyle.SECTION_GAP));
+        list.child(
+            GuiStyle.row()
+                .child(GuiStyle.button("-", SMALL_BUTTON, () -> true, () -> editor.stepLayer(-1)))
+                .child(GuiStyle.toggleButton(() -> "Slice", GuiStyle.EXPAND, editor::isSliced, editor::toggleSlice))
+                .child(GuiStyle.button("+", SMALL_BUTTON, () -> true, () -> editor.stepLayer(1))));
+        list.child(
+            GuiStyle.row()
+                .child(GuiStyle.button("Fill layer", GuiStyle.EXPAND, this::hasBrush, editor::fillLayer))
+                .child(GuiStyle.button("Clear", GuiStyle.EXPAND, () -> true, editor::clearLayer)));
+
+        list.child(GuiStyle.section("Canvas", this::canvasValue, GuiStyle.SECTION_GAP));
+        list.child(axisRow("X", 0));
+        list.child(axisRow("Y", 1));
+        list.child(axisRow("Z", 2));
+        list.child(
+            GuiStyle.row()
+                .child(GuiStyle.button("Turn", GuiStyle.EXPAND, () -> true, editor::turn))
+                .child(GuiStyle.button("Flip", GuiStyle.EXPAND, () -> true, editor::flip)));
+        list.child(
+            GuiStyle.row()
+                .child(GuiStyle.button("Wipe", GuiStyle.EXPAND, () -> true, editor::wipe)));
+
+        nameField = GuiStyle.field(Blueprint.MAX_NAME_LENGTH);
+        nameField.expanded();
+        nameField.setText(
+            editor.getModel()
+                .getName());
+        list.child(GuiStyle.section("Save", this::saveValue, GuiStyle.SECTION_GAP));
+        list.child(
+            GuiStyle.row()
+                .child(nameField));
+        list.child(
+            GuiStyle.row()
+                .child(GuiStyle.button("Save", GuiStyle.EXPAND, this::canSave, this::save)));
+        list.child(
+            GuiStyle.row()
+                .child(GuiStyle.button("Close", GuiStyle.EXPAND, () -> true, this::close)));
+
+        list.child(GuiStyle.section("Missing", this::missingValue, GuiStyle.SECTION_GAP));
+        ListWidget<IWidget, ?> shortfall = new ListWidget<>();
+        VerticalScrollData innerScroll = new VerticalScrollData();
+        innerScroll.texture(GuiStyle.scrollHandle());
+        shortfall.scrollDirection(innerScroll);
+        shortfall.collapseDisabledChild();
+        shortfall.crossAxisAlignment(Alignment.CrossAxis.START);
+        shortfall.widthRel(1.0F);
+        shortfall.height(MATERIALS_HEIGHT);
+        shortfall.getScrollArea()
+            .setScrollBarBackgroundColor(GuiStyle.SCROLL_TRACK);
+        for (int index = 0; index < MAX_MATERIAL_ROWS; index++) {
+            shortfall.child(buildMissingRow(index));
+        }
+        list.child(shortfall);
+
+        sidePanel = list;
+        return list;
+    }
+
+    private Flow axisRow(String label, int axis) {
+        return GuiStyle.row()
+            .child(GuiStyle.button("-", SMALL_BUTTON, () -> true, () -> editor.resize(axis, -1)))
+            .child(axisLabel(label, axis))
+            .child(GuiStyle.button("+", SMALL_BUTTON, () -> true, () -> editor.resize(axis, 1)));
+    }
+
+    private TextWidget<?> axisLabel(String label, int axis) {
+        TextWidget<?> line = GuiStyle.label(IKey.dynamic(() -> label + " " + axisSize(axis)), GuiStyle.TEXT_COLOR);
+        line.textAlign(Alignment.Center);
+        line.expanded();
+        return line;
+    }
+
+    private int axisSize(int axis) {
+        Blueprint model = editor.getModel();
+        return axis == 0 ? model.getSizeX() : axis == 1 ? model.getSizeY() : model.getSizeZ();
+    }
+
+    private ButtonWidget<?> toolButton(String label, int tool) {
+        return GuiStyle
+            .toggleButton(() -> label, GuiStyle.EXPAND, () -> editor.getTool() == tool, () -> editor.setTool(tool));
+    }
+
+    private Flow buildMissingRow(int index) {
+        Flow row = Flow.row()
+            .widthRel(1.0F)
+            .height(GuiStyle.ROW_HEIGHT - 2)
+            .paddingRight(3)
+            .mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
+            .crossAxisAlignment(Alignment.CrossAxis.CENTER)
+            .child(
+                IKey.dynamic(() -> missingName(index))
+                    .asWidget()
+                    .color(GuiStyle.TEXT_COLOR)
+                    .shadow(true))
+            .child(
+                IKey.dynamic(() -> missingCount(index))
+                    .asWidget()
+                    .color(GuiStyle.WARN_COLOR)
+                    .shadow(true));
+        row.setEnabled(index < missingCells.size());
+        row.onUpdateListener(widget -> widget.setEnabled(index < missingCells.size()));
+        return row;
+    }
+
+    private String missingName(int index) {
+        Integer cell = cellAt(index);
+        if (cell == null) {
+            return "";
+        }
+        ItemStack stack = editor.getModel()
+            .stackOf(cell);
+        String name = stack == null ? "unknown block" : safeName(stack);
+        return GuiText.trim(name, SIDE_WIDTH - GuiStyle.PADDING * 2 - 10 - GuiText.width(missingCount(index)));
+    }
+
+    private static String safeName(ItemStack stack) {
+        try {
+            return stack.getDisplayName();
+        } catch (RuntimeException error) {
+            return "unknown block";
+        }
+    }
+
+    private String missingCount(int index) {
+        Integer cell = cellAt(index);
+        return cell == null ? "" : "-" + missing.get(cell);
+    }
+
+    private Integer cellAt(int index) {
+        return index >= 0 && index < missingCells.size() ? missingCells.get(index) : null;
+    }
+
+    private boolean hasBrush() {
+        return editor.getBrush() != null;
+    }
+
+    private boolean canSave() {
+        return !editor.getModel()
+            .isEmpty();
+    }
+
+    private void close() {
+        if (requestClose()) {
+            BlueprintEditorScreen.back();
+        }
+    }
+
+    private void save() {
+        confirming = false;
+        editor.getModel()
+            .setName(nameField.getText());
+        editor.save();
+        BlueprintEditorScreen.back();
+    }
+
+    private String title() {
+        String name = editor.getModel()
+            .getName();
+        return "Editor - " + (name.isEmpty() ? "untitled" : name);
+    }
+
+    private String sizeValue() {
+        Blueprint model = editor.getModel();
+        return model.getSizeX() + "x"
+            + model.getSizeY()
+            + "x"
+            + model.getSizeZ()
+            + ", "
+            + model.blockCount()
+            + " blocks";
+    }
+
+    private String aimValue() {
+        if (hover == null) {
+            return "aim at the build plane";
+        }
+        int[] spot = hover.solid ? new int[] { hover.hitX, hover.hitY, hover.hitZ }
+            : new int[] { hover.placeX, hover.placeY, hover.placeZ };
+        return spot[0] + " / " + spot[1] + " / " + spot[2];
+    }
+
+    private String toolValue() {
+        int tool = editor.getTool();
+        if (tool == BlueprintEditor.TOOL_ERASE) {
+            return "erase";
+        }
+        if (tool == BlueprintEditor.TOOL_BOX) {
+            return editor.getBoxAnchor() == null ? "box: first corner" : "box: second corner";
+        }
+        if (tool == BlueprintEditor.TOOL_ANCHOR) {
+            return "anchor";
+        }
+        return tool == BlueprintEditor.TOOL_PICK ? "pick" : "paint";
+    }
+
+    private String layerValue() {
+        return editor.getLayer() + 1
+            + "/"
+            + editor.getModel()
+                .getSizeY();
+    }
+
+    private String canvasValue() {
+        return editor.getModel()
+            .volume() + "/"
+            + Blueprint.MAX_VOLUME;
+    }
+
+    private String saveValue() {
+        return editor.getIndex() < 0 ? "new" : "slot " + (editor.getIndex() + 1);
+    }
+
+    private String missingValue() {
+        return missingCells.isEmpty() ? "stocked" : missingCells.size() + " short";
+    }
+
+    private String helpHint() {
+        return helpOpen ? "H hides help" : "H shows help";
+    }
+
+}
