@@ -14,8 +14,6 @@ import com.enn3developer.gregcolonies.entity.EntityCitizen;
 
 import cpw.mods.fml.common.network.ByteBufUtils;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
-import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
-import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 
 public class PacketCitizenGroup implements IMessage {
@@ -61,20 +59,15 @@ public class PacketCitizenGroup implements IMessage {
         }
     }
 
-    public static class Handler implements IMessageHandler<PacketCitizenGroup, IMessage> {
+    public static class Handler extends ColonyPacketHandler<PacketCitizenGroup> {
 
         @Override
-        public IMessage onMessage(PacketCitizenGroup message, MessageContext ctx) {
-            EntityPlayerMP player = ctx.getServerHandler().playerEntity;
-            GCNetwork.enqueue(() -> apply(player, message));
-            return null;
+        protected int colonyId(PacketCitizenGroup message) {
+            return message.colonyId;
         }
 
-        private static void apply(EntityPlayerMP player, PacketCitizenGroup message) {
-            Colony colony = GCNetwork.accessibleColony(player, message.colonyId);
-            if (colony == null) {
-                return;
-            }
+        @Override
+        protected void apply(EntityPlayerMP player, Colony colony, PacketCitizenGroup message) {
             ColonyManager manager = ColonyManager.get(player.worldObj);
             Map<UUID, EntityCitizen> loaded = GCNetwork.loadedCitizens(player.worldObj, colony.getId());
             for (UUID id : message.citizens) {

@@ -5,13 +5,11 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.cleanroommc.modularui.factory.ClientGUI;
-import com.cleanroommc.modularui.screen.ModularScreen;
-import com.enn3developer.gregcolonies.GregColonies;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
 import com.enn3developer.gregcolonies.network.GCNetwork;
 import com.enn3developer.gregcolonies.network.PacketRequestColony;
 
-public class ColonyScreen extends ModularScreen {
+public class ColonyScreen extends GCScreen<ColonyView> {
 
     private static boolean armed;
 
@@ -19,29 +17,22 @@ public class ColonyScreen extends ModularScreen {
 
     private static Set<UUID> saved;
 
-    private final ColonyView view;
-
     public ColonyScreen(ColonyView view) {
-        super(GregColonies.MODID, view.buildPanel());
-        this.view = view;
-        pausesGame(false);
-        drawDarkBackground(false);
-    }
-
-    public ColonyView getView() {
-        return view;
+        super(view, view.buildPanel());
     }
 
     public static ColonyScreen getOpen() {
-        ModularScreen current = ModularScreen.getCurrent();
-        return current instanceof ColonyScreen ? (ColonyScreen) current : null;
+        return current(ColonyScreen.class, false);
     }
 
     public static void armReturn() {
         armed = true;
         waiting = false;
         ColonyScreen screen = getOpen();
-        saved = screen == null ? null : new LinkedHashSet<>(screen.view.getSelection());
+        saved = screen == null ? null
+            : new LinkedHashSet<>(
+                screen.getView()
+                    .getSelection());
     }
 
     public static void restore(Set<UUID> selection) {
@@ -72,7 +63,8 @@ public class ColonyScreen extends ModularScreen {
         }
         ColonyScreen current = getOpen();
         if (current != null) {
-            current.view.setColony(colony);
+            current.getView()
+                .setColony(colony);
             return;
         }
         ColonyView view = new ColonyView(colony);
@@ -88,7 +80,7 @@ public class ColonyScreen extends ModularScreen {
     @Override
     public void onOpen() {
         super.onOpen();
-        ColonyCamera.install(view.getColony());
+        ColonyCamera.install(getView().getColony());
     }
 
     @Override

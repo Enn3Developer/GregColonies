@@ -16,7 +16,6 @@ import com.cleanroommc.modularui.drawable.GuiDraw;
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext;
 import com.cleanroommc.modularui.theme.WidgetThemeEntry;
 import com.enn3developer.gregcolonies.client.GCKeyBindings;
-import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandChop;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandFarm;
 import com.enn3developer.gregcolonies.network.CitizenSnapshot;
@@ -223,19 +222,19 @@ public class ColonyViewWidget extends CameraWidget<ColonyViewWidget> {
     }
 
     private void updateTargetPreview() {
-        int mode = view.getTargeting();
-        if (mode == ColonyView.TARGET_NONE) {
+        TargetMode mode = view.getTargeting();
+        if (mode == TargetMode.NONE) {
             return;
         }
         if (!isHovering() && !areaDragging) {
             view.clearPending();
             return;
         }
-        if (mode == ColonyView.TARGET_MINE) {
+        if (mode.getPick() == TargetMode.Pick.CHUNK) {
             pickChunk();
             return;
         }
-        if (isSpotMode(mode)) {
+        if (mode.isSpot()) {
             pickBlock();
             return;
         }
@@ -295,8 +294,7 @@ public class ColonyViewWidget extends CameraWidget<ColonyViewWidget> {
     }
 
     private int clampSide(int anchor, int value) {
-        int side = view.getTargeting() == ColonyView.TARGET_FARM ? CitizenCommandFarm.MAX_SIDE
-            : CitizenCommandChop.MAX_SIDE;
+        int side = view.getTargeting() == TargetMode.FARM ? CitizenCommandFarm.MAX_SIDE : CitizenCommandChop.MAX_SIDE;
         if (value - anchor > side - 1) {
             return anchor + side - 1;
         }
@@ -311,49 +309,23 @@ public class ColonyViewWidget extends CameraWidget<ColonyViewWidget> {
             return;
         }
         int[] area = view.getPending();
-        if (view.getTargeting() == ColonyView.TARGET_DROP_OFF) {
-            view.sendSite(ColonySiteKind.DROP_OFF, area[0], area[1], area[2]);
-            view.setTargeting(ColonyView.TARGET_NONE);
-            return;
-        }
-        if (view.getTargeting() == ColonyView.TARGET_PICK_UP) {
-            view.sendSite(ColonySiteKind.PICK_UP, area[0], area[1], area[2]);
-            view.setTargeting(ColonyView.TARGET_NONE);
-            return;
-        }
-        if (view.getTargeting() == ColonyView.TARGET_MATERIALS) {
-            view.sendSite(ColonySiteKind.MATERIALS, area[0], area[1], area[2]);
-            view.setTargeting(ColonyView.TARGET_NONE);
-            return;
-        }
-        if (view.getTargeting() == ColonyView.TARGET_BUILD) {
+        TargetMode mode = view.getTargeting();
+        if (mode.getSite() != null) {
+            view.sendSite(mode.getSite(), area[0], area[1], area[2]);
+        } else if (mode == TargetMode.BUILD) {
             view.sendBuild(area[0], area[1], area[2]);
-            view.setTargeting(ColonyView.TARGET_NONE);
-            return;
+        } else {
+            view.sendArea(
+                mode.getCommand(),
+                Interactable.hasShiftDown(),
+                area[0],
+                area[1],
+                area[2],
+                area[3],
+                area[4],
+                area[5]);
         }
-        view.sendArea(
-            areaAction(view.getTargeting()),
-            Interactable.hasShiftDown(),
-            area[0],
-            area[1],
-            area[2],
-            area[3],
-            area[4],
-            area[5]);
-        view.setTargeting(ColonyView.TARGET_NONE);
-    }
-
-    private static boolean isSpotMode(int mode) {
-        return mode == ColonyView.TARGET_DROP_OFF || mode == ColonyView.TARGET_PICK_UP
-            || mode == ColonyView.TARGET_MATERIALS
-            || mode == ColonyView.TARGET_BUILD;
-    }
-
-    private static byte areaAction(int targeting) {
-        if (targeting == ColonyView.TARGET_MINE) {
-            return PacketCitizenCommand.MINE;
-        }
-        return targeting == ColonyView.TARGET_FARM ? PacketCitizenCommand.FARM : PacketCitizenCommand.CHOP;
+        view.setTargeting(TargetMode.NONE);
     }
 
     private boolean projectCitizen(CitizenSnapshot citizen) {
@@ -470,7 +442,7 @@ public class ColonyViewWidget extends CameraWidget<ColonyViewWidget> {
     @Override
     public @NotNull Result onMousePressed(int mouseButton) {
         beginDrag(mouseButton);
-        if (mouseButton == 0 && view.getTargeting() != ColonyView.TARGET_NONE) {
+        if (mouseButton == 0 && view.getTargeting() != TargetMode.NONE) {
             MovingObjectPosition hit = ColonyWorldOverlay.pick(getContext().getMouseX(), getContext().getMouseY());
             if (hit != null && hit.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) {
                 areaAnchorX = hit.blockX;
@@ -497,10 +469,10 @@ public class ColonyViewWidget extends CameraWidget<ColonyViewWidget> {
     @Override
     public boolean onMouseRelease(int mouseButton) {
         if (mouseButton == 0 && areaDragging) {
-            int mode = view.getTargeting();
-            if (mode == ColonyView.TARGET_MINE) {
+            TargetMode mode = view.getTargeting();
+            if (mode.getPick() == TargetMode.Pick.CHUNK) {
                 pickChunk();
-            } else if (isSpotMode(mode)) {
+            } else if (mode.isSpot()) {
                 pickBlock();
             } else {
                 updateDragArea(true);
@@ -511,8 +483,8 @@ public class ColonyViewWidget extends CameraWidget<ColonyViewWidget> {
             endDrag();
             return true;
         }
-        if (mouseButton == 1 && getDragTravel() <= CLICK_SLOP && view.getTargeting() != ColonyView.TARGET_NONE) {
-            view.setTargeting(ColonyView.TARGET_NONE);
+        if (mouseButton == 1 && getDragTravel() <= CLICK_SLOP && view.getTargeting() != TargetMode.NONE) {
+            view.setTargeting(TargetMode.NONE);
             endDrag();
             return true;
         }

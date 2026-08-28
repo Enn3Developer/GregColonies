@@ -1,5 +1,8 @@
 package com.enn3developer.gregcolonies.entity.ai.work;
 
+import java.util.HashSet;
+import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import net.minecraft.block.Block;
@@ -29,6 +32,52 @@ public final class Inventories {
         }
         TileEntity tile = world.getTileEntity(x, y, z);
         return tile instanceof IInventory ? (IInventory) tile : null;
+    }
+
+    public static void forEachExtractable(IInventory inventory, Consumer<ItemStack> action) {
+        if (inventory == null) {
+            return;
+        }
+        if (inventory instanceof ISidedInventory) {
+            forEachExtractableSided((ISidedInventory) inventory, action);
+            return;
+        }
+        int size = inventory.getSizeInventory();
+        for (int slot = 0; slot < size; slot++) {
+            ItemStack stack = inventory.getStackInSlot(slot);
+            if (stack != null && stack.stackSize > 0) {
+                action.accept(stack);
+            }
+        }
+    }
+
+    private static void forEachExtractableSided(ISidedInventory inventory, Consumer<ItemStack> action) {
+        Set<Integer> seen = new HashSet<>();
+        for (int side = 0; side < SIDES; side++) {
+            int[] slots = inventory.getAccessibleSlotsFromSide(side);
+            if (slots == null) {
+                continue;
+            }
+            for (int slot : slots) {
+                ItemStack stack = inventory.getStackInSlot(slot);
+                if (stack == null || stack.stackSize <= 0 || !inventory.canExtractItem(slot, stack, side)) {
+                    continue;
+                }
+                if (seen.add(slot)) {
+                    action.accept(stack);
+                }
+            }
+        }
+    }
+
+    public static int count(IInventory inventory, Predicate<ItemStack> filter) {
+        int[] total = { 0 };
+        forEachExtractable(inventory, stack -> {
+            if (filter.test(stack)) {
+                total[0] += stack.stackSize;
+            }
+        });
+        return total[0];
     }
 
     public static ItemStack extract(IInventory inventory, Predicate<ItemStack> filter, int amount) {

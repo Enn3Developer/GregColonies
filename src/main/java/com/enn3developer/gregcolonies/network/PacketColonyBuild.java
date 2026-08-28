@@ -12,8 +12,6 @@ import com.enn3developer.gregcolonies.colony.ColonyManager;
 import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
-import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
-import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 
 public class PacketColonyBuild implements IMessage {
@@ -52,20 +50,15 @@ public class PacketColonyBuild implements IMessage {
         buf.writeBoolean(clear);
     }
 
-    public static class Handler implements IMessageHandler<PacketColonyBuild, IMessage> {
+    public static class Handler extends ColonyPacketHandler<PacketColonyBuild> {
 
         @Override
-        public IMessage onMessage(PacketColonyBuild message, MessageContext ctx) {
-            EntityPlayerMP player = ctx.getServerHandler().playerEntity;
-            GCNetwork.enqueue(() -> apply(player, message));
-            return null;
+        protected int colonyId(PacketColonyBuild message) {
+            return message.colonyId;
         }
 
-        private static void apply(EntityPlayerMP player, PacketColonyBuild message) {
-            Colony colony = GCNetwork.accessibleColony(player, message.colonyId);
-            if (colony == null) {
-                return;
-            }
+        @Override
+        protected void apply(EntityPlayerMP player, Colony colony, PacketColonyBuild message) {
             ColonyManager manager = ColonyManager.get(player.worldObj);
             if (message.clear) {
                 manager.setBuildSite(colony.getId(), null);

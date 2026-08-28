@@ -17,7 +17,6 @@ import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.utils.Alignment;
 import com.cleanroommc.modularui.widget.scroll.VerticalScrollData;
 import com.cleanroommc.modularui.widget.sizer.Unit;
-import com.cleanroommc.modularui.widgets.ButtonWidget;
 import com.cleanroommc.modularui.widgets.ListWidget;
 import com.cleanroommc.modularui.widgets.TextWidget;
 import com.cleanroommc.modularui.widgets.layout.Flow;
@@ -409,44 +408,19 @@ public class BlueprintView {
         return line;
     }
 
-    private ButtonWidget<?> buildLibraryRow(int index) {
-        ButtonWidget<?> row = new ButtonWidget<>();
-        row.widthRel(1.0F);
-        row.height(GuiStyle.ROW_HEIGHT);
-        row.background(libraryRowSkin(index, GuiStyle.ROW_BACKGROUND, GuiStyle.ROW_SELECTED));
-        row.hoverBackground(libraryRowSkin(index, GuiStyle.BUTTON_HOVER, GuiStyle.ROW_SELECTED_HOVER));
-        row.child(
-            Flow.row()
-                .widthRel(1.0F)
-                .heightRel(1.0F)
-                .paddingLeft(GuiStyle.SWATCH_WIDTH + 3)
-                .paddingRight(3)
-                .mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
-                .crossAxisAlignment(Alignment.CrossAxis.CENTER)
-                .child(
-                    IKey.dynamic(() -> libraryRowLabel(index))
-                        .asWidget()
-                        .color(GuiStyle.TEXT_COLOR)
-                        .shadow(true))
-                .child(
-                    IKey.dynamic(() -> libraryRowSize(index))
-                        .asWidget()
-                        .color(GuiStyle.HINT_COLOR)
-                        .shadow(true)));
-        row.onMousePressed(mouseButton -> {
-            if (entryAt(index) != null) {
-                sendSelect(index);
-            }
-            return true;
-        });
-        row.setEnabled(
-            index < colony.getBlueprints()
-                .size());
-        row.onUpdateListener(
-            widget -> widget.setEnabled(
-                index < colony.getBlueprints()
-                    .size()));
-        return row;
+    private IWidget buildLibraryRow(int index) {
+        return GuiRow.at(
+            index,
+            () -> colony.getBlueprints()
+                .size())
+            .padding(GuiStyle.SWATCH_WIDTH + 3, 3)
+            .label(() -> libraryRowLabel(index))
+            .hint(() -> libraryRowSize(index))
+            .skin(
+                libraryRowSkin(index, GuiStyle.ROW_BACKGROUND, GuiStyle.ROW_SELECTED),
+                libraryRowSkin(index, GuiStyle.BUTTON_HOVER, GuiStyle.ROW_SELECTED_HOVER))
+            .onClick(this::sendSelect)
+            .build();
     }
 
     private IDrawable libraryRowSkin(int index, int fill, int selected) {
@@ -479,28 +453,14 @@ public class BlueprintView {
         return entry == null ? "" : entry.getSizeLabel();
     }
 
-    private Flow buildMaterialRow(int index) {
-        Flow row = Flow.row()
-            .widthRel(1.0F)
+    private IWidget buildMaterialRow(int index) {
+        return GuiRow.at(index, materials::size)
             .height(GuiStyle.ROW_HEIGHT - 2)
-            .paddingLeft(GuiStyle.SWATCH_WIDTH + 3)
-            .paddingRight(3)
-            .mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
-            .crossAxisAlignment(Alignment.CrossAxis.CENTER)
-            .background(materialRowSkin(index))
-            .child(
-                IKey.dynamic(() -> materialName(index))
-                    .asWidget()
-                    .color(GuiStyle.TEXT_COLOR)
-                    .shadow(true))
-            .child(
-                IKey.dynamic(() -> materialCount(index))
-                    .asWidget()
-                    .color(() -> materialColor(index))
-                    .shadow(true));
-        row.setEnabled(index < materials.size());
-        row.onUpdateListener(widget -> widget.setEnabled(index < materials.size()));
-        return row;
+            .padding(GuiStyle.SWATCH_WIDTH + 3, 3)
+            .label(() -> materialName(index))
+            .hint(() -> materialCount(index), () -> materialColor(index))
+            .skin(materialRowSkin(index), null)
+            .build();
     }
 
     private IDrawable materialRowSkin(int index) {

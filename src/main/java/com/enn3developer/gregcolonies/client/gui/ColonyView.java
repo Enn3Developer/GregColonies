@@ -46,21 +46,7 @@ public class ColonyView {
 
     public static final String UNGROUPED = "ungrouped";
 
-    public static final int TARGET_NONE = 0;
-
-    public static final int TARGET_CHOP = 1;
-
-    public static final int TARGET_MINE = 2;
-
-    public static final int TARGET_FARM = 3;
-
-    public static final int TARGET_DROP_OFF = 4;
-
-    public static final int TARGET_PICK_UP = 5;
-
-    public static final int TARGET_MATERIALS = 6;
-
-    public static final int TARGET_BUILD = 8;
+    private static final int BUILD_LABEL_COLOR = TargetMode.BUILD.color(TargetMode.LABEL_ALPHA);
 
     private static final int MAX_GROUP_ROWS = 32;
 
@@ -71,14 +57,6 @@ public class ColonyView {
     private static final float SIDE_MAX_FRACTION = 0.38F;
 
     private static final int ASSIGN_WIDTH = 46;
-
-    private static final int DROP_OFF_COLOR = 0xFFFF7CE0;
-
-    private static final int PICK_UP_COLOR = 0xFF7CE0FF;
-
-    private static final int MATERIALS_COLOR = 0xFFFFC46B;
-
-    private static final int BUILD_COLOR = 0xFF9CE06B;
 
     private static final String SELECT_HINT = "LMB select   LMB drag box   shift add   LMB twice opens";
 
@@ -102,7 +80,7 @@ public class ColonyView {
 
     private final int[] pending = new int[6];
 
-    private int targeting = TARGET_NONE;
+    private TargetMode targeting = TargetMode.NONE;
 
     private boolean hasPending;
 
@@ -187,12 +165,12 @@ public class ColonyView {
         return loaded;
     }
 
-    public int getTargeting() {
+    public TargetMode getTargeting() {
         return targeting;
     }
 
-    public void setTargeting(int mode) {
-        targeting = targeting == mode ? TARGET_NONE : mode;
+    public void setTargeting(TargetMode mode) {
+        targeting = targeting == mode ? TargetMode.NONE : mode;
         hasPending = false;
     }
 
@@ -205,7 +183,7 @@ public class ColonyView {
     }
 
     public boolean hasPending() {
-        return targeting != TARGET_NONE && hasPending;
+        return targeting != TargetMode.NONE && hasPending;
     }
 
     public int[] getPending() {
@@ -427,11 +405,11 @@ public class ColonyView {
                         () -> sendCommand(PacketCitizenCommand.CANCEL, false, 0, 0, 0))));
         list.child(
             GuiStyle.row()
-                .child(modeButton("Chop", GuiStyle.EXPAND, TARGET_CHOP))
-                .child(modeButton("Mine", GuiStyle.EXPAND, TARGET_MINE)));
+                .child(modeButton(TargetMode.CHOP))
+                .child(modeButton(TargetMode.MINE)));
         list.child(
             GuiStyle.row()
-                .child(modeButton("Farm", GuiStyle.EXPAND, TARGET_FARM)));
+                .child(modeButton(TargetMode.FARM)));
         list.child(
             GuiStyle.row()
                 .child(
@@ -444,19 +422,24 @@ public class ColonyView {
         list.child(GuiStyle.section("Colony", () -> "", GuiStyle.SECTION_GAP));
         list.child(
             GuiStyle.row()
-                .child(modeButton("Drop-off", GuiStyle.EXPAND, TARGET_DROP_OFF))
-                .child(modeButton("Pick-up", GuiStyle.EXPAND, TARGET_PICK_UP)));
+                .child(modeButton(TargetMode.DROP_OFF))
+                .child(modeButton(TargetMode.PICK_UP)));
         list.child(
             GuiStyle.row()
-                .child(modeButton("Materials", GuiStyle.EXPAND, TARGET_MATERIALS)));
-        list.child(entry("drop-off", () -> siteValue(ColonySiteKind.DROP_OFF), DROP_OFF_COLOR));
-        list.child(entry("pick-up", () -> siteValue(ColonySiteKind.PICK_UP), PICK_UP_COLOR));
-        list.child(entry("materials", () -> siteValue(ColonySiteKind.MATERIALS), MATERIALS_COLOR));
+                .child(modeButton(TargetMode.MATERIALS)));
+        for (ColonySiteKind kind : ColonySiteKind.values()) {
+            list.child(
+                entry(
+                    kind.getShortLabel(),
+                    () -> siteValue(kind),
+                    TargetMode.of(kind)
+                        .color(TargetMode.LABEL_ALPHA)));
+        }
 
         list.child(GuiStyle.section("Build", this::buildValue, GuiStyle.SECTION_GAP));
         list.child(
             GuiStyle.row()
-                .child(modeButton("Build", GuiStyle.EXPAND, TARGET_BUILD)));
+                .child(modeButton(TargetMode.BUILD)));
         list.child(
             GuiStyle.row()
                 .child(GuiStyle.button("Blueprints", GuiStyle.EXPAND, () -> true, this::openBlueprints)));
@@ -465,13 +448,13 @@ public class ColonyView {
                 .child(
                     GuiStyle.button("Builder", GuiStyle.EXPAND, this::hasSelection, () -> sendJob(CitizenJob.BUILDER)))
                 .child(GuiStyle.button("No job", GuiStyle.EXPAND, this::hasSelection, () -> sendJob(CitizenJob.NONE))));
-        list.child(entry("blueprint", this::blueprintValue, BUILD_COLOR));
-        list.child(entry("builders", this::buildersValue, BUILD_COLOR));
-        list.child(entry("site", this::buildSiteValue, BUILD_COLOR));
+        list.child(entry("blueprint", this::blueprintValue, BUILD_LABEL_COLOR));
+        list.child(entry("builders", this::buildersValue, BUILD_LABEL_COLOR));
+        list.child(entry("site", this::buildSiteValue, BUILD_LABEL_COLOR));
 
         TextWidget<?> targetHint = GuiStyle.label(IKey.dynamic(this::targetingLabel), GuiStyle.HINT_COLOR);
         targetHint.widthRel(1.0F);
-        targetHint.setEnabledIf(widget -> targeting != TARGET_NONE);
+        targetHint.setEnabledIf(widget -> targeting != TargetMode.NONE);
         targetHint.marginTop(GuiStyle.ROW_GAP);
         list.child(targetHint);
 
@@ -512,24 +495,13 @@ public class ColonyView {
             .isEmpty();
     }
 
-    private ButtonWidget<?> modeButton(String label, int width, int mode) {
-        return GuiStyle.toggleButton(() -> label, width, () -> targeting == mode, () -> setTargeting(mode));
+    private ButtonWidget<?> modeButton(TargetMode mode) {
+        return GuiStyle
+            .toggleButton(mode::getLabel, GuiStyle.EXPAND, () -> targeting == mode, () -> setTargeting(mode));
     }
 
     private String targetingLabel() {
-        if (targeting == TARGET_CHOP || targeting == TARGET_FARM) {
-            return "drag a region, RMB cancels";
-        }
-        if (targeting == TARGET_BUILD) {
-            return "click the ground, again to clear";
-        }
-        if (targeting == TARGET_MINE) {
-            return "click a chunk, RMB cancels";
-        }
-        if (targeting == TARGET_DROP_OFF || targeting == TARGET_PICK_UP || targeting == TARGET_MATERIALS) {
-            return "click a chest, again to clear";
-        }
-        return "";
+        return targeting.getHint();
     }
 
     private String siteValue(ColonySiteKind kind) {
@@ -566,41 +538,17 @@ public class ColonyView {
         return groupField;
     }
 
-    private ButtonWidget<?> buildGroupRow(int index) {
-        ButtonWidget<?> row = new ButtonWidget<>();
-        row.widthRel(1.0F);
-        row.height(GuiStyle.ROW_HEIGHT);
-        row.marginBottom(1);
-        row.background(groupRowSkin(index, GuiStyle.ROW_BACKGROUND, GuiStyle.ROW_SELECTED));
-        row.hoverBackground(groupRowSkin(index, GuiStyle.BUTTON_HOVER, GuiStyle.ROW_SELECTED_HOVER));
-        row.child(
-            Flow.row()
-                .widthRel(1.0F)
-                .heightRel(1.0F)
-                .paddingLeft(GuiStyle.SWATCH_WIDTH + 4)
-                .paddingRight(4)
-                .mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
-                .crossAxisAlignment(Alignment.CrossAxis.CENTER)
-                .child(
-                    IKey.dynamic(() -> groupRowLabel(index))
-                        .asWidget()
-                        .color(GuiStyle.TEXT_COLOR)
-                        .shadow(true))
-                .child(
-                    IKey.dynamic(() -> groupRowCount(index))
-                        .asWidget()
-                        .color(() -> groupRowCountColor(index))
-                        .shadow(true)));
-        row.onMousePressed(mouseButton -> {
-            String group = groupAt(index);
-            if (group != null) {
-                selectGroup(group, Interactable.hasShiftDown());
-            }
-            return true;
-        });
-        row.setEnabled(index < groups.size());
-        row.onUpdateListener(widget -> widget.setEnabled(index < groups.size()));
-        return row;
+    private IWidget buildGroupRow(int index) {
+        return GuiRow.at(index, groups::size)
+            .marginBottom(1)
+            .padding(GuiStyle.SWATCH_WIDTH + 4, 4)
+            .label(() -> groupRowLabel(index))
+            .hint(() -> groupRowCount(index), () -> groupRowCountColor(index))
+            .skin(
+                groupRowSkin(index, GuiStyle.ROW_BACKGROUND, GuiStyle.ROW_SELECTED),
+                groupRowSkin(index, GuiStyle.BUTTON_HOVER, GuiStyle.ROW_SELECTED_HOVER))
+            .onClick(row -> selectGroup(groups.get(row), Interactable.hasShiftDown()))
+            .build();
     }
 
     private IDrawable groupRowSkin(int index, int fill, int selected) {

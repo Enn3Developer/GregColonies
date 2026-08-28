@@ -19,8 +19,6 @@ import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandMine;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandMoveTo;
 
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
-import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
-import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 
 public class PacketCitizenCommand implements IMessage {
@@ -107,20 +105,15 @@ public class PacketCitizenCommand implements IMessage {
         }
     }
 
-    public static class Handler implements IMessageHandler<PacketCitizenCommand, IMessage> {
+    public static class Handler extends ColonyPacketHandler<PacketCitizenCommand> {
 
         @Override
-        public IMessage onMessage(PacketCitizenCommand message, MessageContext ctx) {
-            EntityPlayerMP player = ctx.getServerHandler().playerEntity;
-            GCNetwork.enqueue(() -> apply(player, message));
-            return null;
+        protected int colonyId(PacketCitizenCommand message) {
+            return message.colonyId;
         }
 
-        private static void apply(EntityPlayerMP player, PacketCitizenCommand message) {
-            Colony colony = GCNetwork.accessibleColony(player, message.colonyId);
-            if (colony == null) {
-                return;
-            }
+        @Override
+        protected void apply(EntityPlayerMP player, Colony colony, PacketCitizenCommand message) {
             Map<UUID, EntityCitizen> loaded = GCNetwork.loadedCitizens(player.worldObj, colony.getId());
             for (UUID id : message.citizens) {
                 EntityCitizen citizen = loaded.get(id);

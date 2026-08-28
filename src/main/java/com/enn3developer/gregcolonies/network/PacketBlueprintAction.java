@@ -8,8 +8,6 @@ import com.enn3developer.gregcolonies.colony.ColonyManager;
 
 import cpw.mods.fml.common.network.ByteBufUtils;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
-import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
-import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 
 public class PacketBlueprintAction implements IMessage {
@@ -72,20 +70,15 @@ public class PacketBlueprintAction implements IMessage {
         ByteBufUtils.writeUTF8String(buf, name);
     }
 
-    public static class Handler implements IMessageHandler<PacketBlueprintAction, IMessage> {
+    public static class Handler extends ColonyPacketHandler<PacketBlueprintAction> {
 
         @Override
-        public IMessage onMessage(PacketBlueprintAction message, MessageContext ctx) {
-            EntityPlayerMP player = ctx.getServerHandler().playerEntity;
-            GCNetwork.enqueue(() -> apply(player, message));
-            return null;
+        protected int colonyId(PacketBlueprintAction message) {
+            return message.colonyId;
         }
 
-        private static void apply(EntityPlayerMP player, PacketBlueprintAction message) {
-            Colony colony = GCNetwork.accessibleColony(player, message.colonyId);
-            if (colony == null) {
-                return;
-            }
+        @Override
+        protected void apply(EntityPlayerMP player, Colony colony, PacketBlueprintAction message) {
             World world = player.worldObj;
             ColonyManager manager = ColonyManager.get(world);
             if (message.action == REQUEST) {

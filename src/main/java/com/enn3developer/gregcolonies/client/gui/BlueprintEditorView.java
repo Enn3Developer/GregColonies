@@ -298,42 +298,20 @@ public class BlueprintEditorView {
         return list;
     }
 
-    private ButtonWidget<?> buildPaletteRow(int index) {
-        ButtonWidget<?> row = new ButtonWidget<>();
-        row.widthRel(1.0F);
-        row.height(ICON_WIDTH);
-        row.background(paletteRowSkin(index, GuiStyle.ROW_BACKGROUND));
-        row.hoverBackground(paletteRowSkin(index, GuiStyle.BUTTON_HOVER));
-        row.child(
-            Flow.row()
-                .widthRel(1.0F)
-                .heightRel(1.0F)
-                .paddingLeft(ICON_WIDTH + 2)
-                .paddingRight(3)
-                .mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
-                .crossAxisAlignment(Alignment.CrossAxis.CENTER)
-                .child(
-                    IKey.dynamic(() -> paletteLabel(index))
-                        .asWidget()
-                        .color(() -> index == editor.getBrushIndex() ? GuiStyle.ACTIVE_COLOR : GuiStyle.TEXT_COLOR)
-                        .shadow(true))
-                .child(
-                    IKey.dynamic(() -> paletteCount(index))
-                        .asWidget()
-                        .color(GuiStyle.HINT_COLOR)
-                        .shadow(true)));
-        row.onMousePressed(mouseButton -> {
-            editor.setBrush(index);
-            return true;
-        });
-        row.setEnabled(
-            index < editor.getPalette()
-                .size());
-        row.onUpdateListener(
-            widget -> widget.setEnabled(
-                index < editor.getPalette()
-                    .size()));
-        return row;
+    private IWidget buildPaletteRow(int index) {
+        return GuiRow.at(
+            index,
+            () -> editor.getPalette()
+                .size())
+            .height(ICON_WIDTH)
+            .padding(ICON_WIDTH + 2, 3)
+            .label(
+                () -> paletteLabel(index),
+                () -> index == editor.getBrushIndex() ? GuiStyle.ACTIVE_COLOR : GuiStyle.TEXT_COLOR)
+            .hint(() -> paletteCount(index))
+            .skin(paletteRowSkin(index, GuiStyle.ROW_BACKGROUND), paletteRowSkin(index, GuiStyle.BUTTON_HOVER))
+            .onClick(editor::setBrush)
+            .build();
     }
 
     private IDrawable paletteRowSkin(int index, int fill) {
@@ -497,26 +475,13 @@ public class BlueprintEditorView {
             .toggleButton(() -> label, GuiStyle.EXPAND, () -> editor.getTool() == tool, () -> editor.setTool(tool));
     }
 
-    private Flow buildMissingRow(int index) {
-        Flow row = Flow.row()
-            .widthRel(1.0F)
+    private IWidget buildMissingRow(int index) {
+        return GuiRow.at(index, missingCells::size)
             .height(GuiStyle.ROW_HEIGHT - 2)
-            .paddingRight(3)
-            .mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
-            .crossAxisAlignment(Alignment.CrossAxis.CENTER)
-            .child(
-                IKey.dynamic(() -> missingName(index))
-                    .asWidget()
-                    .color(GuiStyle.TEXT_COLOR)
-                    .shadow(true))
-            .child(
-                IKey.dynamic(() -> missingCount(index))
-                    .asWidget()
-                    .color(GuiStyle.WARN_COLOR)
-                    .shadow(true));
-        row.setEnabled(index < missingCells.size());
-        row.onUpdateListener(widget -> widget.setEnabled(index < missingCells.size()));
-        return row;
+            .padding(0, 3)
+            .label(() -> missingName(index))
+            .hint(() -> missingCount(index), () -> GuiStyle.WARN_COLOR)
+            .build();
     }
 
     private String missingName(int index) {

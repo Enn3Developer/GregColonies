@@ -49,30 +49,6 @@ public class ColonyWorldOverlay {
 
     private static final int SELECTION_COLOR = 0xE0FFFFFF;
 
-    private static final int CHOP_COLOR = 0xB07CE07C;
-
-    private static final int MINE_COLOR = 0xB0FFB040;
-
-    private static final int FARM_COLOR = 0xB0D8E060;
-
-    private static final int DROP_OFF_COLOR = 0xB0FF7CE0;
-
-    private static final int DROP_OFF_MARK_COLOR = 0x70FF7CE0;
-
-    private static final int PICK_UP_COLOR = 0xB07CE0FF;
-
-    private static final int PICK_UP_MARK_COLOR = 0x707CE0FF;
-
-    private static final int MATERIALS_COLOR = 0xB0FFC46B;
-
-    private static final int MATERIALS_MARK_COLOR = 0x70FFC46B;
-
-    private static final int[] SITE_MARK_COLORS = { DROP_OFF_MARK_COLOR, PICK_UP_MARK_COLOR, MATERIALS_MARK_COLOR };
-
-    private static final int BUILD_COLOR = 0xB09CE06B;
-
-    private static final int BUILD_MARK_COLOR = 0x709CE06B;
-
     private static final double AREA_HEIGHT = 4.0D;
 
     private static final double AREA_EDGE = 0.3D;
@@ -223,7 +199,8 @@ public class ColonyWorldOverlay {
                     site.getZ(),
                     site.getX() + 1,
                     site.getZ() + 1,
-                    SITE_MARK_COLORS[kind.ordinal()]);
+                    TargetMode.of(kind)
+                        .color(TargetMode.MARK_ALPHA));
             }
         }
 
@@ -234,13 +211,20 @@ public class ColonyWorldOverlay {
                 colony.getBuildZ(),
                 colony.getBuildX() + 1,
                 colony.getBuildZ() + 1,
-                BUILD_MARK_COLOR);
+                TargetMode.BUILD.color(TargetMode.MARK_ALPHA));
         }
 
         ColonyView view = screen.getView();
         if (view.hasPending()) {
             int[] area = view.getPending();
-            drawArea(area[0], area[1], area[2], area[3] + 1, area[5] + 1, targetColor(view.getTargeting()));
+            drawArea(
+                area[0],
+                area[1],
+                area[2],
+                area[3] + 1,
+                area[5] + 1,
+                view.getTargeting()
+                    .color(TargetMode.AREA_ALPHA));
         }
 
         GL11.glEnable(GL11.GL_CULL_FACE);
@@ -251,25 +235,6 @@ public class ColonyWorldOverlay {
         GL11.glEnable(GL11.GL_TEXTURE_2D);
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         GL11.glPopMatrix();
-    }
-
-    private static int targetColor(int targeting) {
-        if (targeting == ColonyView.TARGET_MINE) {
-            return MINE_COLOR;
-        }
-        if (targeting == ColonyView.TARGET_FARM) {
-            return FARM_COLOR;
-        }
-        if (targeting == ColonyView.TARGET_DROP_OFF) {
-            return DROP_OFF_COLOR;
-        }
-        if (targeting == ColonyView.TARGET_MATERIALS) {
-            return MATERIALS_COLOR;
-        }
-        if (targeting == ColonyView.TARGET_BUILD) {
-            return BUILD_COLOR;
-        }
-        return targeting == ColonyView.TARGET_PICK_UP ? PICK_UP_COLOR : CHOP_COLOR;
     }
 
     public static Entity liveEntity(CitizenSnapshot citizen) {

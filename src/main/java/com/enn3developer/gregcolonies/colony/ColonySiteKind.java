@@ -2,9 +2,9 @@ package com.enn3developer.gregcolonies.colony;
 
 public enum ColonySiteKind {
 
-    DROP_OFF("dropOff", "drop-off"),
-    PICK_UP("pickUp", "pick-up"),
-    MATERIALS("materials", "materials pick-up");
+    DROP_OFF("dropOff", "drop-off", "drop-off"),
+    PICK_UP("pickUp", "pick-up", "pick-up"),
+    MATERIALS("materials", "materials pick-up", "materials");
 
     private static final ColonySiteKind[] VALUES = values();
 
@@ -12,11 +12,14 @@ public enum ColonySiteKind {
 
     private final String label;
 
+    private final String shortLabel;
+
     private final String flagKey;
 
-    ColonySiteKind(String key, String label) {
+    ColonySiteKind(String key, String label, String shortLabel) {
         this.key = key;
         this.label = label;
+        this.shortLabel = shortLabel;
         this.flagKey = "has" + Character.toUpperCase(key.charAt(0)) + key.substring(1);
     }
 
@@ -26,6 +29,10 @@ public enum ColonySiteKind {
 
     public String getLabel() {
         return label;
+    }
+
+    public String getShortLabel() {
+        return shortLabel;
     }
 
     public String getFlagKey() {

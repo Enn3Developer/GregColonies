@@ -1,46 +1,22 @@
 package com.enn3developer.gregcolonies.client.gui;
 
-import net.minecraft.client.Minecraft;
-
-import com.cleanroommc.modularui.factory.ClientGUI;
-import com.cleanroommc.modularui.screen.ModularScreen;
-import com.enn3developer.gregcolonies.GregColonies;
-import com.enn3developer.gregcolonies.network.GCNetwork;
 import com.enn3developer.gregcolonies.network.PacketBlueprintData;
-import com.enn3developer.gregcolonies.network.PacketRequestColony;
 
-public class BlueprintScreen extends ModularScreen {
+public class BlueprintScreen extends GCScreen<BlueprintView> {
 
     private static boolean returning;
 
-    private final BlueprintView view;
-
     public BlueprintScreen(BlueprintView view) {
-        super(GregColonies.MODID, view.buildPanel());
-        this.view = view;
-        pausesGame(false);
-        drawDarkBackground(false);
-    }
-
-    public BlueprintView getView() {
-        return view;
+        super(view, view.buildPanel());
     }
 
     public static BlueprintScreen getOpen() {
-        ModularScreen current = ModularScreen.getCurrent();
-        return !returning && current instanceof BlueprintScreen ? (BlueprintScreen) current : null;
+        return current(BlueprintScreen.class, returning);
     }
 
     public static void open(ColonyView colonyView) {
         returning = false;
-        Minecraft.getMinecraft()
-            .func_152344_a(() -> {
-                try {
-                    ClientGUI.open(new BlueprintScreen(new BlueprintView(colonyView)));
-                } catch (RuntimeException error) {
-                    GregColonies.LOG.error("Failed to open the blueprint library", error);
-                }
-            });
+        openLater("the blueprint library", () -> new BlueprintScreen(new BlueprintView(colonyView)));
     }
 
     public static void back() {
@@ -48,13 +24,10 @@ public class BlueprintScreen extends ModularScreen {
         returning = true;
         ColonyScreen.restore(
             screen == null ? null
-                : screen.view.getColonyView()
+                : screen.getView()
+                    .getColonyView()
                     .getSelection());
-        Minecraft.getMinecraft()
-            .func_152344_a(() -> {
-                ClientGUI.close();
-                GCNetwork.CHANNEL.sendToServer(new PacketRequestColony());
-            });
+        closeLater();
     }
 
     @Override
@@ -65,9 +38,11 @@ public class BlueprintScreen extends ModularScreen {
 
     public static void accept(PacketBlueprintData data) {
         BlueprintScreen screen = getOpen();
-        if (screen != null && screen.view.getColony()
+        if (screen != null && screen.getView()
+            .getColony()
             .getId() == data.getColonyId()) {
-            screen.view.accept(data.getIndex(), data.getBlueprint(), data.getStock());
+            screen.getView()
+                .accept(data.getIndex(), data.getBlueprint(), data.getStock());
         }
     }
 }

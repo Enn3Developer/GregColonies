@@ -13,7 +13,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import net.minecraft.block.Block;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.inventory.IInventory;
-import net.minecraft.item.ItemStack;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
@@ -146,22 +145,18 @@ public final class GCNetwork {
             return entries;
         }
         Map<String, Integer> held = new LinkedHashMap<>();
-        for (int slot = 0; slot < inventory.getSizeInventory(); slot++) {
-            ItemStack stack = inventory.getStackInSlot(slot);
-            if (stack == null || stack.stackSize <= 0) {
-                continue;
-            }
+        Inventories.forEachExtractable(inventory, stack -> {
             Block block = Block.getBlockFromItem(stack.getItem());
             int meta = stack.getItemDamage();
             if (block == null || meta > 0xFF || !Blueprint.isBuildable(block, meta)) {
-                continue;
+                return;
             }
             String name = Block.blockRegistry.getNameForObject(block);
             if (name == null || name.isEmpty()) {
-                continue;
+                return;
             }
             held.merge(name + "@" + meta, stack.stackSize, Integer::sum);
-        }
+        });
         for (Map.Entry<String, Integer> entry : held.entrySet()) {
             String key = entry.getKey();
             int split = key.lastIndexOf('@');
@@ -193,14 +188,7 @@ public final class GCNetwork {
         }
         for (int cell : blueprint.materials()
             .keySet()) {
-            int held = 0;
-            for (int slot = 0; slot < inventory.getSizeInventory(); slot++) {
-                ItemStack stack = inventory.getStackInSlot(slot);
-                if (stack != null && blueprint.matches(cell, stack)) {
-                    held += stack.stackSize;
-                }
-            }
-            stock.put(cell, held);
+            stock.put(cell, Inventories.count(inventory, stack -> blueprint.matches(cell, stack)));
         }
         return stock;
     }

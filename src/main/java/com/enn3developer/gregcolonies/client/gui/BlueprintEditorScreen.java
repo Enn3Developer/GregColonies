@@ -1,38 +1,21 @@
 package com.enn3developer.gregcolonies.client.gui;
 
-import net.minecraft.client.Minecraft;
-
 import org.lwjgl.input.Keyboard;
 
-import com.cleanroommc.modularui.factory.ClientGUI;
-import com.cleanroommc.modularui.screen.ModularScreen;
-import com.enn3developer.gregcolonies.GregColonies;
 import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
-import com.enn3developer.gregcolonies.network.GCNetwork;
 import com.enn3developer.gregcolonies.network.PacketColonyPalette;
-import com.enn3developer.gregcolonies.network.PacketRequestColony;
 
-public class BlueprintEditorScreen extends ModularScreen {
+public class BlueprintEditorScreen extends GCScreen<BlueprintEditorView> {
 
     private static boolean returning;
 
-    private final BlueprintEditorView view;
-
     public BlueprintEditorScreen(BlueprintEditorView view) {
-        super(GregColonies.MODID, view.buildPanel());
-        this.view = view;
-        pausesGame(false);
-        drawDarkBackground(false);
-    }
-
-    public BlueprintEditorView getView() {
-        return view;
+        super(view, view.buildPanel());
     }
 
     public static BlueprintEditorScreen getOpen() {
-        ModularScreen current = ModularScreen.getCurrent();
-        return !returning && current instanceof BlueprintEditorScreen ? (BlueprintEditorScreen) current : null;
+        return current(BlueprintEditorScreen.class, returning);
     }
 
     public static void open(ColonySnapshot colony, int index, Blueprint source) {
@@ -41,35 +24,27 @@ public class BlueprintEditorScreen extends ModularScreen {
             return;
         }
         returning = false;
-        Minecraft.getMinecraft()
-            .func_152344_a(() -> {
-                try {
-                    ClientGUI.open(new BlueprintEditorScreen(new BlueprintEditorView(editor)));
-                } catch (RuntimeException error) {
-                    GregColonies.LOG.error("Failed to open the blueprint editor", error);
-                }
-            });
+        openLater("the blueprint editor", () -> new BlueprintEditorScreen(new BlueprintEditorView(editor)));
     }
 
     public static void back() {
         returning = true;
-        Minecraft.getMinecraft()
-            .func_152344_a(() -> {
-                ClientGUI.close();
-                GCNetwork.CHANNEL.sendToServer(new PacketRequestColony());
-            });
+        closeLater();
     }
 
     public static void accept(PacketColonyPalette palette) {
         BlueprintEditorScreen screen = getOpen();
         if (screen != null) {
-            screen.view.acceptPalette(palette);
+            screen.getView()
+                .acceptPalette(palette);
         }
     }
 
     @Override
     public boolean onKeyPressed(char typedChar, int keyCode) {
-        if (keyCode == Keyboard.KEY_ESCAPE && !view.isEditingText() && !view.isConfirming() && !view.requestClose()) {
+        if (keyCode == Keyboard.KEY_ESCAPE && !getView().isEditingText()
+            && !getView().isConfirming()
+            && !getView().requestClose()) {
             return true;
         }
         return super.onKeyPressed(typedChar, keyCode);
@@ -79,9 +54,9 @@ public class BlueprintEditorScreen extends ModularScreen {
     public void onOpen() {
         super.onOpen();
         BlueprintGhost.forget();
-        ColonyCamera.install(view.getColony());
-        view.focusCamera();
-        view.getEditor()
+        ColonyCamera.install(getView().getColony());
+        getView().focusCamera();
+        getView().getEditor()
             .requestPalette();
     }
 

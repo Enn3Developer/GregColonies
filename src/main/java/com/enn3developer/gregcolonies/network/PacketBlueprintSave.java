@@ -16,8 +16,6 @@ import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
 
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
-import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
-import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
@@ -97,16 +95,10 @@ public class PacketBlueprintSave implements IMessage {
         buf.writeBytes(payload);
     }
 
-    public static class Handler implements IMessageHandler<PacketBlueprintSave, IMessage> {
+    public static class Handler extends ServerPacketHandler<PacketBlueprintSave> {
 
         @Override
-        public IMessage onMessage(PacketBlueprintSave message, MessageContext ctx) {
-            EntityPlayerMP player = ctx.getServerHandler().playerEntity;
-            GCNetwork.enqueue(() -> apply(player, message));
-            return null;
-        }
-
-        private static void apply(EntityPlayerMP player, PacketBlueprintSave message) {
+        protected void apply(EntityPlayerMP player, PacketBlueprintSave message) {
             UUID sender = player.getUniqueID();
             if (message.payload == null || message.chunks <= 0
                 || message.chunk < 0

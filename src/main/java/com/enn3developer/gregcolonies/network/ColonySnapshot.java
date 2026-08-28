@@ -2,7 +2,6 @@ package com.enn3developer.gregcolonies.network;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -128,16 +127,7 @@ public class ColonySnapshot {
             snapshot.buildTotal = site.total();
         }
 
-        Map<UUID, EntityCitizen> loaded = new HashMap<>();
-        for (Object object : world.loadedEntityList) {
-            if (!(object instanceof EntityCitizen)) {
-                continue;
-            }
-            EntityCitizen citizen = (EntityCitizen) object;
-            if (citizen.getColonyId() == colony.getId()) {
-                loaded.put(citizen.getUniqueID(), citizen);
-            }
-        }
+        Map<UUID, EntityCitizen> loaded = GCNetwork.loadedCitizens(world, colony.getId());
         for (ColonyCitizen entry : colony.getCitizens()) {
             snapshot.citizens.add(CitizenSnapshot.of(entry, loaded.get(entry.getId())));
         }
