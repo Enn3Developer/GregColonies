@@ -23,7 +23,7 @@ import com.cleanroommc.modularui.widgets.slot.ItemSlot;
 import com.cleanroommc.modularui.widgets.slot.ModularSlot;
 import com.cleanroommc.modularui.widgets.slot.SlotGroup;
 import com.enn3developer.gregcolonies.GregColonies;
-import com.enn3developer.gregcolonies.entity.diet.CitizenDiet;
+import com.enn3developer.gregcolonies.entity.diet.HungerModel;
 
 final class CitizenPanel {
 
@@ -287,7 +287,7 @@ final class CitizenPanel {
     }
 
     private static String foodLabel(int level) {
-        return level + " / " + CitizenDiet.MAX_FOOD_LEVEL;
+        return level + " / " + HungerModel.MAX_FOOD_LEVEL;
     }
 
     private static String rowLabel(String left, String right) {

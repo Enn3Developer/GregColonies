@@ -1,11 +1,6 @@
 package com.enn3developer.gregcolonies.client.gui;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -43,7 +38,7 @@ import com.enn3developer.gregcolonies.network.PacketOpenCitizen;
 
 public class ColonyView extends OverlayView {
 
-    public static final String UNGROUPED = "ungrouped";
+    public static final String UNGROUPED = ColonySelection.UNGROUPED;
 
     private static final int BUILD_LABEL_COLOR = TargetMode.BUILD.color(TargetMode.LABEL_ALPHA);
 
@@ -69,19 +64,9 @@ public class ColonyView extends OverlayView {
 
     private final ColonyViewWidget map = new ColonyViewWidget(this);
 
-    private final Set<UUID> selection = new LinkedHashSet<>();
-
-    private final List<String> groups = new ArrayList<>();
-
-    private ColonySnapshot colony;
+    private final ColonySelection selection = new ColonySelection();
 
     private TextFieldWidget groupField;
-
-    private final int[] pending = new int[6];
-
-    private TargetMode targeting = TargetMode.NONE;
-
-    private boolean hasPending;
 
     private ModularPanel panel;
 
@@ -93,32 +78,19 @@ public class ColonyView extends OverlayView {
     }
 
     public ColonySnapshot getColony() {
-        return colony;
+        return selection.getColony();
     }
 
     public void setColony(ColonySnapshot colony) {
-        this.colony = colony;
-        Set<UUID> known = new LinkedHashSet<>();
-        Map<String, Integer> counts = new TreeMap<>();
-        for (CitizenSnapshot citizen : colony.getCitizens()) {
-            known.add(citizen.getId());
-            counts.merge(
-                citizen.getGroup()
-                    .isEmpty() ? UNGROUPED : citizen.getGroup(),
-                1,
-                Integer::sum);
-        }
-        selection.retainAll(known);
-        groups.clear();
-        groups.addAll(counts.keySet());
+        selection.setColony(colony);
     }
 
     public boolean isSelected(UUID id) {
-        return selection.contains(id);
+        return selection.isSelected(id);
     }
 
     public Set<UUID> getSelection() {
-        return selection;
+        return selection.get();
     }
 
     public void clearSelection() {
@@ -126,68 +98,43 @@ public class ColonyView extends OverlayView {
     }
 
     public void toggle(UUID id) {
-        if (!selection.remove(id)) {
-            selection.add(id);
-        }
+        selection.toggle(id);
     }
 
     public void selectAll() {
-        selection.clear();
-        for (CitizenSnapshot citizen : colony.getCitizens()) {
-            selection.add(citizen.getId());
-        }
+        selection.selectAll();
     }
 
     public void selectGroup(String group, boolean add) {
-        if (!add) {
-            selection.clear();
-        }
-        for (CitizenSnapshot citizen : colony.getCitizens()) {
-            if (groupLabel(citizen).equals(group)) {
-                selection.add(citizen.getId());
-            }
-        }
+        selection.selectGroup(group, add);
     }
 
     public int getSelectedLoaded() {
-        int loaded = 0;
-        for (CitizenSnapshot citizen : colony.getCitizens()) {
-            if (citizen.isLoaded() && selection.contains(citizen.getId())) {
-                loaded++;
-            }
-        }
-        return loaded;
+        return selection.countLoaded();
     }
 
     public TargetMode getTargeting() {
-        return targeting;
+        return selection.getTargeting();
     }
 
     public void setTargeting(TargetMode mode) {
-        targeting = targeting == mode ? TargetMode.NONE : mode;
-        hasPending = false;
+        selection.setTargeting(mode);
     }
 
     public boolean hasPending() {
-        return targeting != TargetMode.NONE && hasPending;
+        return selection.hasPending();
     }
 
     public int[] getPending() {
-        return pending;
+        return selection.getPending();
     }
 
     public void setPending(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
-        pending[0] = minX;
-        pending[1] = minY;
-        pending[2] = minZ;
-        pending[3] = maxX;
-        pending[4] = maxY;
-        pending[5] = maxZ;
-        hasPending = true;
+        selection.setPending(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
     public void clearPending() {
-        hasPending = false;
+        selection.clearPending();
     }
 
     public boolean isEditing() {
@@ -198,21 +145,22 @@ public class ColonyView extends OverlayView {
         if (selection.isEmpty()) {
             return;
         }
-        GCNetwork.CHANNEL.sendToServer(new PacketCitizenCommand(colony.getId(), action, append, x, y, z, selection));
+        GCNetwork.CHANNEL
+            .sendToServer(new PacketCitizenCommand(getColony().getId(), action, append, x, y, z, selection.get()));
     }
 
     public void sendArea(byte action, boolean append, int x1, int y1, int z1, int x2, int y2, int z2) {
         if (selection.isEmpty()) {
             return;
         }
-        GCNetwork.CHANNEL
-            .sendToServer(new PacketCitizenCommand(colony.getId(), action, append, x1, y1, z1, x2, y2, z2, selection));
+        GCNetwork.CHANNEL.sendToServer(
+            new PacketCitizenCommand(getColony().getId(), action, append, x1, y1, z1, x2, y2, z2, selection.get()));
     }
 
     public void sendSite(ColonySiteKind kind, int x, int y, int z) {
-        boolean clear = colony.site(kind)
+        boolean clear = getColony().site(kind)
             .isAt(x, y, z);
-        GCNetwork.CHANNEL.sendToServer(new PacketColonySite(colony.getId(), kind, x, y, z, clear));
+        GCNetwork.CHANNEL.sendToServer(new PacketColonySite(getColony().getId(), kind, x, y, z, clear));
     }
 
     public void openBlueprints() {
@@ -220,20 +168,13 @@ public class ColonyView extends OverlayView {
     }
 
     public void sendBuild(int x, int y, int z) {
-        boolean clear = colony.isBuildSiteAt(x, y, z);
-        GCNetwork.CHANNEL.sendToServer(new PacketColonyBuild(colony.getId(), x, y, z, clear));
+        boolean clear = getColony().isBuildSiteAt(x, y, z);
+        GCNetwork.CHANNEL.sendToServer(new PacketColonyBuild(getColony().getId(), x, y, z, clear));
     }
 
     public CitizenSnapshot getSingleSelected() {
-        if (selection.size() != 1) {
-            return null;
-        }
-        for (CitizenSnapshot citizen : colony.getCitizens()) {
-            if (selection.contains(citizen.getId())) {
-                return canOpen(citizen) ? citizen : null;
-            }
-        }
-        return null;
+        CitizenSnapshot citizen = selection.single();
+        return canOpen(citizen) ? citizen : null;
     }
 
     public static boolean canOpen(CitizenSnapshot citizen) {
@@ -250,21 +191,21 @@ public class ColonyView extends OverlayView {
             return;
         }
         ColonyScreen.armReturn();
-        GCNetwork.CHANNEL.sendToServer(new PacketOpenCitizen(colony.getId(), citizen.getId()));
+        GCNetwork.CHANNEL.sendToServer(new PacketOpenCitizen(getColony().getId(), citizen.getId()));
     }
 
     public void sendGroup(String group) {
         if (selection.isEmpty()) {
             return;
         }
-        GCNetwork.CHANNEL.sendToServer(new PacketCitizenGroup(colony.getId(), group, selection));
+        GCNetwork.CHANNEL.sendToServer(new PacketCitizenGroup(getColony().getId(), group, selection.get()));
     }
 
     public void sendJob(CitizenJob job) {
         if (selection.isEmpty()) {
             return;
         }
-        GCNetwork.CHANNEL.sendToServer(new PacketCitizenJob(colony.getId(), job, selection));
+        GCNetwork.CHANNEL.sendToServer(new PacketCitizenJob(getColony().getId(), job, selection.get()));
     }
 
     public ModularPanel buildPanel() {
@@ -392,7 +333,7 @@ public class ColonyView extends OverlayView {
 
         TextWidget<?> targetHint = GuiStyle.label(IKey.dynamic(this::targetingLabel), GuiStyle.HINT_COLOR);
         targetHint.widthRel(1.0F);
-        targetHint.setEnabledIf(widget -> targeting != TargetMode.NONE);
+        targetHint.setEnabledIf(widget -> getTargeting() != TargetMode.NONE);
         targetHint.marginTop(GuiStyle.ROW_GAP);
         list.child(targetHint);
 
@@ -416,7 +357,7 @@ public class ColonyView extends OverlayView {
 
     private String buildersValue() {
         int builders = 0;
-        for (CitizenSnapshot citizen : colony.getCitizens()) {
+        for (CitizenSnapshot citizen : getColony().getCitizens()) {
             if (citizen.getJob() == CitizenJob.BUILDER) {
                 builders++;
             }
@@ -429,45 +370,45 @@ public class ColonyView extends OverlayView {
     }
 
     private boolean hasCitizens() {
-        return !colony.getCitizens()
+        return !getColony().getCitizens()
             .isEmpty();
     }
 
     private ButtonWidget<?> modeButton(TargetMode mode) {
         return GuiStyle
-            .toggleButton(mode::getLabel, GuiStyle.EXPAND, () -> targeting == mode, () -> setTargeting(mode));
+            .toggleButton(mode::getLabel, GuiStyle.EXPAND, () -> getTargeting() == mode, () -> setTargeting(mode));
     }
 
     private String targetingLabel() {
-        return targeting.getHint();
+        return getTargeting().getHint();
     }
 
     private String siteValue(ColonySiteKind kind) {
-        ColonySite site = colony.site(kind);
+        ColonySite site = getColony().site(kind);
         return site.isPresent() ? site.describe() : "not set";
     }
 
     private String blueprintValue() {
-        ColonySnapshot.BlueprintEntry entry = colony.getBlueprint(colony.getActiveBlueprint());
+        ColonySnapshot.BlueprintEntry entry = getColony().getBlueprint(getColony().getActiveBlueprint());
         if (entry == null) {
             return "none";
         }
-        return entry.getLabel(colony.getActiveBlueprint());
+        return entry.getLabel(getColony().getActiveBlueprint());
     }
 
     private String buildSiteValue() {
-        if (!colony.hasBuildSite()) {
+        if (!getColony().hasBuildSite()) {
             return "none";
         }
-        return colony.getBuildX() + "/" + colony.getBuildY() + "/" + colony.getBuildZ();
+        return getColony().getBuildX() + "/" + getColony().getBuildY() + "/" + getColony().getBuildZ();
     }
 
     private String buildValue() {
-        if (!colony.hasBuildSite()) {
-            ColonySnapshot.BlueprintEntry entry = colony.getBlueprint(colony.getActiveBlueprint());
+        if (!getColony().hasBuildSite()) {
+            ColonySnapshot.BlueprintEntry entry = getColony().getBlueprint(getColony().getActiveBlueprint());
             return entry == null ? "" : entry.getBlocks() + " blocks";
         }
-        return colony.getBuildTotal() - colony.getBuildRemaining() + "/" + colony.getBuildTotal();
+        return getColony().getBuildTotal() - getColony().getBuildRemaining() + "/" + getColony().getBuildTotal();
     }
 
     private TextFieldWidget groupField() {
@@ -477,7 +418,10 @@ public class ColonyView extends OverlayView {
     }
 
     private IWidget buildGroupRow(int index) {
-        return GuiRow.at(index, groups::size)
+        return GuiRow.at(
+            index,
+            () -> selection.getGroups()
+                .size())
             .marginBottom(1)
             .padding(GuiStyle.SWATCH_WIDTH + 4, 4)
             .label(() -> groupRowLabel(index))
@@ -485,7 +429,11 @@ public class ColonyView extends OverlayView {
             .skin(
                 groupRowSkin(index, GuiStyle.ROW_BACKGROUND, GuiStyle.ROW_SELECTED),
                 groupRowSkin(index, GuiStyle.BUTTON_HOVER, GuiStyle.ROW_SELECTED_HOVER))
-            .onClick(row -> selectGroup(groups.get(row), Interactable.hasShiftDown()))
+            .onClick(
+                row -> selectGroup(
+                    selection.getGroups()
+                        .get(row),
+                    Interactable.hasShiftDown()))
             .build();
     }
 
@@ -497,7 +445,7 @@ public class ColonyView extends OverlayView {
     }
 
     private String groupAt(int index) {
-        return index < groups.size() ? groups.get(index) : null;
+        return selection.groupAt(index);
     }
 
     private String groupRowLabel(int index) {
@@ -519,8 +467,8 @@ public class ColonyView extends OverlayView {
             return 0;
         }
         int count = 0;
-        for (CitizenSnapshot citizen : colony.getCitizens()) {
-            if (groupLabel(citizen).equals(group) && (!selectedOnly || selection.contains(citizen.getId()))) {
+        for (CitizenSnapshot citizen : getColony().getCitizens()) {
+            if (groupLabel(citizen).equals(group) && (!selectedOnly || selection.isSelected(citizen.getId()))) {
                 count++;
             }
         }
@@ -552,48 +500,44 @@ public class ColonyView extends OverlayView {
     }
 
     private static String groupLabel(CitizenSnapshot citizen) {
-        return citizen.getGroup()
-            .isEmpty() ? UNGROUPED : citizen.getGroup();
+        return ColonySelection.groupLabel(citizen);
     }
 
     @Override
     protected String title() {
-        return colony.getName() + " #" + colony.getId();
+        return getColony().getName() + " #" + getColony().getId();
     }
 
     @Override
     protected String headerHint() {
-        return "owner " + colony.getOwnerName()
+        return "owner " + getColony().getOwnerName()
             + "   dim "
-            + colony.getDimension()
+            + getColony().getDimension()
             + "   "
-            + colony.getX()
+            + getColony().getX()
             + "/"
-            + colony.getY()
+            + getColony().getY()
             + "/"
-            + colony.getZ()
+            + getColony().getZ()
             + "   r"
-            + colony.getRadius();
+            + getColony().getRadius();
     }
 
     @Override
     protected String headerLine() {
         int loaded = 0;
-        for (CitizenSnapshot citizen : colony.getCitizens()) {
+        for (CitizenSnapshot citizen : getColony().getCitizens()) {
             if (citizen.isLoaded()) {
                 loaded++;
             }
         }
-        return colony.getCitizens()
-            .size() + " citizens   "
-            + loaded
-            + " loaded   "
-            + colony.getOrderCount()
-            + " orders";
+        return getColony().getCitizens()
+            .size() + " citizens   " + loaded + " loaded   " + getColony().getOrderCount() + " orders";
     }
 
     private String groupValue() {
-        return groups.size() + " groups";
+        return selection.getGroups()
+            .size() + " groups";
     }
 
     private String selectionValue() {
@@ -601,7 +545,7 @@ public class ColonyView extends OverlayView {
             return "none";
         }
         return selection.size() + "/"
-            + colony.getCitizens()
+            + getColony().getCitizens()
                 .size();
     }
 

@@ -31,13 +31,7 @@ import squeek.spiceoflife.helpers.FoodHelper;
 
 public class CitizenDiet {
 
-    public static final int MAX_FOOD_LEVEL = 20;
-
     private static final float MAX_NUTRIENT = 100.0F;
-
-    private static final float MAX_EXHAUSTION_LEVEL = 4.0F;
-
-    private static final float EXHAUSTION_CAP = 40.0F;
 
     private static final float HUNGER_POTION_EXHAUSTION = 0.025F;
 
@@ -59,19 +53,16 @@ public class CitizenDiet {
 
     private final Map<String, Float> nutrients = new HashMap<>();
     private final FoodHistory history = new FoodHistory();
-    private int foodLevel = MAX_FOOD_LEVEL;
-    private float saturation = 5.0F;
-    private float exhaustion;
+    private final HungerModel hunger = new HungerModel();
     private int eatCooldown;
     private int effectTimer;
-    private int foodTimer;
 
     public int getFoodLevel() {
-        return foodLevel;
+        return hunger.getFoodLevel();
     }
 
     public float getSaturation() {
-        return saturation;
+        return hunger.getSaturation();
     }
 
     public FoodHistory getHistory() {
@@ -88,49 +79,40 @@ public class CitizenDiet {
     }
 
     public void addExhaustion(float amount) {
-        exhaustion = Math.min(exhaustion + amount, EXHAUSTION_CAP);
+        hunger.addExhaustion(amount);
     }
 
     public void update(EntityCitizen citizen) {
         EnumDifficulty difficulty = citizen.worldObj.difficultySetting;
 
-        PotionEffect hunger = citizen.getActivePotionEffect(Potion.hunger);
-        if (hunger != null) {
-            addExhaustion(HUNGER_POTION_EXHAUSTION * (hunger.getAmplifier() + 1));
+        PotionEffect starving = citizen.getActivePotionEffect(Potion.hunger);
+        if (starving != null) {
+            addExhaustion(HUNGER_POTION_EXHAUSTION * (starving.getAmplifier() + 1));
         }
 
-        if (exhaustion > MAX_EXHAUSTION_LEVEL) {
-            exhaustion -= MAX_EXHAUSTION_LEVEL;
-            if (saturation > 0.0F) {
-                saturation = Math.max(saturation - 1.0F, 0.0F);
-            } else if (difficulty != EnumDifficulty.PEACEFUL) {
-                foodLevel = Math.max(foodLevel - 1, 0);
-                decay(1);
-            }
-        }
+        decay(hunger.drain(difficulty != EnumDifficulty.PEACEFUL));
 
         if (citizen.worldObj.getGameRules()
-            .getGameRuleBooleanValue("naturalRegeneration") && foodLevel >= HEAL_FOOD_LEVEL && shouldHeal(citizen)) {
-            if (++foodTimer >= FOOD_TIMER_PERIOD) {
-                foodTimer = 0;
+            .getGameRuleBooleanValue("naturalRegeneration") && hunger.isAtLeast(HEAL_FOOD_LEVEL)
+            && shouldHeal(citizen)) {
+            if (hunger.tick(FOOD_TIMER_PERIOD)) {
                 citizen.heal(1.0F);
                 addExhaustion(HEAL_EXHAUSTION);
             }
-        } else if (foodLevel <= 0) {
-            if (++foodTimer >= FOOD_TIMER_PERIOD) {
-                foodTimer = 0;
+        } else if (hunger.isEmpty()) {
+            if (hunger.tick(FOOD_TIMER_PERIOD)) {
                 if (citizen.getHealth() > 10.0F || difficulty == EnumDifficulty.HARD
                     || citizen.getHealth() > 1.0F && difficulty == EnumDifficulty.NORMAL) {
                     citizen.attackEntityFrom(DamageSource.starve, 1.0F);
                 }
             }
         } else {
-            foodTimer = 0;
+            hunger.resetTimer();
         }
 
         if (eatCooldown > 0) {
             eatCooldown--;
-        } else if (foodLevel <= EAT_THRESHOLD) {
+        } else if (hunger.isBelow(EAT_THRESHOLD)) {
             tryEat(citizen);
         }
 
@@ -160,7 +142,7 @@ public class CitizenDiet {
             if (base == null || base.hunger <= 0) {
                 continue;
             }
-            float modifier = CitizenFoodModifier.get(history, stack, foodLevel, saturation);
+            float modifier = CitizenFoodModifier.get(history, stack, hunger.getFoodLevel(), hunger.getSaturation());
             FoodValues modified = FoodModifier.getModifiedFoodValues(base, modifier);
             if (modified.hunger <= 0) {
                 continue;
@@ -180,8 +162,7 @@ public class CitizenDiet {
         ItemStack eaten = stack.copy();
         eaten.stackSize = 1;
 
-        foodLevel = Math.min(foodLevel + bestValues.hunger, MAX_FOOD_LEVEL);
-        saturation = Math.min(saturation + bestValues.getSaturationIncrement(), foodLevel);
+        hunger.eat(bestValues.hunger, bestValues.getSaturationIncrement());
 
         FoodEaten foodEaten = new FoodEaten(eaten);
         foodEaten.foodValues = bestValues;
@@ -204,7 +185,7 @@ public class CitizenDiet {
     }
 
     private void decay(int hungerLost) {
-        if (!NutritionConfig.decay.enable) {
+        if (hungerLost <= 0 || !NutritionConfig.decay.enable) {
             return;
         }
         for (Nutrient nutrient : nutrientList()) {
@@ -280,10 +261,7 @@ public class CitizenDiet {
     }
 
     public void writeToNBT(NBTTagCompound tag) {
-        tag.setInteger("foodLevel", foodLevel);
-        tag.setFloat("saturation", saturation);
-        tag.setFloat("exhaustion", exhaustion);
-        tag.setInteger("foodTimer", foodTimer);
+        hunger.writeToNBT(tag);
         tag.setInteger("totalFoodsEaten", history.totalFoodsEatenAllTime);
 
         NBTTagCompound nutrientTag = new NBTTagCompound();
@@ -302,12 +280,7 @@ public class CitizenDiet {
     }
 
     public void readFromNBT(NBTTagCompound tag) {
-        if (tag.hasKey("foodLevel")) {
-            foodLevel = tag.getInteger("foodLevel");
-        }
-        saturation = tag.getFloat("saturation");
-        exhaustion = tag.getFloat("exhaustion");
-        foodTimer = tag.getInteger("foodTimer");
+        hunger.readFromNBT(tag);
 
         nutrients.clear();
         NBTTagCompound nutrientTag = tag.getCompoundTag("nutrients");
