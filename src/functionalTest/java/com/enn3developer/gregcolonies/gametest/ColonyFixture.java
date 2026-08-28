@@ -7,7 +7,6 @@ import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
-import net.minecraft.server.MinecraftServer;
 
 import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.colony.BuildSite;
@@ -71,32 +70,27 @@ final class ColonyFixture {
     }
 
     /**
-     * Two things stop citizens from running under Horizon-QA, and neither is about GregColonies.
+     * A WorldServer with no players and no force-loaded chunks stops ticking entities entirely after
+     * 1200 ticks, which the void test world hits long before these tests run. Holding the counter
+     * down is what a nearby player would do.
      *
-     * Horizon-QA's headless mode calls setCanSpawnNPCs(false) to stop natural spawning, and vanilla
-     * WorldServer.updateEntityWithOptionalForce reads that flag as "kill every INpc in the world",
-     * every tick. EntityCitizen extends EntityVillager, so every citizen dies on its first tick.
-     *
-     * A WorldServer with no players and no force-loaded chunks also stops ticking entities entirely
-     * after 1200 ticks, which the void test world hits long before these tests run.
+     * The other hazard, Horizon-QA's headless setCanSpawnNPCs(false) deleting every INpc each tick,
+     * is handled by MixinWorldServer in the mod itself. These tests deliberately run with that flag
+     * off so every one of them exercises the fix.
      */
-    static void keepCitizensAlive(GameTestHelper helper) {
-        MinecraftServer server = MinecraftServer.getServer();
-        server.setCanSpawnNPCs(true);
+    static void keepEntitiesTicking(GameTestHelper helper) {
         helper.getWorld()
             .resetUpdateEntityTick();
-        helper.onEachTick("keep citizens alive and ticking", () -> {
-            MinecraftServer.getServer()
-                .setCanSpawnNPCs(true);
-            helper.getWorld()
-                .resetUpdateEntityTick();
-        });
+        helper.onEachTick(
+            "keep the world ticking entities",
+            () -> helper.getWorld()
+                .resetUpdateEntityTick());
     }
 
     /** Everything a colony test needs: a floor, a ticking world and a colony at CENTRE. */
     static Colony arena(GameTestHelper helper) {
         floor(helper);
-        keepCitizensAlive(helper);
+        keepEntitiesTicking(helper);
         return colonyAt(helper, CENTRE);
     }
 
