@@ -1,8 +1,12 @@
-package com.enn3developer.gregcolonies.entity.ai;
+package com.enn3developer.gregcolonies.colony;
 
 import net.minecraft.nbt.NBTTagCompound;
 
 public class WorkArea {
+
+    public static final int MAX_SIDE = 32;
+
+    public static final int MAX_HEIGHT = 32;
 
     private int minX;
 

@@ -12,14 +12,14 @@ import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
 import net.minecraft.world.World;
 
+import com.enn3developer.gregcolonies.colony.BlockKey;
+import com.enn3developer.gregcolonies.colony.WorkArea;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
 
 public class CitizenCommandChop extends CitizenCommandHarvest {
 
     public static final String ID = "chop";
-
-    public static final int MAX_SIDE = 32;
 
     private static final int SCAN_DEPTH = 48;
 
@@ -45,7 +45,7 @@ public class CitizenCommandChop extends CitizenCommandHarvest {
 
     public CitizenCommandChop(int x1, int y1, int z1, int x2, int y2, int z2) {
         super(x1, y1, z1, x2, y2, z2);
-        area.capSide(MAX_SIDE);
+        area.capSide(WorkArea.MAX_SIDE);
     }
 
     @Override
@@ -147,7 +147,7 @@ public class CitizenCommandChop extends CitizenCommandHarvest {
         Set<Long> seen = new HashSet<>();
         Deque<int[]> queue = new ArrayDeque<>();
         queue.add(new int[] { rootX, rootY, rootZ });
-        seen.add(WorkBlocks.pack(rootX, rootY, rootZ));
+        seen.add(BlockKey.pack(rootX, rootY, rootZ));
         boolean leaves = false;
 
         while (!queue.isEmpty() && tree.size() < MAX_TREE_LOGS) {
@@ -166,7 +166,7 @@ public class CitizenCommandChop extends CitizenCommandHarvest {
                             || Math.abs(z - rootZ) > MAX_TREE_SPREAD) {
                             continue;
                         }
-                        if (!seen.add(WorkBlocks.pack(x, y, z))) {
+                        if (!seen.add(BlockKey.pack(x, y, z))) {
                             continue;
                         }
                         if (WorkBlocks.isLog(world, x, y, z)) {

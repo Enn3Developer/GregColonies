@@ -53,7 +53,8 @@ public class BlueprintEditorWidget extends CameraWidget<BlueprintEditorWidget> {
             return Result.SUCCESS;
         }
         BlueprintEditor editor = view.getEditor();
-        if (editor.getTool() == BlueprintEditor.TOOL_PAINT || editor.getTool() == BlueprintEditor.TOOL_ERASE) {
+        if (editor.getTool()
+            .draws()) {
             editor.pushUndo();
             stroking = true;
         }
@@ -70,8 +71,8 @@ public class BlueprintEditorWidget extends CameraWidget<BlueprintEditorWidget> {
             BlueprintTrace.Hit hit = traceAt(getContext().getMouseX(), getContext().getMouseY());
             BlueprintEditor editor = view.getEditor();
             if (hit != null && hit.solid) {
-                int tool = editor.getTool();
-                if (tool == BlueprintEditor.TOOL_PAINT || tool == BlueprintEditor.TOOL_ERASE) {
+                EditorTool tool = editor.getTool();
+                if (tool.draws()) {
                     editor.pushUndo();
                 }
                 editor.apply(hit, true);
@@ -134,7 +135,9 @@ public class BlueprintEditorWidget extends CameraWidget<BlueprintEditorWidget> {
             return Result.SUCCESS;
         }
         if (keyCode == Keyboard.KEY_TAB) {
-            editor.setTool((editor.getTool() + 1) % BlueprintEditor.TOOL_COUNT);
+            editor.setTool(
+                editor.getTool()
+                    .next());
             return Result.SUCCESS;
         }
         if (keyCode == Keyboard.KEY_H) {

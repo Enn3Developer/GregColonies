@@ -52,14 +52,7 @@ public final class Crops {
         if (!isTillable(world, x, y, z)) {
             return false;
         }
-        world.setBlock(x, y, z, Blocks.farmland, 0, 3);
-        world.playSoundEffect(
-            x + 0.5D,
-            y + 0.5D,
-            z + 0.5D,
-            Blocks.farmland.stepSound.func_150496_b(),
-            (Blocks.farmland.stepSound.getVolume() + 1.0F) / 2.0F,
-            Blocks.farmland.stepSound.getPitch() * 0.8F);
+        WorldOps.place(world, x, y, z, Blocks.farmland, 0);
         return true;
     }
 
@@ -117,14 +110,7 @@ public final class Crops {
         if (plant == null || plant == Blocks.air) {
             return false;
         }
-        world.setBlock(x, y, z, plant, plantable.getPlantMetadata(world, x, y, z), 3);
-        world.playSoundEffect(
-            x + 0.5D,
-            y + 0.5D,
-            z + 0.5D,
-            plant.stepSound.func_150496_b(),
-            (plant.stepSound.getVolume() + 1.0F) / 2.0F,
-            plant.stepSound.getPitch() * 0.8F);
+        WorldOps.place(world, x, y, z, plant, plantable.getPlantMetadata(world, x, y, z));
         seed.stackSize--;
         return true;
     }

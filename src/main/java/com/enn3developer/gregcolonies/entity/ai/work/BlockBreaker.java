@@ -4,7 +4,6 @@ import java.util.ArrayList;
 
 import net.minecraft.block.Block;
 import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.entity.item.EntityItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 
@@ -101,7 +100,7 @@ public class BlockBreaker {
             ItemStack rest = citizen.getInventory()
                 .store(drop);
             if (rest != null) {
-                dropAt(world, x, y, z, rest);
+                WorldOps.dropAt(world, x, y, z, rest);
             }
         }
 
@@ -120,12 +119,6 @@ public class BlockBreaker {
         }
         clear(citizen);
         return DigResult.BROKEN;
-    }
-
-    private static void dropAt(World world, int x, int y, int z, ItemStack stack) {
-        EntityItem item = new EntityItem(world, x + 0.5D, y + 0.5D, z + 0.5D, stack);
-        item.delayBeforeCanPickup = 10;
-        world.spawnEntityInWorld(item);
     }
 
     private void breakBlock(EntityCitizen citizen, World world, Block block, int meta) {

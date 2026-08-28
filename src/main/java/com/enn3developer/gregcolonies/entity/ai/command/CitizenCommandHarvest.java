@@ -10,29 +10,24 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 
+import com.enn3developer.gregcolonies.colony.BlockKey;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonySite;
 import com.enn3developer.gregcolonies.colony.ColonySiteKind;
+import com.enn3developer.gregcolonies.colony.WorkArea;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.ApproachTracker;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandResult;
 import com.enn3developer.gregcolonies.entity.ai.TravelLeg;
-import com.enn3developer.gregcolonies.entity.ai.WorkArea;
+import com.enn3developer.gregcolonies.entity.ai.WorkPhase;
 import com.enn3developer.gregcolonies.entity.ai.work.BlockBreaker;
 import com.enn3developer.gregcolonies.entity.ai.work.DigResult;
 import com.enn3developer.gregcolonies.entity.ai.work.Inventories;
 import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
+import com.enn3developer.gregcolonies.entity.ai.work.WorldOps;
 
 public abstract class CitizenCommandHarvest extends CitizenCommand {
-
-    public static final int MAX_HEIGHT = 32;
-
-    protected static final int PHASE_TRAVEL = 0;
-
-    protected static final int PHASE_WORK = 1;
-
-    protected static final int PHASE_RETURN = 2;
 
     private static final double WORK_REACH_SQ = 25.0D;
 
@@ -62,7 +57,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
 
     private final Set<Long> skipped = new HashSet<>();
 
-    private int phase = PHASE_TRAVEL;
+    private WorkPhase phase = WorkPhase.TRAVEL;
 
     private final TravelLeg leg = new TravelLeg();
 
@@ -102,7 +97,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
 
     protected CitizenCommandHarvest(int x1, int y1, int z1, int x2, int y2, int z2) {
         area.set(x1, y1, z1, x2, y2, z2);
-        area.capHeight(MAX_HEIGHT);
+        area.capHeight(WorkArea.MAX_HEIGHT);
     }
 
     protected abstract Block referenceBlock();
@@ -131,7 +126,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
     }
 
     protected boolean isSkipped(int x, int y, int z) {
-        return skipped.contains(WorkBlocks.pack(x, y, z));
+        return skipped.contains(BlockKey.pack(x, y, z));
     }
 
     protected int getHarvested() {
@@ -155,10 +150,10 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
 
     @Override
     public CitizenCommandResult update(EntityCitizen citizen) {
-        if (phase == PHASE_TRAVEL) {
+        if (phase == WorkPhase.TRAVEL) {
             return travel(citizen);
         }
-        if (phase == PHASE_WORK) {
+        if (phase == WorkPhase.WORK) {
             return work(citizen);
         }
         return goHome(citizen);
@@ -171,7 +166,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
             travelY = surfaceY(citizen.worldObj, x, z);
         }
         if (leg.walk(citizen, x, travelY, z) != TravelLeg.Step.RUNNING) {
-            phase = PHASE_WORK;
+            phase = WorkPhase.WORK;
         }
         return CitizenCommandResult.RUNNING;
     }
@@ -272,21 +267,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
         if (scaffold == null) {
             return null;
         }
-        Block block = Block.getBlockFromItem(scaffold.getItem());
-        citizen.getNavigator()
-            .clearPathEntity();
-        world.setBlock(cx, cy, cz, block, scaffold.getItemDamage(), 3);
-        world.playSoundEffect(
-            cx + 0.5D,
-            cy + 0.5D,
-            cz + 0.5D,
-            block.stepSound.func_150496_b(),
-            (block.stepSound.getVolume() + 1.0F) / 2.0F,
-            block.stepSound.getPitch() * 0.8F);
-        citizen.setPosition(cx + 0.5D, cy + 1.0D, cz + 0.5D);
-        citizen.motionY = 0.0D;
-        citizen.fallDistance = 0.0F;
-        citizen.swingItem();
+        WorldOps.stepUp(citizen, cx, cy, cz, scaffold);
         pillarCooldown = PILLAR_INTERVAL;
         return CitizenCommandResult.RUNNING;
     }
@@ -339,7 +320,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
 
     private CitizenCommandResult dig(EntityCitizen citizen, int x, int y, int z, boolean tunnelling) {
         if (WorkBlocks.isLiquid(citizen.worldObj, x, y, z)) {
-            return phase == PHASE_RETURN ? CitizenCommandResult.RUNNING : abandonTarget(citizen);
+            return phase == WorkPhase.FINISH ? CitizenCommandResult.RUNNING : abandonTarget(citizen);
         }
         if (!breaker.isAt(x, y, z)) {
             breaker.setTarget(citizen, x, y, z);
@@ -352,14 +333,14 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
             case PROGRESS:
                 return CitizenCommandResult.RUNNING;
             case INVENTORY_FULL:
-                if (phase == PHASE_RETURN) {
+                if (phase == WorkPhase.FINISH) {
                     return CitizenCommandResult.RUNNING;
                 }
                 reason = "inventory full";
                 resumeAfterDropOff = true;
                 return startReturn(citizen);
             case TOOL_BROKEN:
-                if (phase == PHASE_RETURN) {
+                if (phase == WorkPhase.FINISH) {
                     return CitizenCommandResult.RUNNING;
                 }
                 if (!tunnelling) {
@@ -383,7 +364,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
                 }
                 return CitizenCommandResult.RUNNING;
             default:
-                if (phase == PHASE_RETURN) {
+                if (phase == WorkPhase.FINISH) {
                     return CitizenCommandResult.RUNNING;
                 }
                 return abandonTarget(citizen);
@@ -392,7 +373,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
 
     private CitizenCommandResult abandonTarget(EntityCitizen citizen) {
         breaker.clear(citizen);
-        skipped.add(WorkBlocks.pack(anchorX, anchorY, anchorZ));
+        skipped.add(BlockKey.pack(anchorX, anchorY, anchorZ));
         onAbandon(citizen);
         hasTarget = false;
         approach.restart();
@@ -406,7 +387,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
     private CitizenCommandResult startReturn(EntityCitizen citizen) {
         breaker.clear(citizen);
         hasTarget = false;
-        phase = PHASE_RETURN;
+        phase = WorkPhase.FINISH;
         homeTicks = 0;
         leg.clear(citizen);
         return goHome(citizen);
@@ -477,7 +458,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
         }
         reason = "";
         homeTicks = 0;
-        phase = PHASE_TRAVEL;
+        phase = WorkPhase.TRAVEL;
         return CitizenCommandResult.RUNNING;
     }
 
@@ -492,7 +473,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
     @Override
     public void readFromNBT(NBTTagCompound tag) {
         area.readFromNBT(tag);
-        phase = tag.getInteger("phase");
+        phase = WorkPhase.byId(tag.getInteger("phase"));
         harvested = tag.getInteger("harvested");
         reason = tag.getString("reason");
         resumeAfterDropOff = tag.getBoolean("resume");
@@ -501,7 +482,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
     @Override
     public void writeToNBT(NBTTagCompound tag) {
         area.writeToNBT(tag);
-        tag.setInteger("phase", phase);
+        tag.setInteger("phase", phase.id());
         tag.setInteger("harvested", harvested);
         tag.setString("reason", reason);
         tag.setBoolean("resume", resumeAfterDropOff);
@@ -509,7 +490,7 @@ public abstract class CitizenCommandHarvest extends CitizenCommand {
 
     @Override
     public String describe() {
-        String state = phase == PHASE_TRAVEL ? "walking there" : phase == PHASE_WORK ? "working" : "returning";
+        String state = phase == WorkPhase.TRAVEL ? "walking there" : phase == WorkPhase.WORK ? "working" : "returning";
         String tail = reason.isEmpty() ? "" : " (" + reason + ")";
         return getId() + " " + state + " " + harvested + " " + unitName() + tail;
     }

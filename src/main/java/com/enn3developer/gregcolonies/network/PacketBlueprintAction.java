@@ -5,6 +5,7 @@ import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.colony.ColonyRegistry;
 
 import cpw.mods.fml.common.network.ByteBufUtils;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -80,7 +81,7 @@ public class PacketBlueprintAction implements IMessage {
         @Override
         protected void apply(EntityPlayerMP player, Colony colony, PacketBlueprintAction message) {
             World world = player.worldObj;
-            ColonyManager manager = ColonyManager.get(world);
+            ColonyRegistry manager = ColonyManager.registry(world);
             if (message.action == REQUEST) {
                 GCNetwork.sendBlueprint(player, colony, message.index);
                 return;

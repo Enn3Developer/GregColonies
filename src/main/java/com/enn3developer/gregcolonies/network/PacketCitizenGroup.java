@@ -3,7 +3,7 @@ package com.enn3developer.gregcolonies.network;
 import java.util.Collection;
 import java.util.UUID;
 
-import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.colony.ColonyRegistry;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 
 import cpw.mods.fml.common.network.ByteBufUtils;
@@ -41,7 +41,7 @@ public class PacketCitizenGroup extends CitizenTargetPacket {
     }
 
     @Override
-    protected void applyStored(ColonyManager manager, int colonyId, UUID id) {
+    protected void applyStored(ColonyRegistry manager, int colonyId, UUID id) {
         manager.setCitizenGroup(colonyId, id, group);
     }
 

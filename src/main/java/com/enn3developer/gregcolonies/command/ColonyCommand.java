@@ -1,16 +1,14 @@
 package com.enn3developer.gregcolonies.command;
 
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.UUID;
 
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.command.WrongUsageException;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChunkCoordinates;
@@ -18,10 +16,14 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.Chat;
+import com.enn3developer.gregcolonies.colony.CitizenControl;
 import com.enn3developer.gregcolonies.colony.Colony;
+import com.enn3developer.gregcolonies.colony.ColonyActions;
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.colony.ColonyRegistry;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
+import com.enn3developer.gregcolonies.entity.LiveCitizens;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandGuard;
 import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandMoveTo;
 import com.enn3developer.gregcolonies.network.GCNetwork;
@@ -69,7 +71,7 @@ public class ColonyCommand extends CommandBase {
         }
 
         World world = sender.getEntityWorld();
-        ColonyManager manager = ColonyManager.get(world);
+        ColonyRegistry manager = ColonyManager.registry(world);
 
         if ("list".equals(args[0])) {
             if (manager.getColonyCount() == 0) {
@@ -175,11 +177,7 @@ public class ColonyCommand extends CommandBase {
             int x = parseInt(sender, args[1]);
             int y = parseInt(sender, args[2]);
             int z = parseInt(sender, args[3]);
-            manager.enqueueOrder(colony.getId(), new CitizenCommandMoveTo(x, y, z));
-
-            Chat.info(
-                sender,
-                "Queued move_to for colony #" + colony.getId() + " (" + colony.getOrderCount() + " order(s) pending)");
+            Chat.tell(sender, ColonyActions.enqueueOrder(manager, colony, new CitizenCommandMoveTo(x, y, z), ""));
             return;
         }
 
@@ -193,10 +191,7 @@ public class ColonyCommand extends CommandBase {
                 return;
             }
 
-            manager.enqueueOrder(colony.getId(), new CitizenCommandGuard());
-            Chat.info(
-                sender,
-                "Queued guard for colony #" + colony.getId() + " (" + colony.getOrderCount() + " order(s) pending)");
+            Chat.tell(sender, ColonyActions.enqueueOrder(manager, colony, new CitizenCommandGuard(), ""));
             return;
         }
 
@@ -215,21 +210,14 @@ public class ColonyCommand extends CommandBase {
                 return;
             }
 
-            int cleared = manager.clearOrders(colony.getId());
-            int stopped = 0;
-            for (EntityCitizen citizen : findCitizens(world, colony.getId())) {
-                citizen.getCommands()
-                    .clear(citizen);
-                stopped++;
-            }
-            Chat.info(sender, "Dropped " + cleared + " pending order(s), stopped " + stopped + " citizen(s)");
+            Chat.tell(sender, ColonyActions.cancelOrders(manager, colony, "", control(world, colony, null)));
             return;
         }
 
         throw new WrongUsageException(getCommandUsage(sender));
     }
 
-    private void processGroup(ICommandSender sender, String[] args, World world, ColonyManager manager) {
+    private void processGroup(ICommandSender sender, String[] args, World world, ColonyRegistry manager) {
         if (args.length < 2) {
             throw new WrongUsageException(getGroupUsage());
         }
@@ -290,29 +278,17 @@ public class ColonyCommand extends CommandBase {
             }
 
             EntityPlayer player = (EntityPlayer) sender;
-            Map<UUID, EntityCitizen> loaded = new HashMap<>();
-            for (EntityCitizen citizen : findCitizens(world, colony.getId())) {
-                loaded.put(citizen.getUniqueID(), citizen);
-            }
-
-            int dimension = world.provider.dimensionId;
-            int changed = 0;
-            for (ColonyCitizen entry : colony.getCitizens()) {
-                EntityCitizen citizen = loaded.get(entry.getId());
-                double distanceSq = citizen != null ? citizen.getDistanceSqToEntity(player)
-                    : entry.distanceSqTo(dimension, player.posX, player.posZ);
-                if (distanceSq > (double) radius * radius) {
-                    continue;
-                }
-                if (citizen != null) {
-                    citizen.setGroup(group);
-                } else {
-                    entry.setGroup(group);
-                }
-                changed++;
-            }
-            manager.markDirty();
-            Chat.info(sender, changed + " citizen(s) " + (clearing ? "ungrouped" : "put into group " + group));
+            Chat.tell(
+                sender,
+                ColonyActions.assignGroup(
+                    manager,
+                    colony,
+                    group,
+                    world.provider.dimensionId,
+                    player.posX,
+                    player.posZ,
+                    radius,
+                    control(world, colony, player)));
             return;
         }
 
@@ -338,16 +314,7 @@ public class ColonyCommand extends CommandBase {
                 parseInt(sender, args[3]),
                 parseInt(sender, args[4]),
                 parseInt(sender, args[5]));
-            command.setTargetGroup(group);
-            manager.enqueueOrder(colony.getId(), command);
-            Chat.info(
-                sender,
-                "Queued move_to for group " + group
-                    + " of colony #"
-                    + colony.getId()
-                    + " ("
-                    + colony.getOrderCount(group)
-                    + " order(s) pending)");
+            Chat.tell(sender, ColonyActions.enqueueOrder(manager, colony, command, group));
             return;
         }
 
@@ -361,17 +328,7 @@ public class ColonyCommand extends CommandBase {
                 return;
             }
 
-            CitizenCommandGuard command = new CitizenCommandGuard();
-            command.setTargetGroup(group);
-            manager.enqueueOrder(colony.getId(), command);
-            Chat.info(
-                sender,
-                "Queued guard for group " + group
-                    + " of colony #"
-                    + colony.getId()
-                    + " ("
-                    + colony.getOrderCount(group)
-                    + " order(s) pending)");
+            Chat.tell(sender, ColonyActions.enqueueOrder(manager, colony, new CitizenCommandGuard(), group));
             return;
         }
 
@@ -385,19 +342,7 @@ public class ColonyCommand extends CommandBase {
                 return;
             }
 
-            int cleared = manager.clearOrders(colony.getId(), group);
-            int stopped = 0;
-            for (EntityCitizen citizen : findCitizens(world, colony.getId())) {
-                if (!group.equals(citizen.getGroup())) {
-                    continue;
-                }
-                citizen.getCommands()
-                    .clear(citizen);
-                stopped++;
-            }
-            Chat.info(
-                sender,
-                "Dropped " + cleared + " order(s) for group " + group + ", stopped " + stopped + " citizen(s)");
+            Chat.tell(sender, ColonyActions.cancelOrders(manager, colony, group, control(world, colony, null)));
             return;
         }
 
@@ -409,7 +354,7 @@ public class ColonyCommand extends CommandBase {
             + "|guard <group> [colonyId]|cancel <group> [colonyId]>";
     }
 
-    private Colony findColony(ICommandSender sender, ColonyManager manager, int colonyId) {
+    private Colony findColony(ICommandSender sender, ColonyRegistry manager, int colonyId) {
         if (colonyId != 0) {
             return manager.getColony(colonyId);
         }
@@ -432,8 +377,7 @@ public class ColonyCommand extends CommandBase {
         return false;
     }
 
-    private Collection<EntityCitizen> findCitizens(World world, int colonyId) {
-        return GCNetwork.loadedCitizens(world, colonyId)
-            .values();
+    private CitizenControl control(World world, Colony colony, Entity actor) {
+        return new LiveCitizens(GCNetwork.loadedCitizens(world, colony.getId()), actor);
     }
 }

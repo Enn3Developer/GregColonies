@@ -34,6 +34,7 @@ import com.enn3developer.gregcolonies.Config;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.colony.ColonyRegistry;
 import com.enn3developer.gregcolonies.compat.Mods;
 import com.enn3developer.gregcolonies.compat.TinkersTools;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
@@ -259,7 +260,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     public void setGroup(String group) {
         this.group = group == null ? "" : group;
         if (colonyId != 0 && worldObj != null && !worldObj.isRemote) {
-            ColonyManager.get(worldObj)
+            ColonyManager.registry(worldObj)
                 .setCitizenGroup(colonyId, getUniqueID(), this.group);
         }
     }
@@ -271,7 +272,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
     public void setJob(CitizenJob job) {
         this.job = job == null ? CitizenJob.NONE : job;
         if (colonyId != 0 && worldObj != null && !worldObj.isRemote) {
-            ColonyManager.get(worldObj)
+            ColonyManager.registry(worldObj)
                 .setCitizenJob(colonyId, getUniqueID(), this.job);
         }
     }
@@ -285,7 +286,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         if (colonyId == 0 || worldObj == null || worldObj.isRemote) {
             return null;
         }
-        return ColonyManager.get(worldObj)
+        return ColonyManager.registry(worldObj)
             .getColony(colonyId);
     }
 
@@ -293,7 +294,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         if (colonyId == 0 || worldObj.isRemote || !canWork()) {
             return false;
         }
-        CitizenCommand order = ColonyManager.get(worldObj)
+        CitizenCommand order = ColonyManager.registry(worldObj)
             .pollOrder(colonyId, this);
         if (order == null) {
             return false;
@@ -388,7 +389,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         if (colonyId == 0 || !isEntityAlive()) {
             return;
         }
-        ColonyManager manager = ColonyManager.get(worldObj);
+        ColonyRegistry manager = ColonyManager.registry(worldObj);
         if (!rosterRegistered) {
             ColonyCitizen entry = manager.registerCitizen(colonyId, this);
             if (entry == null) {
@@ -412,7 +413,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
             return;
         }
         if (colonyId != 0) {
-            ColonyManager.get(worldObj)
+            ColonyManager.registry(worldObj)
                 .removeCitizen(colonyId, getUniqueID());
         }
         for (ItemStack stack : inventory.takeAll()) {

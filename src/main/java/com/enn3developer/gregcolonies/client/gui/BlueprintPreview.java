@@ -216,7 +216,8 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
         if (cell == Blueprint.AIR) {
             return;
         }
-        Block block = model.blockOf(cell);
+        Block block = model.getPalette()
+            .blockOf(cell);
         if (block == null) {
             return;
         }
@@ -236,7 +237,8 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
     }
 
     public static int cellColor(Blueprint blueprint, int value) {
-        Block block = blueprint.blockOf(value);
+        Block block = blueprint.getPalette()
+            .blockOf(value);
         if (block == null) {
             return UNKNOWN_COLOR;
         }

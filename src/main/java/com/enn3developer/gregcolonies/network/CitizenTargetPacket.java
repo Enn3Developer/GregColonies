@@ -10,6 +10,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.colony.ColonyRegistry;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -42,7 +43,7 @@ public abstract class CitizenTargetPacket implements IMessage {
 
     protected abstract void applyLive(EntityCitizen citizen);
 
-    protected abstract void applyStored(ColonyManager manager, int colonyId, UUID id);
+    protected abstract void applyStored(ColonyRegistry manager, int colonyId, UUID id);
 
     @Override
     public final void fromBytes(ByteBuf buf) {
@@ -67,7 +68,7 @@ public abstract class CitizenTargetPacket implements IMessage {
 
         @Override
         protected void apply(EntityPlayerMP player, Colony colony, T message) {
-            ColonyManager manager = ColonyManager.get(player.worldObj);
+            ColonyRegistry manager = ColonyManager.registry(player.worldObj);
             Map<UUID, EntityCitizen> loaded = GCNetwork.loadedCitizens(player.worldObj, colony.getId());
             for (UUID id : message.getCitizens()) {
                 EntityCitizen citizen = loaded.get(id);

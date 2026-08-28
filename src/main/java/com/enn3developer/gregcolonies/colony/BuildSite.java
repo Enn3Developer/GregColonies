@@ -129,8 +129,8 @@ public class BuildSite {
         if (cell == Blueprint.AIR) {
             return true;
         }
-        return world.getBlock(worldX, worldY, worldZ) == blueprint.blockOf(cell)
-            && world.getBlockMetadata(worldX, worldY, worldZ) == Blueprint.metaOf(cell);
+        return world.getBlock(worldX, worldY, worldZ) == blueprint.getPalette()
+            .blockOf(cell) && world.getBlockMetadata(worldX, worldY, worldZ) == Blueprint.metaOf(cell);
     }
 
     public boolean isFree(World world, int worldX, int worldY, int worldZ) {
@@ -142,9 +142,8 @@ public class BuildSite {
 
     public boolean needsStack(World world, ItemStack stack, int worldX, int worldY, int worldZ) {
         int cell = cellFor(worldX, worldY, worldZ);
-        return cell != Blueprint.AIR && blueprint.matches(cell, stack)
-            && !isPlaced(world, worldX, worldY, worldZ)
-            && isFree(world, worldX, worldY, worldZ);
+        return cell != Blueprint.AIR && blueprint.getPalette()
+            .matches(cell, stack) && !isPlaced(world, worldX, worldY, worldZ) && isFree(world, worldX, worldY, worldZ);
     }
 
     public int remaining(World world) {

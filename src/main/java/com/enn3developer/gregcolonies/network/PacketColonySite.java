@@ -5,8 +5,11 @@ import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.Chat;
 import com.enn3developer.gregcolonies.colony.Colony;
+import com.enn3developer.gregcolonies.colony.ColonyActions;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.colony.ColonyRegistry;
 import com.enn3developer.gregcolonies.colony.ColonySiteKind;
+import com.enn3developer.gregcolonies.colony.Outcome;
 import com.enn3developer.gregcolonies.entity.ai.work.Inventories;
 
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -65,27 +68,22 @@ public class PacketColonySite implements IMessage {
             if (kind == null) {
                 return;
             }
-            ColonyManager manager = ColonyManager.get(player.worldObj);
-            if (message.clear) {
-                manager.clearSite(colony.getId(), kind);
-                Chat.info(player, "Colony " + kind.getLabel() + " cleared");
-                GCNetwork.sendColony(player, colony);
-                return;
-            }
-
             World world = player.worldObj;
-            if (colony.getDimension() != world.provider.dimensionId) {
-                Chat.error(player, "The " + kind.getLabel() + " must be in the colony dimension");
-                return;
+            ColonyRegistry registry = ColonyManager.registry(world);
+            Outcome outcome = message.clear ? ColonyActions.clearSite(registry, colony, kind)
+                : ColonyActions.setSite(
+                    registry,
+                    colony,
+                    kind,
+                    world.provider.dimensionId,
+                    Inventories.at(world, message.x, message.y, message.z) != null,
+                    message.x,
+                    message.y,
+                    message.z);
+            Chat.tell(player, outcome);
+            if (outcome.isOk()) {
+                GCNetwork.sendColony(player, colony);
             }
-            if (Inventories.at(world, message.x, message.y, message.z) == null) {
-                Chat.error(player, "That block has no inventory");
-                return;
-            }
-
-            manager.setSite(colony.getId(), kind, message.x, message.y, message.z);
-            Chat.info(player, "Colony " + kind.getLabel() + " set to " + message.x + "/" + message.y + "/" + message.z);
-            GCNetwork.sendColony(player, colony);
         }
     }
 }

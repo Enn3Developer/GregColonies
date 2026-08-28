@@ -11,24 +11,9 @@ import net.minecraft.block.Block;
 
 import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
-import com.enn3developer.gregcolonies.network.GCNetwork;
-import com.enn3developer.gregcolonies.network.PacketBlueprintAction;
-import com.enn3developer.gregcolonies.network.PacketBlueprintSave;
 import com.enn3developer.gregcolonies.network.PacketColonyPalette;
 
 public class BlueprintEditor {
-
-    public static final int TOOL_PAINT = 0;
-
-    public static final int TOOL_ERASE = 1;
-
-    public static final int TOOL_BOX = 2;
-
-    public static final int TOOL_PICK = 3;
-
-    public static final int TOOL_ANCHOR = 4;
-
-    public static final int TOOL_COUNT = 5;
 
     public static final int DEFAULT_X = 16;
 
@@ -44,6 +29,8 @@ public class BlueprintEditor {
 
     private final ColonySnapshot colony;
 
+    private final EditorGateway gateway;
+
     private int index;
 
     private Blueprint model;
@@ -58,7 +45,7 @@ public class BlueprintEditor {
 
     private int brush;
 
-    private int tool = TOOL_PAINT;
+    private EditorTool tool = EditorTool.PAINT;
 
     private int layer;
 
@@ -77,7 +64,12 @@ public class BlueprintEditor {
     private int[] layerRevision;
 
     public BlueprintEditor(ColonySnapshot colony, int index, Blueprint source) {
+        this(colony, index, source, NetworkEditorGateway.INSTANCE);
+    }
+
+    public BlueprintEditor(ColonySnapshot colony, int index, Blueprint source, EditorGateway gateway) {
         this.colony = colony;
+        this.gateway = gateway;
         this.colonyId = colony.getId();
         this.index = index;
         this.model = source == null ? Blueprint.empty("", DEFAULT_X, DEFAULT_Y, DEFAULT_Z) : source.copy();
@@ -147,11 +139,11 @@ public class BlueprintEditor {
         }
     }
 
-    public int getTool() {
+    public EditorTool getTool() {
         return tool;
     }
 
-    public void setTool(int tool) {
+    public void setTool(EditorTool tool) {
         this.tool = tool;
         boxAnchor = null;
     }
@@ -250,13 +242,11 @@ public class BlueprintEditor {
     }
 
     public void requestPalette() {
-        GCNetwork.CHANNEL.sendToServer(new PacketBlueprintAction(colonyId, PacketBlueprintAction.PALETTE, index));
+        gateway.requestPalette(colonyId, index);
     }
 
     public void save() {
-        for (PacketBlueprintSave packet : PacketBlueprintSave.split(colonyId, index, model)) {
-            GCNetwork.CHANNEL.sendToServer(packet);
-        }
+        gateway.save(colonyId, index, model);
         dirty = false;
     }
 
@@ -385,7 +375,9 @@ public class BlueprintEditor {
 
     public int brushCell() {
         BlueprintBrush selected = getBrush();
-        return selected == null ? Blueprint.AIR : model.cellFor(selected.getBlock(), selected.getMeta());
+        return selected == null ? Blueprint.AIR
+            : model.getPalette()
+                .cellFor(selected.getBlock(), selected.getMeta());
     }
 
     public Map<Integer, Integer> shortfall() {
@@ -393,7 +385,8 @@ public class BlueprintEditor {
         for (Map.Entry<Integer, Integer> entry : model.materials()
             .entrySet()) {
             int cell = entry.getKey();
-            Block block = model.blockOf(cell);
+            Block block = model.getPalette()
+                .blockOf(cell);
             int meta = Blueprint.metaOf(cell);
             int held = 0;
             for (BlueprintBrush entry2 : palette) {
@@ -413,21 +406,21 @@ public class BlueprintEditor {
         if (hit == null) {
             return;
         }
-        if (tool == TOOL_PICK) {
+        if (tool == EditorTool.PICK) {
             take(hit);
             return;
         }
-        if (tool == TOOL_ANCHOR) {
+        if (tool == EditorTool.ANCHOR) {
             int[] spot = hit.solid ? hit.hit() : hit.place();
             pushUndo();
             model.setOrigin(spot[0], spot[1], spot[2]);
             return;
         }
-        if (tool == TOOL_BOX) {
+        if (tool == EditorTool.BOX) {
             box(hit, erasing);
             return;
         }
-        if (erasing || tool == TOOL_ERASE) {
+        if (erasing || tool == EditorTool.ERASE) {
             if (hit.solid) {
                 model.setCell(hit.hitX, hit.hitY, hit.hitZ, Blueprint.AIR);
                 dirty = true;
@@ -448,7 +441,8 @@ public class BlueprintEditor {
             return;
         }
         int cell = model.cellAt(hit.hitX, hit.hitY, hit.hitZ);
-        Block block = model.blockOf(cell);
+        Block block = model.getPalette()
+            .blockOf(cell);
         if (block == null) {
             return;
         }
@@ -468,7 +462,7 @@ public class BlueprintEditor {
     }
 
     private void box(BlueprintTrace.Hit hit, boolean erasing) {
-        int[] target = erasing || tool == TOOL_ERASE ? hit.hit() : hit.place();
+        int[] target = erasing || tool == EditorTool.ERASE ? hit.hit() : hit.place();
         if (target == null) {
             return;
         }

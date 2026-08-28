@@ -460,7 +460,9 @@ public class BlueprintView {
     }
 
     private String stackName(int cell) {
-        ItemStack stack = placed == null ? null : placed.stackOf(cell);
+        ItemStack stack = placed == null ? null
+            : placed.getPalette()
+                .stackOf(cell);
         if (stack == null) {
             return "unknown block";
         }

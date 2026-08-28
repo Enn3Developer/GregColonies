@@ -15,6 +15,7 @@ import com.enn3developer.gregcolonies.Config;
 import com.enn3developer.gregcolonies.GregColonies;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.colony.ColonyRegistry;
 
 public class BlockColonyCore extends BlockContainer {
 
@@ -43,7 +44,7 @@ public class BlockColonyCore extends BlockContainer {
         }
 
         EntityPlayer player = (EntityPlayer) placer;
-        ColonyManager manager = ColonyManager.get(world);
+        ColonyRegistry manager = ColonyManager.registry(world);
         int dimension = world.provider.dimensionId;
 
         Colony nearest = manager.getNearestColony(dimension, x, z);
@@ -92,7 +93,7 @@ public class BlockColonyCore extends BlockContainer {
         if (!(tile instanceof TileColonyCore)) {
             return null;
         }
-        return ColonyManager.get(world)
+        return ColonyManager.registry(world)
             .getColony(((TileColonyCore) tile).getColonyId());
     }
 
@@ -102,7 +103,7 @@ public class BlockColonyCore extends BlockContainer {
             TileEntity tile = world.getTileEntity(x, y, z);
             if (tile instanceof TileColonyCore) {
                 int colonyId = ((TileColonyCore) tile).getColonyId();
-                ColonyManager manager = ColonyManager.get(world);
+                ColonyRegistry manager = ColonyManager.registry(world);
                 Colony colony = manager.getColony(colonyId);
                 if (colony != null && manager.removeColony(colonyId)) {
                     GregColonies.LOG.info("Removed " + colony);

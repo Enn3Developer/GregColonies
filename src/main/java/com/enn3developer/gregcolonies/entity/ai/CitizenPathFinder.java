@@ -14,7 +14,7 @@ import net.minecraft.util.MathHelper;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 
-import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
+import com.enn3developer.gregcolonies.colony.BlockKey;
 
 public class CitizenPathFinder {
 
@@ -321,7 +321,7 @@ public class CitizenPathFinder {
     }
 
     private Node node(int x, int y, int z) {
-        long key = WorkBlocks.pack(x, y, z);
+        long key = BlockKey.pack(x, y, z);
         Node node = nodes.get(key);
         if (node == null) {
             node = new Node(x, y, z);

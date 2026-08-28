@@ -7,14 +7,13 @@ import java.util.UUID;
 
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.util.ChatComponentText;
-import net.minecraft.util.EnumChatFormatting;
-import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.Chat;
 import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.colony.Colony;
+import com.enn3developer.gregcolonies.colony.ColonyActions;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.colony.Outcome;
 
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import io.netty.buffer.ByteBuf;
@@ -120,8 +119,7 @@ public class PacketBlueprintSave implements IMessage {
             transfer.add(message.payload);
             if (transfer.size() > MAX_BYTES) {
                 PENDING.remove(sender);
-                player
-                    .addChatMessage(new ChatComponentText(EnumChatFormatting.RED + "That design is too large to save"));
+                Chat.error(player, "That design is too large to save");
                 return;
             }
             if (message.chunk < message.chunks - 1) {
@@ -143,48 +141,15 @@ public class PacketBlueprintSave implements IMessage {
             } catch (RuntimeException error) {
                 decoded = null;
             }
-            Blueprint blueprint = decoded == null ? null : decoded.trimmed();
-            if (blueprint == null || !blueprint.isPlaceable()) {
-                Chat.info(
-                    player,
-                    EnumChatFormatting.RED
-                        + "That design holds no buildable blocks, or uses blocks this server does not have");
+
+            Outcome outcome = ColonyActions
+                .storeBlueprint(ColonyManager.registry(player.worldObj), colony, decoded, transfer.index);
+            Chat.tell(player, outcome);
+            if (!outcome.isOk()) {
                 return;
             }
-
-            World world = player.worldObj;
-            ColonyManager manager = ColonyManager.get(world);
-            int index = transfer.index;
-            if (index >= 0) {
-                if (!manager.replaceBlueprint(colony.getId(), index, blueprint)) {
-                    return;
-                }
-            } else {
-                if (colony.getBlueprints()
-                    .size() >= Colony.MAX_BLUEPRINTS) {
-                    Chat.error(
-                        player,
-                        "The blueprint library is full (" + Colony.MAX_BLUEPRINTS + "), delete one first");
-                    return;
-                }
-                index = manager.addBlueprint(colony.getId(), blueprint);
-                if (index < 0) {
-                    return;
-                }
-            }
-
-            Chat.info(
-                player,
-                "Blueprint saved: " + blueprint.getSizeX()
-                    + "x"
-                    + blueprint.getSizeY()
-                    + "x"
-                    + blueprint.getSizeZ()
-                    + ", "
-                    + blueprint.blockCount()
-                    + " blocks");
             GCNetwork.sendColony(player, colony);
-            GCNetwork.sendBlueprint(player, colony, index);
+            GCNetwork.sendBlueprint(player, colony, outcome.getValue());
         }
     }
 

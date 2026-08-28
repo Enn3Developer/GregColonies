@@ -8,7 +8,7 @@ import net.minecraft.pathfinding.PathPoint;
 import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 
-import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
+import com.enn3developer.gregcolonies.colony.BlockKey;
 
 public class CitizenNavigate extends PathNavigate {
 
@@ -108,7 +108,7 @@ public class CitizenNavigate extends PathNavigate {
         }
 
         long from = packEntity();
-        long to = WorkBlocks.pack(MathHelper.floor_double(x), MathHelper.floor_double(y), MathHelper.floor_double(z));
+        long to = BlockKey.pack(MathHelper.floor_double(x), MathHelper.floor_double(y), MathHelper.floor_double(z));
         long now = entity.worldObj.getTotalWorldTime();
         if (from == failedFrom && to == failedTo && now - failedAt < FAILURE_COOLDOWN) {
             return null;
@@ -124,7 +124,7 @@ public class CitizenNavigate extends PathNavigate {
     }
 
     private long packEntity() {
-        return WorkBlocks.pack(
+        return BlockKey.pack(
             MathHelper.floor_double(entity.posX),
             MathHelper.floor_double(entity.boundingBox.minY),
             MathHelper.floor_double(entity.posZ));

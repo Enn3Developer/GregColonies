@@ -6,10 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import net.minecraft.block.Block;
-import net.minecraft.init.Blocks;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.nbt.NBTTagString;
@@ -31,7 +27,7 @@ public class Blueprint {
 
     private static final int META_BITS = 4;
 
-    private static final int META_MASK = 0xF;
+    static final int META_MASK = 0xF;
 
     private static final int VAR_INT_BYTES = 5;
 
@@ -39,7 +35,7 @@ public class Blueprint {
     private int sizeX;
     private int sizeY;
     private int sizeZ;
-    private final List<String> palette = new ArrayList<>();
+    private final BlockPalette palette = new BlockPalette();
     private int[] cells = new int[0];
     private int originX;
     private int originY;
@@ -117,7 +113,7 @@ public class Blueprint {
         trimmed.sizeX = highX - lowX + 1;
         trimmed.sizeY = highY - lowY + 1;
         trimmed.sizeZ = highZ - lowZ + 1;
-        trimmed.palette.addAll(palette);
+        trimmed.palette.copyFrom(palette);
         trimmed.cells = new int[trimmed.volume()];
         for (int y = 0; y < trimmed.sizeY; y++) {
             for (int z = 0; z < trimmed.sizeZ; z++) {
@@ -140,15 +136,15 @@ public class Blueprint {
         placed.sizeY = sizeY;
         placed.sizeX = steps % 2 == 0 ? sizeX : sizeZ;
         placed.sizeZ = steps % 2 == 0 ? sizeZ : sizeX;
-        placed.palette.addAll(palette);
+        placed.palette.copyFrom(palette);
         placed.cells = new int[placed.volume()];
         int[] target = new int[2];
         for (int y = 0; y < sizeY; y++) {
             for (int z = 0; z < sizeZ; z++) {
                 for (int x = 0; x < sizeX; x++) {
                     map(x, z, steps, mirror, target);
-                    placed.cells[placed
-                        .index(target[0], y, target[1])] = rotateCell(cells[index(x, y, z)], steps, mirror);
+                    placed.cells[placed.index(target[0], y, target[1])] = palette
+                        .rotate(cells[index(x, y, z)], steps, mirror);
                 }
             }
         }
@@ -175,17 +171,6 @@ public class Blueprint {
             target[0] = sourceX;
             target[1] = z;
         }
-    }
-
-    public static boolean isBuildable(Block block, int meta) {
-        if (block == null || block == Blocks.air) {
-            return false;
-        }
-        if (block.getMaterial()
-            .isLiquid() || block.hasTileEntity(meta)) {
-            return false;
-        }
-        return Item.getItemFromBlock(block) != null;
     }
 
     public String getName() {
@@ -224,49 +209,20 @@ public class Blueprint {
         return contains(x, y, z) ? cells[index(x, y, z)] : AIR;
     }
 
-    public Block blockOf(int cell) {
-        if (cell == AIR) {
-            return null;
-        }
-        int slot = cell >> META_BITS;
-        if (slot < 1 || slot >= palette.size()) {
-            return null;
-        }
-        return (Block) Block.blockRegistry.getObject(palette.get(slot));
-    }
-
-    public ItemStack stackOf(int cell) {
-        Block block = blockOf(cell);
-        if (block == null) {
-            return null;
-        }
-        Item item = Item.getItemFromBlock(block);
-        return item == null ? null : new ItemStack(item, 1, itemMeta(block, metaOf(cell)));
-    }
-
-    private int rotateCell(int cell, int steps, boolean mirror) {
-        Block block = blockOf(cell);
-        if (block == null) {
-            return cell;
-        }
-        int meta = BlockRotation.transform(block, metaOf(cell), steps, mirror) & META_MASK;
-        return (cell & ~META_MASK) | meta;
-    }
-
-    public int itemCell(int cell) {
-        Block block = blockOf(cell);
-        if (block == null) {
-            return cell;
-        }
-        return (cell & ~META_MASK) | itemMeta(block, metaOf(cell));
-    }
-
-    private static int itemMeta(Block block, int meta) {
-        return block.damageDropped(meta) & META_MASK;
+    public BlockPalette getPalette() {
+        return palette;
     }
 
     public static int metaOf(int cell) {
         return cell & META_MASK;
+    }
+
+    public static int slotOf(int cell) {
+        return cell >> META_BITS;
+    }
+
+    public static int cell(int slot, int meta) {
+        return (slot << META_BITS) | (meta & META_MASK);
     }
 
     public int blockCount() {
@@ -287,7 +243,7 @@ public class Blueprint {
         Map<Integer, Integer> counts = new LinkedHashMap<>();
         for (int cell : cells) {
             if (cell != AIR) {
-                counts.merge(itemCell(cell), 1, Integer::sum);
+                counts.merge(palette.itemCell(cell), 1, Integer::sum);
             }
         }
         List<Map.Entry<Integer, Integer>> entries = new ArrayList<>(counts.entrySet());
@@ -299,13 +255,6 @@ public class Blueprint {
             sorted.put(entry.getKey(), entry.getValue());
         }
         return sorted;
-    }
-
-    public boolean matches(int cell, ItemStack stack) {
-        Block block = blockOf(cell);
-        return block != null && stack != null
-            && Block.getBlockFromItem(stack.getItem()) == block
-            && stack.getItemDamage() == itemMeta(block, metaOf(cell));
     }
 
     public int getOriginX() {
@@ -349,7 +298,7 @@ public class Blueprint {
         clone.sizeX = sizeX;
         clone.sizeY = sizeY;
         clone.sizeZ = sizeZ;
-        clone.palette.addAll(palette);
+        clone.palette.copyFrom(palette);
         clone.cells = cells.clone();
         clone.originX = originX;
         clone.originY = originY;
@@ -366,7 +315,7 @@ public class Blueprint {
         resized.sizeX = sizeX;
         resized.sizeY = sizeY;
         resized.sizeZ = sizeZ;
-        resized.palette.addAll(palette);
+        resized.palette.copyFrom(palette);
         resized.cells = new int[resized.volume()];
         for (int y = 0; y < sizeY; y++) {
             for (int z = 0; z < sizeZ; z++) {
@@ -382,30 +331,6 @@ public class Blueprint {
         return resized;
     }
 
-    public int cellFor(Block block, int meta) {
-        if (!isBuildable(block, meta)) {
-            return AIR;
-        }
-        String key = Block.blockRegistry.getNameForObject(block);
-        if (key == null || key.isEmpty()) {
-            return AIR;
-        }
-        int slot = palette.indexOf(key);
-        if (slot < 0) {
-            slot = palette.size();
-            palette.add(key);
-        }
-        return (slot << META_BITS) | (meta & META_MASK);
-    }
-
-    public int cellFor(ItemStack stack) {
-        if (stack == null) {
-            return AIR;
-        }
-        Block block = Block.getBlockFromItem(stack.getItem());
-        return block == null ? AIR : cellFor(block, stack.getItemDamage());
-    }
-
     public void setCell(int x, int y, int z, int cell) {
         if (contains(x, y, z)) {
             cells[index(x, y, z)] = cell;
@@ -413,12 +338,12 @@ public class Blueprint {
     }
 
     public int adopt(Blueprint other, int cell) {
-        return cell == AIR ? AIR : cellFor(other.blockOf(cell), metaOf(cell));
+        return palette.adopt(other.palette, cell);
     }
 
     public boolean isPlaceable() {
         for (int cell : cells) {
-            if (cell != AIR && !isBuildable(blockOf(cell), metaOf(cell))) {
+            if (cell != AIR && !palette.isPlaceable(cell)) {
                 return false;
             }
         }
@@ -434,7 +359,7 @@ public class Blueprint {
         buf.writeShort(originY);
         buf.writeShort(originZ);
         buf.writeShort(palette.size());
-        for (String entry : palette) {
+        for (String entry : palette.names()) {
             ByteBufUtils.writeUTF8String(buf, entry);
         }
         ByteBufUtils.writeVarInt(buf, cells.length, VAR_INT_BYTES);
@@ -494,7 +419,7 @@ public class Blueprint {
         tag.setInteger("sy", sizeY);
         tag.setInteger("sz", sizeZ);
         NBTTagList names = new NBTTagList();
-        for (String entry : palette) {
+        for (String entry : palette.names()) {
             names.appendTag(new NBTTagString(entry));
         }
         tag.setTag("palette", names);

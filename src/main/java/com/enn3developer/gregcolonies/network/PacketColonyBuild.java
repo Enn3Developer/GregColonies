@@ -4,11 +4,11 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.Chat;
-import com.enn3developer.gregcolonies.colony.Blueprint;
-import com.enn3developer.gregcolonies.colony.BuildSite;
 import com.enn3developer.gregcolonies.colony.Colony;
+import com.enn3developer.gregcolonies.colony.ColonyActions;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
-import com.enn3developer.gregcolonies.colony.ColonySiteKind;
+import com.enn3developer.gregcolonies.colony.ColonyRegistry;
+import com.enn3developer.gregcolonies.colony.Outcome;
 
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import io.netty.buffer.ByteBuf;
@@ -58,50 +58,21 @@ public class PacketColonyBuild implements IMessage {
 
         @Override
         protected void apply(EntityPlayerMP player, Colony colony, PacketColonyBuild message) {
-            ColonyManager manager = ColonyManager.get(player.worldObj);
-            if (message.clear) {
-                manager.setBuildSite(colony.getId(), null);
-                Chat.info(player, "Build site cleared");
-                GCNetwork.sendColony(player, colony);
-                return;
-            }
-
             World world = player.worldObj;
-            if (colony.getDimension() != world.provider.dimensionId) {
-                Chat.error(player, "The build site must be in the colony dimension");
-                return;
+            ColonyRegistry registry = ColonyManager.registry(world);
+            Outcome outcome = message.clear ? ColonyActions.clearBuildSite(registry, colony)
+                : ColonyActions.setBuildSite(
+                    registry,
+                    colony,
+                    world.provider.dimensionId,
+                    message.x,
+                    message.y,
+                    message.z,
+                    site -> site.remaining(world));
+            Chat.tell(player, outcome);
+            if (outcome.isOk()) {
+                GCNetwork.sendColony(player, colony);
             }
-            Blueprint blueprint = colony.getActiveBlueprint();
-            if (blueprint == null) {
-                Chat.error(player, "Capture a blueprint before starting a build");
-                return;
-            }
-            if (!colony.site(ColonySiteKind.MATERIALS)
-                .isPresent()) {
-                Chat.error(player, "Set a materials chest before starting a build");
-                return;
-            }
-
-            int y = message.y + 1;
-            BuildSite site = new BuildSite(
-                message.x,
-                y,
-                message.z,
-                blueprint,
-                colony.getPlaceRotation(),
-                colony.isPlaceMirror());
-            manager.setBuildSite(colony.getId(), site);
-            Chat.info(
-                player,
-                "Build site set at " + message.x
-                    + "/"
-                    + y
-                    + "/"
-                    + message.z
-                    + ", "
-                    + site.remaining(world)
-                    + " blocks to place");
-            GCNetwork.sendColony(player, colony);
         }
     }
 }

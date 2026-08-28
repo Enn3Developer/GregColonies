@@ -16,8 +16,7 @@ import com.cleanroommc.modularui.drawable.GuiDraw;
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext;
 import com.cleanroommc.modularui.theme.WidgetThemeEntry;
 import com.enn3developer.gregcolonies.client.GCKeyBindings;
-import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandChop;
-import com.enn3developer.gregcolonies.entity.ai.command.CitizenCommandFarm;
+import com.enn3developer.gregcolonies.colony.WorkArea;
 import com.enn3developer.gregcolonies.network.CitizenSnapshot;
 import com.enn3developer.gregcolonies.network.GCNetwork;
 import com.enn3developer.gregcolonies.network.PacketCitizenCommand;
@@ -294,7 +293,7 @@ public class ColonyViewWidget extends CameraWidget<ColonyViewWidget> {
     }
 
     private int clampSide(int anchor, int value) {
-        int side = view.getTargeting() == TargetMode.FARM ? CitizenCommandFarm.MAX_SIDE : CitizenCommandChop.MAX_SIDE;
+        int side = WorkArea.MAX_SIDE;
         if (value - anchor > side - 1) {
             return anchor + side - 1;
         }

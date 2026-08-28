@@ -88,7 +88,7 @@ public class LivingTaskSleep extends AutoTask {
                 bedZ = entry.getBedZ();
                 return true;
             }
-            ColonyManager.get(world)
+            ColonyManager.registry(world)
                 .releaseBed(colony.getId(), citizen.getUniqueID());
         }
         if (claimBed(citizen, colony, dimension)) {
@@ -111,7 +111,7 @@ public class LivingTaskSleep extends AutoTask {
             return false;
         }
         if (!isBed(world, bedX, bedY, bedZ)) {
-            ColonyManager.get(world)
+            ColonyManager.registry(world)
                 .releaseBed(colony.getId(), citizen.getUniqueID());
             return false;
         }
@@ -207,7 +207,7 @@ public class LivingTaskSleep extends AutoTask {
                 }
             }
         }
-        return found && ColonyManager.get(world)
+        return found && ColonyManager.registry(world)
             .claimBed(colony.getId(), citizen.getUniqueID(), bedX, bedY, bedZ);
     }
 

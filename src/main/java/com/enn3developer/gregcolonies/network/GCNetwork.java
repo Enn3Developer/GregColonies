@@ -17,6 +17,7 @@ import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.Chat;
 import com.enn3developer.gregcolonies.GregColonies;
+import com.enn3developer.gregcolonies.colony.BlockPalette;
 import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
@@ -81,7 +82,7 @@ public final class GCNetwork {
 
     static Colony nearestColony(EntityPlayerMP player) {
         World world = player.worldObj;
-        return ColonyManager.get(world)
+        return ColonyManager.registry(world)
             .getNearestColonyOf(
                 player.getUniqueID(),
                 world.provider.dimensionId,
@@ -90,7 +91,7 @@ public final class GCNetwork {
     }
 
     static Colony accessibleColony(EntityPlayerMP player, int colonyId) {
-        Colony colony = ColonyManager.get(player.worldObj)
+        Colony colony = ColonyManager.registry(player.worldObj)
             .getColony(colonyId);
         return colony != null && colony.canAccess(player) ? colony : null;
     }
@@ -146,7 +147,7 @@ public final class GCNetwork {
         Inventories.forEachExtractable(inventory, stack -> {
             Block block = Block.getBlockFromItem(stack.getItem());
             int meta = stack.getItemDamage();
-            if (block == null || meta > 0xFF || !Blueprint.isBuildable(block, meta)) {
+            if (block == null || meta > 0xFF || !BlockPalette.isBuildable(block, meta)) {
                 return;
             }
             String name = Block.blockRegistry.getNameForObject(block);
@@ -186,7 +187,12 @@ public final class GCNetwork {
         }
         for (int cell : blueprint.materials()
             .keySet()) {
-            stock.put(cell, Inventories.count(inventory, stack -> blueprint.matches(cell, stack)));
+            stock.put(
+                cell,
+                Inventories.count(
+                    inventory,
+                    stack -> blueprint.getPalette()
+                        .matches(cell, stack)));
         }
         return stock;
     }

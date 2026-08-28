@@ -112,7 +112,8 @@ public final class BlueprintGhost {
                 if (cell == Blueprint.AIR) {
                     continue;
                 }
-                Block block = model.blockOf(cell);
+                Block block = model.getPalette()
+                    .blockOf(cell);
                 if (block == null) {
                     continue;
                 }
@@ -160,8 +161,8 @@ public final class BlueprintGhost {
             cell(baseX + anchor[0], baseY + anchor[1], baseZ + anchor[2], ANCHOR_COLOR);
         }
         if (hover != null) {
-            boolean erasing = editor.getTool() == BlueprintEditor.TOOL_ERASE
-                || editor.getTool() == BlueprintEditor.TOOL_PICK;
+            boolean erasing = editor.getTool()
+                .erases();
             if (erasing && hover.solid) {
                 cell(baseX + hover.hitX, baseY + hover.hitY, baseZ + hover.hitZ, ERASE_COLOR);
             } else if (!erasing && model.contains(hover.placeX, hover.placeY, hover.placeZ)) {

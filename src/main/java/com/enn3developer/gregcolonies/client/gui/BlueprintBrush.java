@@ -4,7 +4,7 @@ import net.minecraft.block.Block;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 
-import com.enn3developer.gregcolonies.colony.Blueprint;
+import com.enn3developer.gregcolonies.colony.BlockPalette;
 
 public class BlueprintBrush {
 
@@ -26,7 +26,7 @@ public class BlueprintBrush {
     }
 
     public static BlueprintBrush of(Block block, int meta, int held) {
-        return Blueprint.isBuildable(block, meta) ? new BlueprintBrush(block, meta, held) : null;
+        return BlockPalette.isBuildable(block, meta) ? new BlueprintBrush(block, meta, held) : null;
     }
 
     public Block getBlock() {

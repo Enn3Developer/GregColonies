@@ -14,15 +14,17 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.world.World;
 
+import com.enn3developer.gregcolonies.colony.BlockKey;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonySite;
 import com.enn3developer.gregcolonies.colony.ColonySiteKind;
+import com.enn3developer.gregcolonies.colony.WorkArea;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.ApproachTracker;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandResult;
 import com.enn3developer.gregcolonies.entity.ai.TravelLeg;
-import com.enn3developer.gregcolonies.entity.ai.WorkArea;
+import com.enn3developer.gregcolonies.entity.ai.WorkPhase;
 import com.enn3developer.gregcolonies.entity.ai.work.BlockBreaker;
 import com.enn3developer.gregcolonies.entity.ai.work.Crops;
 import com.enn3developer.gregcolonies.entity.ai.work.DigResult;
@@ -34,15 +36,7 @@ public class CitizenCommandFarm extends CitizenCommand {
 
     public static final String ID = "farm";
 
-    public static final int MAX_SIDE = 32;
-
     public static final int SEED_RESERVE = 32;
-
-    private static final int PHASE_TRAVEL = 0;
-
-    private static final int PHASE_WORK = 1;
-
-    private static final int PHASE_DELIVER = 2;
 
     private static final int JOB_HARVEST = 0;
 
@@ -92,7 +86,7 @@ public class CitizenCommandFarm extends CitizenCommand {
 
     private final Map<Long, Block> crops = new HashMap<>();
 
-    private int phase = PHASE_TRAVEL;
+    private WorkPhase phase = WorkPhase.TRAVEL;
 
     private final TravelLeg leg = new TravelLeg();
 
@@ -130,8 +124,8 @@ public class CitizenCommandFarm extends CitizenCommand {
 
     public CitizenCommandFarm(int x1, int y1, int z1, int x2, int y2, int z2) {
         area.set(x1, y1, z1, x2, y2, z2);
-        area.capSide(MAX_SIDE);
-        area.capHeight(CitizenCommandHarvest.MAX_HEIGHT);
+        area.capSide(WorkArea.MAX_SIDE);
+        area.capHeight(WorkArea.MAX_HEIGHT);
     }
 
     @Override
@@ -173,10 +167,10 @@ public class CitizenCommandFarm extends CitizenCommand {
         if (craftTicks > 0) {
             craftTicks--;
         }
-        if (phase == PHASE_TRAVEL) {
+        if (phase == WorkPhase.TRAVEL) {
             return travel(citizen);
         }
-        if (phase == PHASE_WORK) {
+        if (phase == WorkPhase.WORK) {
             return work(citizen, colony);
         }
         return deliver(citizen, colony);
@@ -188,14 +182,14 @@ public class CitizenCommandFarm extends CitizenCommand {
             return CitizenCommandResult.RUNNING;
         }
         reason = step == TravelLeg.Step.FAILED ? "no path to the field" : "";
-        phase = PHASE_WORK;
+        phase = WorkPhase.WORK;
         return CitizenCommandResult.RUNNING;
     }
 
     private CitizenCommandResult work(EntityCitizen citizen, Colony colony) {
         if (!citizen.worldObj.blockExists(centerX(), area.getMinY(), centerZ())) {
             reason = "out of range";
-            phase = PHASE_TRAVEL;
+            phase = WorkPhase.TRAVEL;
             return CitizenCommandResult.RUNNING;
         }
         makeSeeds(citizen);
@@ -254,7 +248,7 @@ public class CitizenCommandFarm extends CitizenCommand {
             if (job == null) {
                 return false;
             }
-            if (skipped.contains(WorkBlocks.pack(job[0], job[1], job[2])) || !isValid(citizen, world, job)) {
+            if (skipped.contains(BlockKey.pack(job[0], job[1], job[2])) || !isValid(citizen, world, job)) {
                 continue;
             }
             jobX = job[0];
@@ -274,7 +268,7 @@ public class CitizenCommandFarm extends CitizenCommand {
         int z = job[2];
         if (job[3] == JOB_PLANT) {
             return world.isAirBlock(x, y, z) && Crops.isSoil(world, x, y - 1, z)
-                && hasSeedFor(citizen, x, y, z, crops.get(WorkBlocks.pack(x, y, z)));
+                && hasSeedFor(citizen, x, y, z, crops.get(BlockKey.pack(x, y, z)));
         }
         if (job[3] == JOB_TILL) {
             return Crops.isTillable(world, x, y, z) && Crops.isHoe(
@@ -314,11 +308,11 @@ public class CitizenCommandFarm extends CitizenCommand {
                     if (Crops.isMature(world, x, y, z) || Crops.isProduce(world, x, y, z)) {
                         harvests.add(new int[] { x, y, z, JOB_HARVEST });
                     } else if (world.isAirBlock(x, y, z) && Crops.isSoil(world, x, y - 1, z)) {
-                        if (hasSeedFor(citizen, x, y, z, crops.get(WorkBlocks.pack(x, y, z)))) {
+                        if (hasSeedFor(citizen, x, y, z, crops.get(BlockKey.pack(x, y, z)))) {
                             chores.add(new int[] { x, y, z, JOB_PLANT });
                         } else {
                             needsSeed = true;
-                            missingSeed = crops.get(WorkBlocks.pack(x, y, z));
+                            missingSeed = crops.get(BlockKey.pack(x, y, z));
                         }
                     } else if (bonemeal && Crops.canGrow(world, x, y, z)) {
                         chores.add(new int[] { x, y, z, JOB_FERTILIZE });
@@ -373,7 +367,7 @@ public class CitizenCommandFarm extends CitizenCommand {
     }
 
     private CitizenCommandResult sow(EntityCitizen citizen) {
-        Block wanted = crops.get(WorkBlocks.pack(jobX, jobY, jobZ));
+        Block wanted = crops.get(BlockKey.pack(jobX, jobY, jobZ));
         World world = citizen.worldObj;
         ItemStack seed = citizen.getInventory()
             .takeMain(stack -> Crops.isSeedFor(stack, world, jobX, jobY, jobZ, wanted));
@@ -413,7 +407,7 @@ public class CitizenCommandFarm extends CitizenCommand {
                     .getTool()
                     .setStackInSlot(0, null);
             }
-            Block wanted = crops.get(WorkBlocks.pack(jobX, jobY + 1, jobZ));
+            Block wanted = crops.get(BlockKey.pack(jobX, jobY + 1, jobZ));
             if (hasSeedFor(citizen, jobX, jobY + 1, jobZ, wanted)) {
                 chores.add(new int[] { jobX, jobY + 1, jobZ, JOB_PLANT });
             } else {
@@ -457,7 +451,7 @@ public class CitizenCommandFarm extends CitizenCommand {
 
     private CitizenCommandResult skip(EntityCitizen citizen) {
         breaker.clear(citizen);
-        skipped.add(WorkBlocks.pack(jobX, jobY, jobZ));
+        skipped.add(BlockKey.pack(jobX, jobY, jobZ));
         hasJob = false;
         approach.restart();
         return CitizenCommandResult.RUNNING;
@@ -473,7 +467,7 @@ public class CitizenCommandFarm extends CitizenCommand {
         breaker.clear(citizen);
         hasJob = false;
         errandTicks = 0;
-        phase = PHASE_DELIVER;
+        phase = WorkPhase.FINISH;
         leg.clear(citizen);
         return CitizenCommandResult.RUNNING;
     }
@@ -535,7 +529,7 @@ public class CitizenCommandFarm extends CitizenCommand {
         if (crop == null) {
             return;
         }
-        crops.put(WorkBlocks.pack(jobX, jobY, jobZ), crop);
+        crops.put(BlockKey.pack(jobX, jobY, jobZ), crop);
         if (!hasSeedFor(citizen, jobX, jobY, jobZ, crop)) {
             needsSeed = true;
             missingSeed = crop;
@@ -574,7 +568,7 @@ public class CitizenCommandFarm extends CitizenCommand {
         leg.clear(citizen);
         errandTicks = 0;
         scanTicks = 0;
-        phase = PHASE_TRAVEL;
+        phase = WorkPhase.TRAVEL;
         return CitizenCommandResult.RUNNING;
     }
 
@@ -597,7 +591,7 @@ public class CitizenCommandFarm extends CitizenCommand {
     @Override
     public void readFromNBT(NBTTagCompound tag) {
         area.readFromNBT(tag);
-        phase = tag.getInteger("phase");
+        phase = WorkPhase.byId(tag.getInteger("phase"));
         harvested = tag.getInteger("harvested");
         planted = tag.getInteger("planted");
         reason = tag.getString("reason");
@@ -615,7 +609,7 @@ public class CitizenCommandFarm extends CitizenCommand {
     @Override
     public void writeToNBT(NBTTagCompound tag) {
         area.writeToNBT(tag);
-        tag.setInteger("phase", phase);
+        tag.setInteger("phase", phase.id());
         tag.setInteger("harvested", harvested);
         tag.setInteger("planted", planted);
         tag.setString("reason", reason);
@@ -631,7 +625,7 @@ public class CitizenCommandFarm extends CitizenCommand {
 
     @Override
     public String describe() {
-        String state = phase == PHASE_TRAVEL ? "walking there" : phase == PHASE_WORK ? "tending" : "delivering";
+        String state = phase == WorkPhase.TRAVEL ? "walking there" : phase == WorkPhase.WORK ? "tending" : "delivering";
         String tail = reason.isEmpty() ? "" : " (" + reason + ")";
         return ID + " " + state + " " + harvested + " crops " + planted + " seeded" + tail;
     }

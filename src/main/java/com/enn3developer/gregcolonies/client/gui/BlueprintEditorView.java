@@ -299,15 +299,15 @@ public class BlueprintEditorView extends OverlayView {
         list.child(GuiStyle.section("Tool", this::toolValue, 0));
         list.child(
             GuiStyle.row()
-                .child(toolButton("Paint", BlueprintEditor.TOOL_PAINT))
-                .child(toolButton("Erase", BlueprintEditor.TOOL_ERASE)));
+                .child(toolButton(EditorTool.PAINT))
+                .child(toolButton(EditorTool.ERASE)));
         list.child(
             GuiStyle.row()
-                .child(toolButton("Box", BlueprintEditor.TOOL_BOX))
-                .child(toolButton("Pick", BlueprintEditor.TOOL_PICK)));
+                .child(toolButton(EditorTool.BOX))
+                .child(toolButton(EditorTool.PICK)));
         list.child(
             GuiStyle.row()
-                .child(toolButton("Anchor", BlueprintEditor.TOOL_ANCHOR)));
+                .child(toolButton(EditorTool.ANCHOR)));
         list.child(
             GuiStyle.row()
                 .child(GuiStyle.button("Undo", GuiStyle.EXPAND, editor::hasUndo, editor::undo))
@@ -384,9 +384,9 @@ public class BlueprintEditorView extends OverlayView {
         return axis == 0 ? model.getSizeX() : axis == 1 ? model.getSizeY() : model.getSizeZ();
     }
 
-    private ButtonWidget<?> toolButton(String label, int tool) {
+    private ButtonWidget<?> toolButton(EditorTool tool) {
         return GuiStyle
-            .toggleButton(() -> label, GuiStyle.EXPAND, () -> editor.getTool() == tool, () -> editor.setTool(tool));
+            .toggleButton(tool::getLabel, GuiStyle.EXPAND, () -> editor.getTool() == tool, () -> editor.setTool(tool));
     }
 
     private IWidget buildMissingRow(int index) {
@@ -404,6 +404,7 @@ public class BlueprintEditorView extends OverlayView {
             return "";
         }
         ItemStack stack = editor.getModel()
+            .getPalette()
             .stackOf(cell);
         String name = stack == null ? "unknown block" : safeName(stack);
         return GuiText.fit(name, missingCount(index), SIDE_WIDTH - GuiStyle.PADDING * 2 - 10);
@@ -479,17 +480,11 @@ public class BlueprintEditorView extends OverlayView {
     }
 
     private String toolValue() {
-        int tool = editor.getTool();
-        if (tool == BlueprintEditor.TOOL_ERASE) {
-            return "erase";
-        }
-        if (tool == BlueprintEditor.TOOL_BOX) {
+        EditorTool tool = editor.getTool();
+        if (tool == EditorTool.BOX) {
             return editor.getBoxAnchor() == null ? "box: first corner" : "box: second corner";
         }
-        if (tool == BlueprintEditor.TOOL_ANCHOR) {
-            return "anchor";
-        }
-        return tool == BlueprintEditor.TOOL_PICK ? "pick" : "paint";
+        return tool.getState();
     }
 
     private String layerValue() {
