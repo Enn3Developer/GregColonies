@@ -58,4 +58,10 @@ dependencies {
     devOnlyNonPublishable("com.github.GTNewHorizons:TinkersConstruct:1.14.103-GTNH:dev")
 
     devOnlyNonPublishable("com.github.GTNewHorizons:OpenBlocks:1.12.21-GTNH:dev")
+
+    testImplementation(platform('org.junit:junit-bom:5.14.1'))
+    testImplementation('org.junit.jupiter:junit-jupiter')
+    testRuntimeOnly('org.junit.platform:junit-platform-launcher')
+    testImplementation('org.mockito:mockito-core:5.+')
+    testImplementation('it.unimi.dsi:fastutil:8.5.18')
 }
