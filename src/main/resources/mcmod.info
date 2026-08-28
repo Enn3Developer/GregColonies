@@ -13,9 +13,6 @@
 		"logoFile": "",
 		"screenshots": [],
 		"parent": "",
-		"requiredMods": ["Forge@[10.13.4.1614,)", "unimixins@[0.2.1,)", "gregtech", "structurelib", "gtnhlib", "modularui2"],
-		"dependencies": ["unimixins", "gregtech", "structurelib", "gtnhlib", "modularui2"],
-		"dependants": [],
-		"useDependencyInformation": true
+		"useDependencyInformation": false
 	}]
 }
