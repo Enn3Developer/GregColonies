@@ -9,7 +9,9 @@ import java.util.function.Predicate;
 
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.ItemTool;
 import net.minecraft.nbt.NBTTagCompound;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -76,11 +78,27 @@ class CitizenInventoryTest {
 
     @Test
     void itemsThatOnlyDeclareAToolClassAlsoCount() {
+        Item declared = new Item();
+        declared.setHarvestLevel("pickaxe", 1);
+        ItemStack stack = new ItemStack(declared);
+
+        assertFalse(declared instanceof ItemTool);
         assertEquals(
-            !new ItemStack(Items.shears).getItem()
-                .getToolClasses(new ItemStack(Items.shears))
+            1,
+            declared.getToolClasses(stack)
+                .size());
+        assertTrue(CitizenInventory.isTool(stack));
+    }
+
+    @Test
+    void itemsWithoutAToolClassAreNotTools() {
+        ItemStack shears = new ItemStack(Items.shears);
+        assertTrue(
+            shears.getItem()
+                .getToolClasses(shears)
                 .isEmpty(),
-            CitizenInventory.isTool(new ItemStack(Items.shears)));
+            "shears are the no-tool-class case this test relies on");
+        assertFalse(CitizenInventory.isTool(shears));
     }
 
     @Test

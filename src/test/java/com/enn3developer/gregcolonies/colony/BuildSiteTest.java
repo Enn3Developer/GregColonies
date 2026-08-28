@@ -102,10 +102,24 @@ class BuildSiteTest {
     }
 
     @Test
-    void airCellsCountAsAlreadyPlaced() {
+    void cellsOutsideTheBlueprintCountAsAlreadyPlaced() {
         BuildSite site = new BuildSite(10, 64, 20, pillar(), 0, false);
         assertTrue(site.isPlaced(world, 10, 67, 20));
         assertTrue(site.isPlaced(world, 99, 99, 99));
+    }
+
+    @Test
+    void airCellsInsideTheBlueprintCountAsAlreadyPlaced() {
+        Blueprint blueprint = Blueprint.empty("gap", 1, 3, 1);
+        int cell = blueprint.getPalette()
+            .cellFor(Blocks.stone, 0);
+        blueprint.setCell(0, 0, 0, cell);
+        blueprint.setCell(0, 2, 0, cell);
+
+        BuildSite site = new BuildSite(10, 64, 20, blueprint, 0, false);
+        assertEquals(Blueprint.AIR, site.cellFor(10, 65, 20));
+        assertTrue(site.isPlaced(world, 10, 65, 20));
+        assertEquals(2, site.remaining(world));
     }
 
     @Test

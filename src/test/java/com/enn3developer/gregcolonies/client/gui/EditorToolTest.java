@@ -60,6 +60,14 @@ class EditorToolTest {
     }
 
     @Test
+    void cyclingFollowsTheDeclaredOrder() {
+        EditorTool[] tools = EditorTool.values();
+        for (int i = 0; i < tools.length; i++) {
+            assertEquals(tools[(i + 1) % tools.length], tools[i].next(), tools[i] + " cycles to the wrong tool");
+        }
+    }
+
+    @Test
     void targetModesCarryTheirSiteKind() {
         assertEquals(ColonySiteKind.DROP_OFF, TargetMode.DROP_OFF.getSite());
         assertEquals(ColonySiteKind.PICK_UP, TargetMode.PICK_UP.getSite());

@@ -181,14 +181,16 @@ class InventoriesTest {
 
     @Test
     void differentNbtNeverMerges() {
-        ItemStack tagged = new ItemStack(Items.diamond_sword);
+        ItemStack tagged = new ItemStack(Blocks.dirt, 1);
         tagged.setTagCompound(new NBTTagCompound());
         tagged.getTagCompound()
             .setInteger("mark", 1);
+        assertTrue(tagged.isStackable(), "this test only says something about NBT if the item stacks");
 
         FakeInventory inventory = new FakeInventory(2).with(0, tagged);
-        assertNull(Inventories.insert(inventory, new ItemStack(Items.diamond_sword)));
-        assertNotNull(inventory.getStackInSlot(1));
+        assertNull(Inventories.insert(inventory, new ItemStack(Blocks.dirt, 1)));
+        assertEquals(1, inventory.getStackInSlot(0).stackSize);
+        assertEquals(1, inventory.getStackInSlot(1).stackSize);
     }
 
     @Test

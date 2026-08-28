@@ -122,6 +122,14 @@ class ColonyManagerTest {
     @Test
     void theSaveNameIsStable() {
         assertEquals("gregcolonies_colonies", ColonyManager.DATA_NAME);
-        assertNotNull(new ColonyManager(ColonyManager.DATA_NAME));
+    }
+
+    @Test
+    void mapStorageCanBuildItReflectively() {
+        assertDoesNotThrow(() -> ColonyManager.class.getConstructor(String.class));
+        assertEquals(
+            0,
+            new ColonyManager(ColonyManager.DATA_NAME).getRegistry()
+                .getColonyCount());
     }
 }

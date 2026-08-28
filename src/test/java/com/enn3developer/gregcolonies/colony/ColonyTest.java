@@ -357,6 +357,8 @@ class ColonyTest {
 
         assertTrue(populated.isBedFree(first, 5, 64, 5));
         assertTrue(populated.claimBed(first, 5, 64, 5));
+        assertTrue(populated.isBedFree(first, 5, 64, 5), "a citizen never blocks itself out of its own bed");
+        assertTrue(populated.claimBed(first, 5, 64, 5));
         assertFalse(populated.isBedFree(second, 5, 64, 5));
         assertFalse(populated.claimBed(second, 5, 64, 5));
         assertTrue(populated.claimBed(second, 6, 64, 5));
@@ -383,7 +385,7 @@ class ColonyTest {
 
     @Test
     void releasingAnUnknownBedIsHarmless() {
-        colony.releaseBed(UUID.randomUUID());
+        assertDoesNotThrow(() -> colony.releaseBed(UUID.randomUUID()));
     }
 
     @Test

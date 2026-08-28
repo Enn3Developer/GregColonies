@@ -8,6 +8,8 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
+import com.enn3developer.gregcolonies.colony.Blueprint;
+
 class CitizenNamesTest {
 
     @Test
@@ -34,7 +36,7 @@ class CitizenNamesTest {
         Random random = new Random(13L);
         for (int i = 0; i < 500; i++) {
             String name = CitizenNames.generate(random, CitizenGender.MALE);
-            assertTrue(name.length() <= 24, name + " is too long at " + name.length());
+            assertTrue(name.length() <= Blueprint.MAX_NAME_LENGTH, name + " is too long at " + name.length());
         }
     }
 

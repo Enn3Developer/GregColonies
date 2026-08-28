@@ -8,6 +8,7 @@ import java.util.Map;
 
 import net.minecraft.init.Blocks;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraftforge.common.util.ForgeDirection;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -61,6 +62,9 @@ class BlueprintTest {
     @Test
     void cleanNameStripsControlCharactersAndTrims() {
         assertEquals("hut", Blueprint.cleanName("  hut "));
+        assertEquals("hut", Blueprint.cleanName("h\u0007u\nt"));
+        assertEquals("hut", Blueprint.cleanName("hut\u007F"));
+        assertEquals("", Blueprint.cleanName("\u0000\u001F"));
         assertEquals("", Blueprint.cleanName(null));
         assertEquals("", Blueprint.cleanName(" "));
     }
@@ -181,12 +185,16 @@ class BlueprintTest {
     @Test
     void trimmedKeepsTheOriginRelativeToTheContent() {
         Blueprint blueprint = box(5, 1, 5);
-        blueprint.setCell(3, 0, 3, stone(blueprint));
-        blueprint.setOrigin(3, 0, 3);
+        int cell = stone(blueprint);
+        blueprint.setCell(1, 0, 1, cell);
+        blueprint.setCell(3, 0, 3, cell);
+        blueprint.setOrigin(2, 0, 3);
 
         Blueprint trimmed = blueprint.trimmed();
-        assertEquals(0, trimmed.getOriginX());
-        assertEquals(0, trimmed.getOriginZ());
+        assertEquals(3, trimmed.getSizeX());
+        assertEquals(3, trimmed.getSizeZ());
+        assertEquals(1, trimmed.getOriginX());
+        assertEquals(2, trimmed.getOriginZ());
     }
 
     @Test
@@ -269,6 +277,35 @@ class BlueprintTest {
         Blueprint forward = blueprint.transformed(3, false);
         assertEquals(forward.getSizeX(), back.getSizeX());
         assertEquals(forward.cellAt(0, 0, 1), back.cellAt(0, 0, 1));
+    }
+
+    @Test
+    void turningTheBlueprintTurnsTheBlocksInIt() {
+        Blueprint blueprint = box(1, 1, 1);
+        int north = blueprint.getPalette()
+            .cellFor(Blocks.ladder, ForgeDirection.NORTH.ordinal());
+        blueprint.setCell(0, 0, 0, north);
+
+        Blueprint turned = blueprint.transformed(1, false);
+        assertEquals(
+            Blocks.ladder,
+            turned.getPalette()
+                .blockOf(turned.cellAt(0, 0, 0)));
+        assertEquals(ForgeDirection.EAST.ordinal(), Blueprint.metaOf(turned.cellAt(0, 0, 0)));
+    }
+
+    @Test
+    void mirroringTheBlueprintMirrorsTheBlocksInIt() {
+        Blueprint blueprint = box(1, 1, 1);
+        blueprint.setCell(
+            0,
+            0,
+            0,
+            blueprint.getPalette()
+                .cellFor(Blocks.ladder, ForgeDirection.EAST.ordinal()));
+
+        Blueprint mirrored = blueprint.transformed(0, true);
+        assertEquals(ForgeDirection.WEST.ordinal(), Blueprint.metaOf(mirrored.cellAt(0, 0, 0)));
     }
 
     @Test
@@ -358,12 +395,18 @@ class BlueprintTest {
     @Test
     void materialsFoldsCellsThatDropTheSameItem() {
         Blueprint blueprint = box(2, 1, 1);
-        blueprint.setCell(0, 0, 0, stone(blueprint));
-        blueprint.setCell(1, 0, 0, stone(blueprint));
-        assertEquals(
-            1,
-            blueprint.materials()
-                .size());
+        int upright = blueprint.getPalette()
+            .cellFor(Blocks.log, 0);
+        int sideways = blueprint.getPalette()
+            .cellFor(Blocks.log, 4);
+        assertNotEquals(upright, sideways);
+        blueprint.setCell(0, 0, 0, upright);
+        blueprint.setCell(1, 0, 0, sideways);
+
+        Map<Integer, Integer> materials = blueprint.materials();
+        assertEquals(1, materials.size());
+        List<Integer> counts = new ArrayList<>(materials.values());
+        assertEquals(2, counts.get(0));
     }
 
     @Test
@@ -483,6 +526,37 @@ class BlueprintTest {
         buf.writeShort(0);
         buf.writeShort(1);
         assertNull(Blueprint.read(buf));
+    }
+
+    @Test
+    void bufferWithARunPastTheEndIsRejected() {
+        ByteBuf buf = oneCellHeader();
+        ByteBufUtils.writeVarInt(buf, 5, 5);
+        ByteBufUtils.writeVarInt(buf, 0, 5);
+        assertNull(Blueprint.read(buf));
+    }
+
+    @Test
+    void bufferWithAnEmptyRunIsRejected() {
+        ByteBuf buf = oneCellHeader();
+        ByteBufUtils.writeVarInt(buf, 0, 5);
+        ByteBufUtils.writeVarInt(buf, 0, 5);
+        assertNull(Blueprint.read(buf));
+    }
+
+    private static ByteBuf oneCellHeader() {
+        ByteBuf buf = Unpooled.buffer();
+        ByteBufUtils.writeUTF8String(buf, "bad");
+        buf.writeShort(1);
+        buf.writeShort(1);
+        buf.writeShort(1);
+        buf.writeShort(0);
+        buf.writeShort(0);
+        buf.writeShort(0);
+        buf.writeShort(1);
+        ByteBufUtils.writeUTF8String(buf, "");
+        ByteBufUtils.writeVarInt(buf, 1, 5);
+        return buf;
     }
 
     @Test

@@ -47,11 +47,29 @@ class BlockKeyTest {
     }
 
     @Test
-    void worldHeightRangeIsSafe() {
-        Set<Long> keys = new HashSet<>();
-        for (int y = 0; y < 256; y++) {
-            keys.add(BlockKey.pack(30_000_000, y, -30_000_000));
+    void everyAxisKeepsItsOwnBits() {
+        for (int bit = 0; bit < 26; bit++) {
+            int step = 1 << bit;
+            assertNotEquals(BlockKey.pack(0, 64, 0), BlockKey.pack(step, 64, 0), "x aliases at a step of " + step);
+            assertNotEquals(BlockKey.pack(0, 64, 0), BlockKey.pack(0, 64, step), "z aliases at a step of " + step);
         }
-        assertEquals(256, keys.size());
+        for (int bit = 0; bit < 12; bit++) {
+            int step = 1 << bit;
+            assertNotEquals(BlockKey.pack(0, 0, 0), BlockKey.pack(0, step, 0), "y aliases at a step of " + step);
+        }
+    }
+
+    @Test
+    void theWholeWorldBorderPacksWithoutCollisions() {
+        int[] edges = { -30_000_000, -1, 0, 1, 30_000_000 };
+        Set<Long> keys = new HashSet<>();
+        for (int x : edges) {
+            for (int z : edges) {
+                for (int y = 0; y < 256; y++) {
+                    keys.add(BlockKey.pack(x, y, z));
+                }
+            }
+        }
+        assertEquals(edges.length * edges.length * 256, keys.size());
     }
 }

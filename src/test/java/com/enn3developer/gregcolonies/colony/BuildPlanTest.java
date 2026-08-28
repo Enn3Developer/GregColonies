@@ -340,12 +340,17 @@ class BuildPlanTest {
 
         assertTrue(plan.nextTarget(probe, colony(), site));
         plan.markProgress();
+        probe.occupied(plan.getTargetX(), plan.getTargetY(), plan.getTargetZ());
         plan.skipCell();
 
-        plan.nextTarget(probe, colony(), site);
-        assertEquals(BuildPlan.Phase.BUILD, plan.getPhase());
-        plan.nextTarget(probe, colony(), site);
-        assertEquals(BuildPlan.Phase.BUILD, plan.getPhase(), "progress must not end the build");
+        assertFalse(plan.nextTarget(probe, colony(), site));
+        assertEquals(BuildPlan.Phase.BUILD, plan.getPhase(), "the cube pass rolls into the detail pass");
+        assertFalse(plan.nextTarget(probe, colony(), site));
+        assertEquals(BuildPlan.Phase.BUILD, plan.getPhase(), "progress must buy another round, not end the build");
+
+        assertFalse(plan.nextTarget(probe, colony(), site));
+        assertFalse(plan.nextTarget(probe, colony(), site));
+        assertEquals(BuildPlan.Phase.STRIP, plan.getPhase(), "a round with no progress ends the build");
     }
 
     @Test

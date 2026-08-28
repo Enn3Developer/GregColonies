@@ -147,12 +147,12 @@ class HungerModelTest {
     @Test
     void nbtRoundTrips() {
         HungerModel hunger = new HungerModel();
-        hunger.addExhaustion(2.5F);
-        hunger.eat(0, 0.0F);
-        hunger.tick(10);
         for (int i = 0; i < 3; i++) {
             hunger.addExhaustion(4.5F);
             hunger.drain(true);
+        }
+        for (int i = 0; i < 9; i++) {
+            hunger.tick(10);
         }
 
         NBTTagCompound tag = new NBTTagCompound();
@@ -161,7 +161,12 @@ class HungerModelTest {
         HungerModel read = new HungerModel();
         read.readFromNBT(tag);
         assertEquals(hunger.getFoodLevel(), read.getFoodLevel());
-        assertEquals(hunger.getSaturation(), read.getSaturation());
+        assertEquals(2.0F, read.getSaturation());
+        assertTrue(read.tick(10), "the food timer must survive the save");
+
+        read.addExhaustion(3.0F);
+        assertEquals(0, read.drain(true));
+        assertEquals(1.0F, read.getSaturation(), "the exhaustion bar must survive the save");
     }
 
     @Test
