@@ -62,6 +62,10 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
 
     private static boolean warned;
 
+    private static final int STATE_MASK = GL11.GL_ENABLE_BIT | GL11.GL_CURRENT_BIT
+        | GL11.GL_DEPTH_BUFFER_BIT
+        | GL11.GL_COLOR_BUFFER_BIT;
+
     private final BlueprintView view;
 
     private float yaw = DEFAULT_YAW;
@@ -188,15 +192,13 @@ public class BlueprintPreview extends Widget<BlueprintPreview> implements Intera
         Minecraft.getMinecraft()
             .getTextureManager()
             .bindTexture(TextureMap.locationBlocksTexture);
-        GL11.glPushAttrib(GL11.GL_ENABLE_BIT);
+        GL11.glPushAttrib(STATE_MASK);
         GL11.glPushMatrix();
         try {
             paint3D(model, top, look, centreX, centreY, scale);
         } finally {
-            OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
-            GL11.glEnable(GL11.GL_TEXTURE_2D);
+            // glPushAttrib does not record which texture unit is selected
             OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
-            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
             GL11.glPopMatrix();
             GL11.glPopAttrib();
         }

@@ -44,6 +44,11 @@ public final class BlueprintGhost {
 
     private static boolean warned;
 
+    private static final int STATE_MASK = GL11.GL_ENABLE_BIT | GL11.GL_CURRENT_BIT
+        | GL11.GL_DEPTH_BUFFER_BIT
+        | GL11.GL_COLOR_BUFFER_BIT
+        | GL11.GL_LINE_BIT;
+
     private BlueprintGhost() {}
 
     public static void forget() {
@@ -74,6 +79,7 @@ public final class BlueprintGhost {
         if (model == null) {
             return;
         }
+        GL11.glPushAttrib(STATE_MASK);
         GL11.glPushMatrix();
         try {
             GL11.glTranslated(-cameraX, -cameraY, -cameraZ);
@@ -82,7 +88,10 @@ public final class BlueprintGhost {
         } catch (RuntimeException error) {
             warnOnce(error);
         } finally {
+            // glPushAttrib does not record which texture unit is selected
+            OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
             GL11.glPopMatrix();
+            GL11.glPopAttrib();
         }
     }
 
@@ -108,12 +117,6 @@ public final class BlueprintGhost {
         for (int y = 0; y <= top && y < listCount; y++) {
             GL11.glCallList(listBase + y);
         }
-
-        OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
-        GL11.glDisable(GL11.GL_BLEND);
-        GL11.glEnable(GL11.GL_CULL_FACE);
     }
 
     private static void compile(BlueprintEditor editor, Blueprint model, int top) {
@@ -227,13 +230,6 @@ public final class BlueprintGhost {
             }
         }
 
-        GL11.glLineWidth(1.0F);
-        GL11.glEnable(GL11.GL_DEPTH_TEST);
-        GL11.glDepthMask(true);
-        GL11.glDisable(GL11.GL_BLEND);
-        GL11.glEnable(GL11.GL_CULL_FACE);
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     private static void drawPlane(BlueprintEditor editor, Blueprint model, double baseX, double baseY, double baseZ) {
