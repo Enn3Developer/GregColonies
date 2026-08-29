@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockDoor;
 import net.minecraft.block.material.Material;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.EntityLivingBase;
@@ -303,11 +304,11 @@ public class CitizenPathFinder {
                 return AVOIDED_WATER;
             }
             soft = true;
-        } else if (!enterDoors && block == Blocks.wooden_door) {
+        } else if (!enterDoors && isWoodenDoor(block)) {
             return BLOCKED;
         }
 
-        if (!block.getBlocksMovement(world, x, y, z) && (!breakDoors || block != Blocks.wooden_door)) {
+        if (!block.getBlocksMovement(world, x, y, z) && (!breakDoors || !isWoodenDoor(block))) {
             int render = block.getRenderType();
             if (render == RENDER_FENCE || render == RENDER_WALL || block == Blocks.fence_gate) {
                 return FENCE;
@@ -318,6 +319,10 @@ public class CitizenPathFinder {
             return BLOCKED;
         }
         return soft ? OPEN_WATER : CLEAR;
+    }
+
+    private static boolean isWoodenDoor(Block block) {
+        return block instanceof BlockDoor && block.getMaterial() == Material.wood;
     }
 
     private Node node(int x, int y, int z) {

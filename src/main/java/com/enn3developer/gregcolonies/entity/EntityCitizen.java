@@ -123,6 +123,7 @@ public class EntityCitizen extends EntityVillager implements IGuiHolder<EntityGu
         tasks.addTask(5, new EntityAIOpenDoor(this, true));
         tasks.addTask(6, new EntityAIWatchClosest(this, EntityPlayer.class, 6.0F));
         tasks.addTask(7, idle);
+        getNavigator().setBreakDoors(true);
         for (int i = 0; i < equipmentDropChances.length; i++) {
             equipmentDropChances[i] = 0.0F;
         }
