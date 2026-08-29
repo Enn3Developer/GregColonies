@@ -2,10 +2,8 @@ package com.enn3developer.gregcolonies.entity.ai.command;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import net.minecraft.block.Block;
 import net.minecraft.inventory.IInventory;
@@ -20,19 +18,16 @@ import com.enn3developer.gregcolonies.colony.ColonySite;
 import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.colony.WorkArea;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
-import com.enn3developer.gregcolonies.entity.ai.ApproachTracker;
-import com.enn3developer.gregcolonies.entity.ai.CitizenCommand;
 import com.enn3developer.gregcolonies.entity.ai.CitizenCommandResult;
 import com.enn3developer.gregcolonies.entity.ai.TravelLeg;
 import com.enn3developer.gregcolonies.entity.ai.WorkPhase;
-import com.enn3developer.gregcolonies.entity.ai.work.BlockBreaker;
 import com.enn3developer.gregcolonies.entity.ai.work.Crops;
 import com.enn3developer.gregcolonies.entity.ai.work.DigResult;
 import com.enn3developer.gregcolonies.entity.ai.work.Inventories;
 import com.enn3developer.gregcolonies.entity.ai.work.SeedCrafting;
 import com.enn3developer.gregcolonies.entity.ai.work.WorkBlocks;
 
-public class CitizenCommandFarm extends CitizenCommand {
+public class CitizenCommandFarm extends AreaWorkCommand {
 
     public static final String ID = "farm";
 
@@ -58,41 +53,17 @@ public class CitizenCommandFarm extends CitizenCommand {
 
     private static final int MAX_JOBS = 1024;
 
-    private static final double WORK_REACH_SQ = 25.0D;
-
-    private static final double DROP_OFF_REACH_SQ = 16.0D;
-
-    private static final double WALK_SPEED = 0.6D;
-
-    private static final float LOOK_SPEED = 30.0F;
-
     private static final int APPROACH_TIMEOUT = 200;
 
     private static final int ERRAND_TIMEOUT = 6000;
 
     private static final int ERRAND_RETRY = 600;
 
-    private static final int LEG_RETRY = 200;
-
-    private final WorkArea area = new WorkArea();
-
-    private final BlockBreaker breaker = new BlockBreaker();
-
     private final List<int[]> harvests = new ArrayList<>();
 
     private final List<int[]> chores = new ArrayList<>();
 
-    private final Set<Long> skipped = new HashSet<>();
-
     private final Map<Long, Block> crops = new HashMap<>();
-
-    private WorkPhase phase = WorkPhase.TRAVEL;
-
-    private final TravelLeg leg = new TravelLeg();
-
-    private String reason = "";
-
-    private int harvested;
 
     private int planted;
 
@@ -110,8 +81,6 @@ public class CitizenCommandFarm extends CitizenCommand {
 
     private int craftTicks;
 
-    private final ApproachTracker approach = new ApproachTracker(APPROACH_TIMEOUT);
-
     private boolean needsSeed;
 
     private Block missingSeed;
@@ -120,9 +89,12 @@ public class CitizenCommandFarm extends CitizenCommand {
 
     private long nextDeliver;
 
-    public CitizenCommandFarm() {}
+    public CitizenCommandFarm() {
+        super(APPROACH_TIMEOUT);
+    }
 
     public CitizenCommandFarm(int x1, int y1, int z1, int x2, int y2, int z2) {
+        super(APPROACH_TIMEOUT);
         area.set(x1, y1, z1, x2, y2, z2);
         area.capSide(WorkArea.MAX_SIDE);
         area.capHeight(WorkArea.MAX_HEIGHT);
@@ -150,15 +122,14 @@ public class CitizenCommandFarm extends CitizenCommand {
         missingSeed = null;
         harvests.clear();
         chores.clear();
-        skipped.clear();
+        clearSkipped();
         breaker.clear(citizen);
     }
 
     @Override
     public CitizenCommandResult update(EntityCitizen citizen) {
-        Colony colony = citizen.getColony();
-        if (colony == null) {
-            reason = "no colony";
+        if (citizen.getColony() == null) {
+            setReason("no colony");
             return CitizenCommandResult.FAILED;
         }
         if (scanTicks > 0) {
@@ -167,29 +138,34 @@ public class CitizenCommandFarm extends CitizenCommand {
         if (craftTicks > 0) {
             craftTicks--;
         }
-        if (phase == WorkPhase.TRAVEL) {
-            return travel(citizen);
-        }
-        if (phase == WorkPhase.WORK) {
-            return work(citizen, colony);
-        }
-        return deliver(citizen, colony);
+        return super.update(citizen);
     }
 
-    private CitizenCommandResult travel(EntityCitizen citizen) {
+    @Override
+    protected CitizenCommandResult travel(EntityCitizen citizen) {
         TravelLeg.Step step = leg.walk(citizen, centerX(), area.getMinY() + 1, centerZ());
         if (step == TravelLeg.Step.RUNNING) {
             return CitizenCommandResult.RUNNING;
         }
-        reason = step == TravelLeg.Step.FAILED ? "no path to the field" : "";
-        phase = WorkPhase.WORK;
+        setReason(step == TravelLeg.Step.FAILED ? "no path to the field" : "");
+        setPhase(WorkPhase.WORK);
         return CitizenCommandResult.RUNNING;
+    }
+
+    @Override
+    protected CitizenCommandResult work(EntityCitizen citizen) {
+        return work(citizen, citizen.getColony());
+    }
+
+    @Override
+    protected CitizenCommandResult deliver(EntityCitizen citizen) {
+        return deliver(citizen, citizen.getColony());
     }
 
     private CitizenCommandResult work(EntityCitizen citizen, Colony colony) {
         if (!citizen.worldObj.blockExists(centerX(), area.getMinY(), centerZ())) {
-            reason = "out of range";
-            phase = WorkPhase.TRAVEL;
+            setReason("out of range");
+            setPhase(WorkPhase.TRAVEL);
             return CitizenCommandResult.RUNNING;
         }
         makeSeeds(citizen);
@@ -204,8 +180,7 @@ public class CitizenCommandFarm extends CitizenCommand {
         approach.restart();
         citizen.getNavigator()
             .clearPathEntity();
-        citizen.getLookHelper()
-            .setLookPosition(jobX + 0.5D, jobY + 0.5D, jobZ + 0.5D, LOOK_SPEED, LOOK_SPEED);
+        faceBlock(citizen, jobX, jobY, jobZ);
         if (jobType == JOB_PLANT) {
             return sow(citizen);
         }
@@ -239,7 +214,7 @@ public class CitizenCommandFarm extends CitizenCommand {
                 scan(citizen);
                 scanTicks = SCAN_INTERVAL;
                 if (harvests.isEmpty() && chores.isEmpty()) {
-                    reason = "nothing to tend";
+                    setReason("nothing to tend");
                     return false;
                 }
             }
@@ -248,7 +223,7 @@ public class CitizenCommandFarm extends CitizenCommand {
             if (job == null) {
                 return false;
             }
-            if (skipped.contains(BlockKey.pack(job[0], job[1], job[2])) || !isValid(citizen, world, job)) {
+            if (isSkipped(job[0], job[1], job[2]) || !isValid(citizen, world, job)) {
                 continue;
             }
             jobX = job[0];
@@ -257,7 +232,7 @@ public class CitizenCommandFarm extends CitizenCommand {
             jobType = job[3];
             hasJob = true;
             approach.reset();
-            reason = "";
+            setReason("");
             return true;
         }
     }
@@ -286,7 +261,7 @@ public class CitizenCommandFarm extends CitizenCommand {
         World world = citizen.worldObj;
         harvests.clear();
         chores.clear();
-        skipped.clear();
+        clearSkipped();
         needsSeed = false;
         boolean bonemeal = citizen.getInventory()
             .hasMain(Crops::isBonemeal);
@@ -348,7 +323,7 @@ public class CitizenCommandFarm extends CitizenCommand {
                 return CitizenCommandResult.RUNNING;
             case BROKEN:
             case TOOL_BROKEN:
-                harvested++;
+                countHarvest();
                 remember(citizen, crop);
                 hasJob = false;
                 return CitizenCommandResult.RUNNING;
@@ -356,7 +331,7 @@ public class CitizenCommandFarm extends CitizenCommand {
                 hasJob = false;
                 return CitizenCommandResult.RUNNING;
             case INVENTORY_FULL:
-                reason = "inventory full";
+                setReason("inventory full");
                 if (canDeliver(citizen, colony)) {
                     return startDeliver(citizen);
                 }
@@ -374,7 +349,7 @@ public class CitizenCommandFarm extends CitizenCommand {
         if (seed == null) {
             needsSeed = true;
             missingSeed = wanted;
-            reason = "no seeds";
+            setReason("no seeds");
             hasJob = false;
             return CitizenCommandResult.RUNNING;
         }
@@ -393,7 +368,7 @@ public class CitizenCommandFarm extends CitizenCommand {
         ItemStack tool = citizen.getInventory()
             .getHeldTool();
         if (!Crops.isHoe(tool)) {
-            reason = "no hoe";
+            setReason("no hoe");
             hasJob = false;
             return CitizenCommandResult.RUNNING;
         }
@@ -451,7 +426,7 @@ public class CitizenCommandFarm extends CitizenCommand {
 
     private CitizenCommandResult skip(EntityCitizen citizen) {
         breaker.clear(citizen);
-        skipped.add(BlockKey.pack(jobX, jobY, jobZ));
+        skip(jobX, jobY, jobZ);
         hasJob = false;
         approach.restart();
         return CitizenCommandResult.RUNNING;
@@ -467,7 +442,7 @@ public class CitizenCommandFarm extends CitizenCommand {
         breaker.clear(citizen);
         hasJob = false;
         errandTicks = 0;
-        phase = WorkPhase.FINISH;
+        setPhase(WorkPhase.FINISH);
         leg.clear(citizen);
         return CitizenCommandResult.RUNNING;
     }
@@ -486,7 +461,7 @@ public class CitizenCommandFarm extends CitizenCommand {
     private CitizenCommandResult deliver(EntityCitizen citizen, Colony colony) {
         ColonySite site = colony.site(ColonySiteKind.DROP_OFF);
         if (!site.isPresent() || colony.getDimension() != citizen.worldObj.provider.dimensionId) {
-            reason = "no drop-off";
+            setReason("no drop-off");
             return backToWork(citizen);
         }
         int x = site.getX();
@@ -497,7 +472,7 @@ public class CitizenCommandFarm extends CitizenCommand {
             return unload(citizen, x, y, z);
         }
         if (walk == TravelLeg.Step.FAILED) {
-            reason = "drop-off unreachable";
+            setReason("drop-off unreachable");
             nextDeliver = citizen.worldObj.getTotalWorldTime() + ERRAND_RETRY;
             return backToWork(citizen);
         }
@@ -508,7 +483,7 @@ public class CitizenCommandFarm extends CitizenCommand {
         faceChest(citizen, x, y, z);
         IInventory target = Inventories.at(citizen.worldObj, x, y, z);
         if (target == null) {
-            reason = "drop-off gone";
+            setReason("drop-off gone");
             nextDeliver = citizen.worldObj.getTotalWorldTime() + ERRAND_RETRY;
             return backToWork(citizen);
         }
@@ -517,9 +492,9 @@ public class CitizenCommandFarm extends CitizenCommand {
             .deposit(target, CitizenCommandFarm::keep, SEED_RESERVE);
         if (moved > 0) {
             citizen.swingItem();
-            reason = "";
+            setReason("");
         } else {
-            reason = "drop-off full";
+            setReason("drop-off full");
             nextDeliver = citizen.worldObj.getTotalWorldTime() + ERRAND_RETRY;
         }
         return backToWork(citizen);
@@ -551,15 +526,14 @@ public class CitizenCommandFarm extends CitizenCommand {
             citizen.swingItem();
             needsSeed = false;
             scanTicks = 0;
-            reason = "";
+            setReason("");
         } else {
-            reason = "no seeds";
+            setReason("no seeds");
         }
     }
 
-    private static void faceChest(EntityCitizen citizen, int x, int y, int z) {
-        citizen.getLookHelper()
-            .setLookPosition(x + 0.5D, y + 0.5D, z + 0.5D, LOOK_SPEED, LOOK_SPEED);
+    private void faceChest(EntityCitizen citizen, int x, int y, int z) {
+        faceBlock(citizen, x, y, z);
         citizen.getNavigator()
             .clearPathEntity();
     }
@@ -568,7 +542,7 @@ public class CitizenCommandFarm extends CitizenCommand {
         leg.clear(citizen);
         errandTicks = 0;
         scanTicks = 0;
-        phase = WorkPhase.TRAVEL;
+        setPhase(WorkPhase.TRAVEL);
         return CitizenCommandResult.RUNNING;
     }
 
@@ -581,20 +555,9 @@ public class CitizenCommandFarm extends CitizenCommand {
     }
 
     @Override
-    public void finish(EntityCitizen citizen) {
-        breaker.clear(citizen);
-        leg.clear(citizen);
-        citizen.getNavigator()
-            .clearPathEntity();
-    }
-
-    @Override
     public void readFromNBT(NBTTagCompound tag) {
-        area.readFromNBT(tag);
-        phase = WorkPhase.byId(tag.getInteger("phase"));
-        harvested = tag.getInteger("harvested");
+        super.readFromNBT(tag);
         planted = tag.getInteger("planted");
-        reason = tag.getString("reason");
         crops.clear();
         NBTTagList list = tag.getTagList("crops", 10);
         for (int i = 0; i < list.tagCount(); i++) {
@@ -608,11 +571,8 @@ public class CitizenCommandFarm extends CitizenCommand {
 
     @Override
     public void writeToNBT(NBTTagCompound tag) {
-        area.writeToNBT(tag);
-        tag.setInteger("phase", phase.id());
-        tag.setInteger("harvested", harvested);
+        super.writeToNBT(tag);
         tag.setInteger("planted", planted);
-        tag.setString("reason", reason);
         NBTTagList list = new NBTTagList();
         for (Map.Entry<Long, Block> entry : crops.entrySet()) {
             NBTTagCompound crop = new NBTTagCompound();
@@ -624,9 +584,17 @@ public class CitizenCommandFarm extends CitizenCommand {
     }
 
     @Override
-    public String describe() {
-        String state = phase == WorkPhase.TRAVEL ? "walking there" : phase == WorkPhase.WORK ? "tending" : "delivering";
-        String tail = reason.isEmpty() ? "" : " (" + reason + ")";
-        return ID + " " + state + " " + harvested + " crops " + planted + " seeded" + tail;
+    protected String describeWork() {
+        return "tending";
+    }
+
+    @Override
+    protected String describeReturn() {
+        return "delivering";
+    }
+
+    @Override
+    protected String describeTally() {
+        return getHarvested() + " crops " + planted + " seeded";
     }
 }
