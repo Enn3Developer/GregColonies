@@ -13,8 +13,10 @@ import com.enn3developer.gregcolonies.colony.Blueprint;
 import com.enn3developer.gregcolonies.colony.BuildSite;
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
+import com.enn3developer.gregcolonies.colony.ColonyHome;
 import com.enn3developer.gregcolonies.colony.ColonySite;
 import com.enn3developer.gregcolonies.colony.ColonySiteKind;
+import com.enn3developer.gregcolonies.colony.WorkArea;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 
 import cpw.mods.fml.common.network.ByteBufUtils;
@@ -33,6 +35,7 @@ public class ColonySnapshot {
     private int orderCount;
     private final Map<ColonySiteKind, ColonySite> sites = new EnumMap<>(ColonySiteKind.class);
     private final List<BlueprintEntry> blueprints = new ArrayList<>();
+    private final List<HomeEntry> homes = new ArrayList<>();
     private int activeBlueprint = -1;
     private int placeRotation;
     private boolean placeMirror;
@@ -82,6 +85,38 @@ public class ColonySnapshot {
         }
     }
 
+    public static class HomeEntry {
+
+        private int id;
+        private final WorkArea area = new WorkArea();
+        private int beds;
+        private int occupants;
+
+        public int getId() {
+            return id;
+        }
+
+        public WorkArea getArea() {
+            return area;
+        }
+
+        public int getBeds() {
+            return beds;
+        }
+
+        public int getOccupants() {
+            return occupants;
+        }
+
+        public String getLabel() {
+            return "home " + id;
+        }
+
+        public String getValue() {
+            return occupants + "/" + beds + " beds";
+        }
+    }
+
     private ColonySnapshot() {
         for (ColonySiteKind kind : ColonySiteKind.values()) {
             sites.put(kind, new ColonySite());
@@ -111,6 +146,14 @@ public class ColonySnapshot {
             entry.sizeZ = blueprint.getSizeZ();
             entry.blocks = blueprint.blockCount();
             snapshot.blueprints.add(entry);
+        }
+        for (ColonyHome home : colony.getHomes()) {
+            HomeEntry entry = new HomeEntry();
+            entry.id = home.getId();
+            entry.area.copyFrom(home.getArea());
+            entry.beds = home.getBeds();
+            entry.occupants = colony.homeOccupants(home.getId());
+            snapshot.homes.add(entry);
         }
         snapshot.activeBlueprint = colony.getActiveBlueprintIndex();
         snapshot.placeRotation = colony.getPlaceRotation();
@@ -230,6 +273,23 @@ public class ColonySnapshot {
         return hasBuildSite && buildX == x && buildY == y + 1 && buildZ == z;
     }
 
+    public List<HomeEntry> getHomes() {
+        return homes;
+    }
+
+    public HomeEntry getHome(int index) {
+        return index >= 0 && index < homes.size() ? homes.get(index) : null;
+    }
+
+    public HomeEntry homeAt(int x, int y, int z) {
+        for (HomeEntry home : homes) {
+            if (home.area.contains(x, y, z)) {
+                return home;
+            }
+        }
+        return null;
+    }
+
     public List<CitizenSnapshot> getCitizens() {
         return citizens;
     }
@@ -255,6 +315,13 @@ public class ColonySnapshot {
             buf.writeShort(entry.sizeY);
             buf.writeShort(entry.sizeZ);
             buf.writeInt(entry.blocks);
+        }
+        buf.writeInt(homes.size());
+        for (HomeEntry entry : homes) {
+            buf.writeInt(entry.id);
+            entry.area.write(buf);
+            buf.writeInt(entry.beds);
+            buf.writeInt(entry.occupants);
         }
         buf.writeInt(activeBlueprint);
         buf.writeByte(placeRotation);
@@ -296,6 +363,15 @@ public class ColonySnapshot {
             entry.sizeZ = buf.readShort();
             entry.blocks = buf.readInt();
             snapshot.blueprints.add(entry);
+        }
+        int homeCount = buf.readInt();
+        for (int i = 0; i < homeCount; i++) {
+            HomeEntry entry = new HomeEntry();
+            entry.id = buf.readInt();
+            entry.area.read(buf);
+            entry.beds = buf.readInt();
+            entry.occupants = buf.readInt();
+            snapshot.homes.add(entry);
         }
         snapshot.activeBlueprint = buf.readInt();
         snapshot.placeRotation = buf.readByte();

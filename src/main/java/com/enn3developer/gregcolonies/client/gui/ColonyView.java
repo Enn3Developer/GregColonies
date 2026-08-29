@@ -23,6 +23,7 @@ import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
 import com.enn3developer.gregcolonies.client.ControllingCompat;
 import com.enn3developer.gregcolonies.client.GCKeyBindings;
+import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonySite;
 import com.enn3developer.gregcolonies.colony.ColonySiteKind;
 import com.enn3developer.gregcolonies.entity.CitizenJob;
@@ -33,6 +34,7 @@ import com.enn3developer.gregcolonies.network.PacketCitizenCommand;
 import com.enn3developer.gregcolonies.network.PacketCitizenGroup;
 import com.enn3developer.gregcolonies.network.PacketCitizenJob;
 import com.enn3developer.gregcolonies.network.PacketColonyBuild;
+import com.enn3developer.gregcolonies.network.PacketColonyHome;
 import com.enn3developer.gregcolonies.network.PacketColonySite;
 import com.enn3developer.gregcolonies.network.PacketOpenCitizen;
 
@@ -43,6 +45,10 @@ public class ColonyView extends OverlayView {
     private static final int BUILD_LABEL_COLOR = TargetMode.BUILD.color(TargetMode.LABEL_ALPHA);
 
     private static final int MAX_GROUP_ROWS = 32;
+
+    private static final int MAX_HOME_ROWS = Colony.MAX_HOMES;
+
+    private static final int HOME_LABEL_COLOR = TargetMode.HOME.color(TargetMode.LABEL_ALPHA);
 
     private static final int SIDE_WIDTH = 168;
 
@@ -161,6 +167,15 @@ public class ColonyView extends OverlayView {
         boolean clear = getColony().site(kind)
             .isAt(x, y, z);
         GCNetwork.CHANNEL.sendToServer(new PacketColonySite(getColony().getId(), kind, x, y, z, clear));
+    }
+
+    public void sendHome(int x1, int y1, int z1, int x2, int y2, int z2) {
+        ColonySnapshot.HomeEntry home = getColony().homeAt(x1, y1, z1);
+        if (home != null) {
+            GCNetwork.CHANNEL.sendToServer(PacketColonyHome.clear(getColony().getId(), home.getId()));
+            return;
+        }
+        GCNetwork.CHANNEL.sendToServer(PacketColonyHome.set(getColony().getId(), x1, y1, z1, x2, y2, z2));
     }
 
     public void openBlueprints() {
@@ -315,6 +330,14 @@ public class ColonyView extends OverlayView {
                         .color(TargetMode.LABEL_ALPHA)));
         }
 
+        list.child(GuiStyle.section("Homes", this::homesValue, GuiStyle.SECTION_GAP));
+        list.child(
+            GuiStyle.row()
+                .child(modeButton(TargetMode.HOME)));
+        for (int index = 0; index < MAX_HOME_ROWS; index++) {
+            list.child(buildHomeRow(index));
+        }
+
         list.child(GuiStyle.section("Build", this::buildValue, GuiStyle.SECTION_GAP));
         list.child(
             GuiStyle.row()
@@ -341,14 +364,45 @@ public class ColonyView extends OverlayView {
         return list;
     }
 
+    private IWidget buildHomeRow(int index) {
+        Flow row = entry(() -> homeLabel(index), () -> homeValue(index), HOME_LABEL_COLOR);
+        row.setEnabledIf(widget -> getColony().getHome(index) != null);
+        return row;
+    }
+
+    private String homeLabel(int index) {
+        ColonySnapshot.HomeEntry home = getColony().getHome(index);
+        return home == null ? "" : home.getLabel();
+    }
+
+    private String homeValue(int index) {
+        ColonySnapshot.HomeEntry home = getColony().getHome(index);
+        return home == null ? "" : home.getValue();
+    }
+
+    private String homesValue() {
+        int beds = 0;
+        int occupants = 0;
+        for (ColonySnapshot.HomeEntry home : getColony().getHomes()) {
+            beds += home.getBeds();
+            occupants += home.getOccupants();
+        }
+        return getColony().getHomes()
+            .size() + " homes   " + occupants + "/" + beds + " beds";
+    }
+
     private Flow entry(String name, Supplier<String> value, int color) {
+        return entry(() -> name, value, color);
+    }
+
+    private Flow entry(Supplier<String> name, Supplier<String> value, int color) {
         return Flow.row()
             .widthRel(1.0F)
             .coverChildrenHeight()
             .marginBottom(1)
             .mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
-            .child(GuiStyle.label(IKey.str(name), GuiStyle.HINT_COLOR))
-            .child(GuiStyle.label(IKey.dynamic(() -> entryValue(name, value)), color));
+            .child(GuiStyle.label(IKey.dynamic(name::get), GuiStyle.HINT_COLOR))
+            .child(GuiStyle.label(IKey.dynamic(() -> entryValue(name.get(), value)), color));
     }
 
     private String entryValue(String name, Supplier<String> value) {

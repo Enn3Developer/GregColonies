@@ -51,6 +51,38 @@ public final class ColonyActions {
         return Outcome.ok("Colony " + kind.getLabel() + " set to " + x + "/" + y + "/" + z);
     }
 
+    public static Outcome clearHome(ColonyRegistry registry, Colony colony, int homeId) {
+        if (!registry.removeHome(colony.getId(), homeId)) {
+            return Outcome.silent();
+        }
+        return Outcome.ok("Home #" + homeId + " cleared");
+    }
+
+    public static Outcome setHome(ColonyRegistry registry, Colony colony, int dimension, WorkArea area, int beds) {
+        if (colony.getDimension() != dimension) {
+            return Outcome.fail("A home must be in the colony dimension");
+        }
+        if (!colony.isInside(dimension, area.getCenterX() + 0.5D, area.getCenterZ() + 0.5D)) {
+            return Outcome.fail("A home must be inside the colony");
+        }
+        if (beds <= 0) {
+            return Outcome.fail("There is no bed in that region");
+        }
+        if (colony.overlapsHome(area)) {
+            return Outcome.fail("That region overlaps another home");
+        }
+        if (colony.getHomes()
+            .size() >= Colony.MAX_HOMES) {
+            return Outcome.fail("The colony already has " + Colony.MAX_HOMES + " homes, clear one first");
+        }
+
+        ColonyHome home = registry.addHome(colony.getId(), area, beds);
+        if (home == null) {
+            return Outcome.silent();
+        }
+        return Outcome.ok("Home #" + home.getId() + " set at " + home.describe() + ", " + beds + " bed(s)");
+    }
+
     public static Outcome storeBlueprint(ColonyRegistry registry, Colony colony, Blueprint decoded, int index) {
         Blueprint blueprint = decoded == null ? null : decoded.trimmed();
         if (blueprint == null || !blueprint.isPlaceable()) {

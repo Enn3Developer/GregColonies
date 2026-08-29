@@ -2,6 +2,8 @@ package com.enn3developer.gregcolonies.colony;
 
 import net.minecraft.nbt.NBTTagCompound;
 
+import io.netty.buffer.ByteBuf;
+
 public class WorkArea {
 
     public static final int MAX_SIDE = 32;
@@ -33,6 +35,15 @@ public class WorkArea {
         maxX = Math.max(x1, x2);
         maxY = Math.max(y1, y2);
         maxZ = Math.max(z1, z2);
+    }
+
+    public void copyFrom(WorkArea other) {
+        minX = other.minX;
+        minY = other.minY;
+        minZ = other.minZ;
+        maxX = other.maxX;
+        maxY = other.maxY;
+        maxZ = other.maxZ;
     }
 
     public void capHeight(int height) {
@@ -72,12 +83,28 @@ public class WorkArea {
         return (minX + maxX) / 2;
     }
 
+    public int getCenterY() {
+        return (minY + maxY) / 2;
+    }
+
     public int getCenterZ() {
         return (minZ + maxZ) / 2;
     }
 
     public boolean contains(int x, int y, int z) {
         return x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ;
+    }
+
+    public boolean overlaps(WorkArea other) {
+        return minX <= other.maxX && maxX >= other.minX
+            && minY <= other.maxY
+            && maxY >= other.minY
+            && minZ <= other.maxZ
+            && maxZ >= other.minZ;
+    }
+
+    public String describe() {
+        return minX + "/" + minY + "/" + minZ + " to " + maxX + "/" + maxY + "/" + maxZ;
     }
 
     public void writeToNBT(NBTTagCompound tag) {
@@ -96,5 +123,23 @@ public class WorkArea {
         maxX = tag.getInteger("x2");
         maxY = tag.getInteger("y2");
         maxZ = tag.getInteger("z2");
+    }
+
+    public void write(ByteBuf buf) {
+        buf.writeInt(minX);
+        buf.writeInt(minY);
+        buf.writeInt(minZ);
+        buf.writeInt(maxX);
+        buf.writeInt(maxY);
+        buf.writeInt(maxZ);
+    }
+
+    public void read(ByteBuf buf) {
+        minX = buf.readInt();
+        minY = buf.readInt();
+        minZ = buf.readInt();
+        maxX = buf.readInt();
+        maxY = buf.readInt();
+        maxZ = buf.readInt();
     }
 }

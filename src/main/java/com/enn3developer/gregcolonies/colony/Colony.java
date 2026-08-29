@@ -24,6 +24,8 @@ public class Colony {
 
     public static final int MAX_BLUEPRINTS = 16;
 
+    public static final int MAX_HOMES = 32;
+
     private static final int BUILD_LEASE_TICKS = 100;
 
     private int id;
@@ -42,6 +44,8 @@ public class Colony {
     private BuildSite buildSite;
     private UUID buildOwner;
     private long buildLease;
+    private final List<ColonyHome> homes = new ArrayList<>();
+    private int nextHomeId = 1;
     private final Deque<CitizenCommand> orders = new ArrayDeque<>();
     private final Map<UUID, ColonyCitizen> citizens = new LinkedHashMap<>();
 
@@ -207,6 +211,95 @@ public class Colony {
         }
     }
 
+    public List<ColonyHome> getHomes() {
+        return homes;
+    }
+
+    public ColonyHome getHome(int id) {
+        for (ColonyHome home : homes) {
+            if (home.getId() == id) {
+                return home;
+            }
+        }
+        return null;
+    }
+
+    public ColonyHome getHomeAt(int x, int y, int z) {
+        for (ColonyHome home : homes) {
+            if (home.contains(x, y, z)) {
+                return home;
+            }
+        }
+        return null;
+    }
+
+    public boolean overlapsHome(WorkArea area) {
+        for (ColonyHome home : homes) {
+            if (home.getArea()
+                .overlaps(area)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public ColonyHome addHome(WorkArea area, int beds) {
+        if (homes.size() >= MAX_HOMES || overlapsHome(area)) {
+            return null;
+        }
+        ColonyHome home = new ColonyHome(nextHomeId++, area, beds);
+        homes.add(home);
+        return home;
+    }
+
+    public boolean removeHome(int id) {
+        ColonyHome home = getHome(id);
+        if (home == null) {
+            return false;
+        }
+        homes.remove(home);
+        for (ColonyCitizen citizen : citizens.values()) {
+            if (citizen.getHomeId() == id) {
+                citizen.clearHome();
+                citizen.clearBed();
+            }
+        }
+        return true;
+    }
+
+    public int homeOccupants(int id) {
+        int occupants = 0;
+        for (ColonyCitizen citizen : citizens.values()) {
+            if (citizen.getHomeId() == id) {
+                occupants++;
+            }
+        }
+        return occupants;
+    }
+
+    public boolean claimHome(UUID id, int homeId) {
+        ColonyCitizen owner = citizens.get(id);
+        ColonyHome home = getHome(homeId);
+        if (owner == null || home == null) {
+            return false;
+        }
+        if (owner.getHomeId() == homeId) {
+            return true;
+        }
+        if (homeOccupants(homeId) >= home.getBeds()) {
+            return false;
+        }
+        owner.setHomeId(homeId);
+        return true;
+    }
+
+    public void releaseHome(UUID id) {
+        ColonyCitizen owner = citizens.get(id);
+        if (owner != null) {
+            owner.clearHome();
+        }
+    }
+
     public boolean isBedFree(UUID id, int x, int y, int z) {
         for (ColonyCitizen citizen : citizens.values()) {
             if (!citizen.getId()
@@ -219,11 +312,16 @@ public class Colony {
 
     public boolean claimBed(UUID id, int x, int y, int z) {
         ColonyCitizen owner = citizens.get(id);
-        if (owner == null || !isBedFree(id, x, y, z)) {
+        if (owner == null || !isBedFree(id, x, y, z) || !ownsBedAt(owner, x, y, z)) {
             return false;
         }
         owner.setBed(x, y, z);
         return true;
+    }
+
+    public boolean ownsBedAt(ColonyCitizen owner, int x, int y, int z) {
+        ColonyHome home = getHomeAt(x, y, z);
+        return home == null ? !owner.hasHome() : home.getId() == owner.getHomeId();
     }
 
     public void releaseBed(UUID id) {
@@ -383,6 +481,13 @@ public class Colony {
             tag.setTag("buildSite", buildSite.writeToNBT());
         }
 
+        NBTTagList homeList = new NBTTagList();
+        for (ColonyHome home : homes) {
+            homeList.appendTag(home.writeToNBT());
+        }
+        tag.setTag("homes", homeList);
+        tag.setInteger("nextHomeId", nextHomeId);
+
         NBTTagList orderList = new NBTTagList();
         for (CitizenCommand order : orders) {
             orderList.appendTag(CitizenCommandRegistry.write(order));
@@ -432,6 +537,15 @@ public class Colony {
         colony.placeMirror = tag.getBoolean("placeMirror");
         if (tag.hasKey("buildSite", 10)) {
             colony.buildSite = BuildSite.readFromNBT(tag.getCompoundTag("buildSite"));
+        }
+
+        NBTTagList homeList = tag.getTagList("homes", 10);
+        for (int i = 0; i < homeList.tagCount() && colony.homes.size() < MAX_HOMES; i++) {
+            colony.homes.add(ColonyHome.readFromNBT(homeList.getCompoundTagAt(i)));
+        }
+        colony.nextHomeId = Math.max(tag.getInteger("nextHomeId"), 1);
+        for (ColonyHome home : colony.homes) {
+            colony.nextHomeId = Math.max(colony.nextHomeId, home.getId() + 1);
         }
 
         NBTTagList orderList = tag.getTagList("orders", 10);

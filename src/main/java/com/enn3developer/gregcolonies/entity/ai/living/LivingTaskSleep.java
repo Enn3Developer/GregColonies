@@ -1,13 +1,16 @@
 package com.enn3developer.gregcolonies.entity.ai.living;
 
-import net.minecraft.block.Block;
 import net.minecraft.block.BlockBed;
 import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyCitizen;
+import com.enn3developer.gregcolonies.colony.ColonyHome;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
+import com.enn3developer.gregcolonies.colony.ColonyRegistry;
+import com.enn3developer.gregcolonies.colony.Homes;
+import com.enn3developer.gregcolonies.colony.WorkArea;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.Hazards;
 import com.enn3developer.gregcolonies.entity.ai.auto.AutoTask;
@@ -81,8 +84,10 @@ public class LivingTaskSleep extends AutoTask {
         if (entry == null) {
             return false;
         }
+
+        ColonyHome home = home(citizen, colony, entry);
         if (entry.hasBed()) {
-            if (isBed(world, entry.getBedX(), entry.getBedY(), entry.getBedZ())) {
+            if (keepsBed(world, colony, entry, home)) {
                 bedX = entry.getBedX();
                 bedY = entry.getBedY();
                 bedZ = entry.getBedZ();
@@ -91,11 +96,85 @@ public class LivingTaskSleep extends AutoTask {
             ColonyManager.registry(world)
                 .releaseBed(colony.getId(), citizen.getUniqueID());
         }
-        if (claimBed(citizen, colony, dimension)) {
+        if (home == null ? claimBed(citizen, colony, dimension) : claimBedAtHome(citizen, colony, home)) {
             return true;
         }
         delay(citizen);
         return false;
+    }
+
+    private static boolean keepsBed(World world, Colony colony, ColonyCitizen entry, ColonyHome home) {
+        if (!isBed(world, entry.getBedX(), entry.getBedY(), entry.getBedZ())) {
+            return false;
+        }
+        ColonyHome standing = colony.getHomeAt(entry.getBedX(), entry.getBedY(), entry.getBedZ());
+        return standing == home;
+    }
+
+    private static ColonyHome home(EntityCitizen citizen, Colony colony, ColonyCitizen entry) {
+        World world = citizen.worldObj;
+        ColonyRegistry registry = ColonyManager.registry(world);
+        ColonyHome current = colony.getHome(entry.getHomeId());
+        if (current != null) {
+            return current;
+        }
+        if (entry.hasHome()) {
+            registry.releaseHome(colony.getId(), entry.getId());
+        }
+
+        ColonyHome best = null;
+        double bestDistanceSq = Double.MAX_VALUE;
+        for (ColonyHome candidate : colony.getHomes()) {
+            if (Homes.rescan(world, candidate)) {
+                registry.markDirty();
+            }
+            if (colony.homeOccupants(candidate.getId()) >= candidate.getBeds()) {
+                continue;
+            }
+            WorkArea area = candidate.getArea();
+            double distanceSq = citizen
+                .getDistanceSq(area.getCenterX() + 0.5D, area.getCenterY(), area.getCenterZ() + 0.5D);
+            if (distanceSq >= bestDistanceSq) {
+                continue;
+            }
+            best = candidate;
+            bestDistanceSq = distanceSq;
+        }
+        if (best == null) {
+            return null;
+        }
+        return registry.claimHome(colony.getId(), entry.getId(), best.getId()) ? best : null;
+    }
+
+    private boolean claimBedAtHome(EntityCitizen citizen, Colony colony, ColonyHome home) {
+        World world = citizen.worldObj;
+        WorkArea area = home.getArea();
+        if (!Homes.isLoaded(world, area)) {
+            return false;
+        }
+
+        double bestDistanceSq = Double.MAX_VALUE;
+        boolean found = false;
+        for (int y = area.getMinY(); y <= area.getMaxY(); y++) {
+            for (int x = area.getMinX(); x <= area.getMaxX(); x++) {
+                for (int z = area.getMinZ(); z <= area.getMaxZ(); z++) {
+                    if (!isBed(world, x, y, z)) {
+                        continue;
+                    }
+                    double distanceSq = citizen.getDistanceSq(x + 0.5D, y, z + 0.5D);
+                    if (distanceSq >= bestDistanceSq || !colony.isBedFree(citizen.getUniqueID(), x, y, z)) {
+                        continue;
+                    }
+                    bestDistanceSq = distanceSq;
+                    bedX = x;
+                    bedY = y;
+                    bedZ = z;
+                    found = true;
+                }
+            }
+        }
+        return found && ColonyManager.registry(world)
+            .claimBed(colony.getId(), citizen.getUniqueID(), bedX, bedY, bedZ);
     }
 
     @Override
@@ -113,6 +192,10 @@ public class LivingTaskSleep extends AutoTask {
         if (!isBed(world, bedX, bedY, bedZ)) {
             ColonyManager.registry(world)
                 .releaseBed(colony.getId(), citizen.getUniqueID());
+            return false;
+        }
+        ColonyCitizen entry = colony.getCitizen(citizen.getUniqueID());
+        if (entry == null || !entry.isBedAt(bedX, bedY, bedZ)) {
             return false;
         }
 
@@ -192,7 +275,8 @@ public class LivingTaskSleep extends AutoTask {
         for (int y = minY; y <= maxY; y++) {
             for (int x = cx - SEARCH_RADIUS; x <= cx + SEARCH_RADIUS; x++) {
                 for (int z = cz - SEARCH_RADIUS; z <= cz + SEARCH_RADIUS; z++) {
-                    if (!isBed(world, x, y, z) || !colony.isInside(dimension, x + 0.5D, z + 0.5D)) {
+                    if (!isBed(world, x, y, z) || !colony.isInside(dimension, x + 0.5D, z + 0.5D)
+                        || colony.getHomeAt(x, y, z) != null) {
                         continue;
                     }
                     double distanceSq = citizen.getDistanceSq(x + 0.5D, y, z + 0.5D);
@@ -229,10 +313,6 @@ public class LivingTaskSleep extends AutoTask {
     }
 
     private static boolean isBed(World world, int x, int y, int z) {
-        if (!world.blockExists(x, y, z)) {
-            return false;
-        }
-        Block block = world.getBlock(x, y, z);
-        return block instanceof BlockBed && BlockBed.isBlockHeadOfBed(world.getBlockMetadata(x, y, z));
+        return Homes.isBed(world, x, y, z);
     }
 }

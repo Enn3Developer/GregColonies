@@ -16,6 +16,7 @@ import com.cleanroommc.modularui.drawable.GuiDraw;
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext;
 import com.cleanroommc.modularui.theme.WidgetThemeEntry;
 import com.enn3developer.gregcolonies.client.GCKeyBindings;
+import com.enn3developer.gregcolonies.colony.ColonyHome;
 import com.enn3developer.gregcolonies.colony.WorkArea;
 import com.enn3developer.gregcolonies.network.CitizenSnapshot;
 import com.enn3developer.gregcolonies.network.GCNetwork;
@@ -81,6 +82,8 @@ public class ColonyViewWidget extends CameraWidget<ColonyViewWidget> {
     private boolean areaDragging;
 
     private int areaCornerX;
+
+    private int areaCornerY;
 
     private int areaCornerZ;
 
@@ -271,6 +274,7 @@ public class ColonyViewWidget extends CameraWidget<ColonyViewWidget> {
             MovingObjectPosition hit = ColonyWorldOverlay.pick(screenX, screenY);
             if (hit != null && hit.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) {
                 areaCornerX = hit.blockX;
+                areaCornerY = hit.blockY;
                 areaCornerZ = hit.blockZ;
                 hasAreaCorner = true;
             }
@@ -281,24 +285,25 @@ public class ColonyViewWidget extends CameraWidget<ColonyViewWidget> {
         if (!hasAreaCorner) {
             return;
         }
-        int x = clampSide(areaAnchorX, areaCornerX);
-        int z = clampSide(areaAnchorZ, areaCornerZ);
+        int x = clamp(areaAnchorX, areaCornerX, WorkArea.MAX_SIDE);
+        int z = clamp(areaAnchorZ, areaCornerZ, WorkArea.MAX_SIDE);
+        int y = view.getTargeting()
+            .getPick() == TargetMode.Pick.VOLUME ? clamp(areaAnchorY, areaCornerY, ColonyHome.MAX_HEIGHT) : areaAnchorY;
         view.setPending(
             Math.min(areaAnchorX, x),
-            areaAnchorY,
+            Math.min(areaAnchorY, y),
             Math.min(areaAnchorZ, z),
             Math.max(areaAnchorX, x),
-            areaAnchorY,
+            Math.max(areaAnchorY, y),
             Math.max(areaAnchorZ, z));
     }
 
-    private int clampSide(int anchor, int value) {
-        int side = WorkArea.MAX_SIDE;
-        if (value - anchor > side - 1) {
-            return anchor + side - 1;
+    private static int clamp(int anchor, int value, int span) {
+        if (value - anchor > span - 1) {
+            return anchor + span - 1;
         }
-        if (anchor - value > side - 1) {
-            return anchor - side + 1;
+        if (anchor - value > span - 1) {
+            return anchor - span + 1;
         }
         return value;
     }
@@ -313,6 +318,8 @@ public class ColonyViewWidget extends CameraWidget<ColonyViewWidget> {
             view.sendSite(mode.getSite(), area[0], area[1], area[2]);
         } else if (mode == TargetMode.BUILD) {
             view.sendBuild(area[0], area[1], area[2]);
+        } else if (mode == TargetMode.HOME) {
+            view.sendHome(area[0], area[1], area[2], area[3], area[4], area[5]);
         } else {
             view.sendArea(
                 mode.getCommand(),
@@ -448,6 +455,7 @@ public class ColonyViewWidget extends CameraWidget<ColonyViewWidget> {
                 areaAnchorY = hit.blockY;
                 areaAnchorZ = hit.blockZ;
                 areaCornerX = hit.blockX;
+                areaCornerY = hit.blockY;
                 areaCornerZ = hit.blockZ;
                 hasAreaCorner = true;
                 areaPickX = getContext().getMouseX();

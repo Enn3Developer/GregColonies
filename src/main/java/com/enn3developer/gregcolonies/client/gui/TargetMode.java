@@ -15,11 +15,14 @@ public enum TargetMode {
         PacketCitizenCommand.CHOP),
     MATERIALS("Materials", ColonySiteKind.MATERIALS, 0xFFC46B, Pick.SPOT, "click a chest, again to clear",
         PacketCitizenCommand.CHOP),
-    BUILD("Build", null, 0x9CE06B, Pick.SPOT, "click the ground, again to clear", PacketCitizenCommand.CHOP);
+    BUILD("Build", null, 0x9CE06B, Pick.SPOT, "click the ground, again to clear", PacketCitizenCommand.CHOP),
+    HOME("Home", null, 0xB08CFF, Pick.VOLUME, "drag a room corner to corner, click a home to clear",
+        PacketCitizenCommand.CHOP);
 
     public enum Pick {
         NONE,
         REGION,
+        VOLUME,
         CHUNK,
         SPOT
     }

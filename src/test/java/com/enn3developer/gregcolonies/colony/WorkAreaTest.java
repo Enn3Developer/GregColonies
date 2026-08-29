@@ -6,6 +6,9 @@ import net.minecraft.nbt.NBTTagCompound;
 
 import org.junit.jupiter.api.Test;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+
 class WorkAreaTest {
 
     @Test
@@ -21,9 +24,37 @@ class WorkAreaTest {
 
     @Test
     void centreIsTheMidpoint() {
-        WorkArea area = new WorkArea(0, 0, 0, 10, 0, 4);
+        WorkArea area = new WorkArea(0, 0, 0, 10, 6, 4);
         assertEquals(5, area.getCenterX());
+        assertEquals(3, area.getCenterY());
         assertEquals(2, area.getCenterZ());
+    }
+
+    @Test
+    void overlapNeedsEveryAxisToMeet() {
+        WorkArea area = new WorkArea(0, 0, 0, 4, 4, 4);
+        assertTrue(area.overlaps(new WorkArea(4, 4, 4, 8, 8, 8)));
+        assertTrue(area.overlaps(new WorkArea(-8, -8, -8, 8, 8, 8)));
+        assertFalse(area.overlaps(new WorkArea(5, 0, 0, 8, 4, 4)));
+        assertFalse(area.overlaps(new WorkArea(0, 5, 0, 4, 8, 4)));
+        assertFalse(area.overlaps(new WorkArea(0, 0, 5, 4, 4, 8)));
+    }
+
+    @Test
+    void copyFromTakesEveryCorner() {
+        WorkArea area = new WorkArea();
+        area.copyFrom(new WorkArea(1, 2, 3, 4, 5, 6));
+        assertEquals("1/2/3 to 4/5/6", area.describe());
+    }
+
+    @Test
+    void aRegionSurvivesTheWire() {
+        ByteBuf buf = Unpooled.buffer();
+        new WorkArea(-3, 12, 40, 7, 20, 44).write(buf);
+        WorkArea area = new WorkArea();
+        area.read(buf);
+        assertEquals("-3/12/40 to 7/20/44", area.describe());
+        assertEquals(0, buf.readableBytes());
     }
 
     @Test

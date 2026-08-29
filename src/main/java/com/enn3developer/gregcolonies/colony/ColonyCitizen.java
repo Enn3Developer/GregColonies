@@ -20,6 +20,7 @@ public class ColonyCitizen {
     private int x;
     private int y;
     private int z;
+    private int homeId;
     private boolean hasBed;
     private int bedX;
     private int bedY;
@@ -75,6 +76,22 @@ public class ColonyCitizen {
 
     public void setJob(CitizenJob job) {
         this.job = job == null ? CitizenJob.NONE : job;
+    }
+
+    public int getHomeId() {
+        return homeId;
+    }
+
+    public boolean hasHome() {
+        return homeId != 0;
+    }
+
+    public void setHomeId(int homeId) {
+        this.homeId = homeId;
+    }
+
+    public void clearHome() {
+        homeId = 0;
     }
 
     public boolean hasBed() {
@@ -156,6 +173,7 @@ public class ColonyCitizen {
         tag.setInteger("x", x);
         tag.setInteger("y", y);
         tag.setInteger("z", z);
+        tag.setInteger("home", homeId);
         tag.setBoolean("hasBed", hasBed);
         if (hasBed) {
             tag.setInteger("bedX", bedX);
@@ -177,6 +195,7 @@ public class ColonyCitizen {
         citizen.x = tag.getInteger("x");
         citizen.y = tag.getInteger("y");
         citizen.z = tag.getInteger("z");
+        citizen.homeId = tag.getInteger("home");
         citizen.hasBed = tag.getBoolean("hasBed");
         if (citizen.hasBed) {
             citizen.bedX = tag.getInteger("bedX");

@@ -23,6 +23,7 @@ import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.colony.ColonyManager;
 import com.enn3developer.gregcolonies.colony.ColonySite;
 import com.enn3developer.gregcolonies.colony.ColonySiteKind;
+import com.enn3developer.gregcolonies.colony.Homes;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.work.Inventories;
 
@@ -55,6 +56,7 @@ public final class GCNetwork {
         CHANNEL.registerMessage(PacketBlueprintData.Handler.class, PacketBlueprintData.class, 11, Side.CLIENT);
         CHANNEL.registerMessage(PacketCitizenJob.Handler.class, PacketCitizenJob.class, 12, Side.SERVER);
         CHANNEL.registerMessage(PacketColonyPalette.Handler.class, PacketColonyPalette.class, 13, Side.CLIENT);
+        CHANNEL.registerMessage(PacketColonyHome.Handler.class, PacketColonyHome.class, 14, Side.SERVER);
         FMLCommonHandler.instance()
             .bus()
             .register(new GCNetwork());
@@ -120,6 +122,7 @@ public final class GCNetwork {
     }
 
     static void sendColony(EntityPlayerMP player, Colony colony) {
+        Homes.rescan(player.worldObj, ColonyManager.registry(player.worldObj), colony);
         CHANNEL.sendTo(new PacketColonyData(ColonySnapshot.of(colony, player.worldObj)), player);
     }
 

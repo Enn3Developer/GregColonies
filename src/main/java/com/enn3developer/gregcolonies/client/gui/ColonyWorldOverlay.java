@@ -21,6 +21,7 @@ import org.lwjgl.util.glu.GLU;
 
 import com.enn3developer.gregcolonies.colony.ColonySite;
 import com.enn3developer.gregcolonies.colony.ColonySiteKind;
+import com.enn3developer.gregcolonies.colony.WorkArea;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.network.CitizenSnapshot;
 import com.enn3developer.gregcolonies.network.ColonySnapshot;
@@ -50,6 +51,8 @@ public class ColonyWorldOverlay {
     private static final int SELECTION_COLOR = 0xE0FFFFFF;
 
     private static final double AREA_HEIGHT = 4.0D;
+
+    private static final int HOME_COLOR = TargetMode.HOME.color(TargetMode.MARK_ALPHA);
 
     private static final double AREA_EDGE = 0.3D;
 
@@ -204,6 +207,18 @@ public class ColonyWorldOverlay {
             }
         }
 
+        for (ColonySnapshot.HomeEntry home : colony.getHomes()) {
+            WorkArea area = home.getArea();
+            drawBox(
+                area.getMinX(),
+                area.getMinY(),
+                area.getMinZ(),
+                area.getMaxX() + 1,
+                area.getMaxY() + 1,
+                area.getMaxZ() + 1,
+                HOME_COLOR);
+        }
+
         if (colony.hasBuildSite()) {
             drawArea(
                 colony.getBuildX(),
@@ -217,14 +232,14 @@ public class ColonyWorldOverlay {
         ColonyView view = screen.getView();
         if (view.hasPending()) {
             int[] area = view.getPending();
-            drawArea(
-                area[0],
-                area[1],
-                area[2],
-                area[3] + 1,
-                area[5] + 1,
-                view.getTargeting()
-                    .color(TargetMode.AREA_ALPHA));
+            int color = view.getTargeting()
+                .color(TargetMode.AREA_ALPHA);
+            if (view.getTargeting()
+                .getPick() == TargetMode.Pick.VOLUME) {
+                drawBox(area[0], area[1], area[2], area[3] + 1, area[4] + 1, area[5] + 1, color);
+            } else {
+                drawArea(area[0], area[1], area[2], area[3] + 1, area[5] + 1, color);
+            }
         }
 
         GL11.glEnable(GL11.GL_CULL_FACE);
@@ -393,12 +408,16 @@ public class ColonyWorldOverlay {
     }
 
     private static void drawArea(double x0, double y, double z0, double x1, double z1, int color) {
+        drawBox(x0, y, z0, x1, y + AREA_HEIGHT, z1, color);
+    }
+
+    private static void drawBox(double x0, double y0, double z0, double x1, double y1, double z1, int color) {
         float alpha = (color >>> 24) / 255.0F;
         float red = (color >> 16 & 0xFF) / 255.0F;
         float green = (color >> 8 & 0xFF) / 255.0F;
         float blue = (color & 0xFF) / 255.0F;
-        double ground = y + GROUND_OFFSET;
-        double top = ground + AREA_HEIGHT;
+        double ground = y0 + GROUND_OFFSET;
+        double top = y1 + GROUND_OFFSET;
 
         GL11.glBegin(GL11.GL_QUADS);
         drawWall(x0, z0, x1, z0, ground, top, red, green, blue, alpha);

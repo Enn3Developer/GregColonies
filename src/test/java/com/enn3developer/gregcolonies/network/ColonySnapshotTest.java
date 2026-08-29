@@ -11,7 +11,9 @@ import org.junit.jupiter.api.Test;
 
 import com.enn3developer.gregcolonies.colony.BuildSite;
 import com.enn3developer.gregcolonies.colony.Colony;
+import com.enn3developer.gregcolonies.colony.ColonyHome;
 import com.enn3developer.gregcolonies.colony.ColonySiteKind;
+import com.enn3developer.gregcolonies.colony.WorkArea;
 import com.enn3developer.gregcolonies.testing.Fixtures;
 import com.enn3developer.gregcolonies.testing.MinecraftBootstrap;
 
@@ -204,5 +206,36 @@ class ColonySnapshotTest {
                 .getLabel(0)
                 .contains("tower"));
         assertNull(snapshot.getBlueprint(9));
+    }
+
+    @Test
+    void homesReachTheClientWithTheirBedsAndResidents() {
+        UUID id = UUID.randomUUID();
+        Colony colony = Fixtures.colonyWith(colony(), Fixtures.citizen(id, "Aeliana", "alpha", 0, 5, 64, 6));
+        ColonyHome home = colony.addHome(new WorkArea(0, 64, 0, 4, 68, 4), 2);
+        assertTrue(colony.claimHome(id, home.getId()));
+
+        ColonySnapshot snapshot = ColonySnapshot.of(colony, new GTMockWorld());
+        ByteBuf buf = Unpooled.buffer();
+        snapshot.write(buf);
+        ColonySnapshot read = ColonySnapshot.read(buf);
+
+        assertEquals(0, buf.readableBytes());
+        assertEquals(
+            1,
+            read.getHomes()
+                .size());
+
+        ColonySnapshot.HomeEntry entry = read.getHome(0);
+        assertEquals(home.getId(), entry.getId());
+        assertEquals(2, entry.getBeds());
+        assertEquals(1, entry.getOccupants());
+        assertEquals("1/2 beds", entry.getValue());
+        assertEquals(
+            "0/64/0 to 4/68/4",
+            entry.getArea()
+                .describe());
+        assertSame(entry, read.homeAt(2, 66, 2));
+        assertNull(read.homeAt(5, 66, 2));
     }
 }

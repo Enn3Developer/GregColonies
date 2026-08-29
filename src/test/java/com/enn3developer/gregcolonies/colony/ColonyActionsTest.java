@@ -408,4 +408,77 @@ class ColonyActionsTest {
         ColonyActions.assignGroup(registry, colony, "alpha", 0, 0.0D, 0.0D, 8, new FakeControl(0, 0.0D));
         assertEquals(1, dirty);
     }
+
+    @Test
+    void aHomeNeedsToBeInTheColonyDimension() {
+        Outcome outcome = ColonyActions.setHome(registry, colony, 1, new WorkArea(100, 64, 200, 104, 68, 204), 2);
+        assertFalse(outcome.isOk());
+        assertTrue(
+            colony.getHomes()
+                .isEmpty());
+    }
+
+    @Test
+    void aHomeNeedsToBeInsideTheColony() {
+        Outcome outcome = ColonyActions.setHome(registry, colony, 0, new WorkArea(100000, 64, 200, 100004, 68, 204), 2);
+        assertFalse(outcome.isOk());
+        assertTrue(
+            colony.getHomes()
+                .isEmpty());
+    }
+
+    @Test
+    void aHomeWithoutABedIsRefused() {
+        Outcome outcome = ColonyActions.setHome(registry, colony, 0, new WorkArea(100, 64, 200, 104, 68, 204), 0);
+        assertFalse(outcome.isOk());
+        assertTrue(
+            colony.getHomes()
+                .isEmpty());
+    }
+
+    @Test
+    void settingAHomeRecordsItsBeds() {
+        int before = dirty;
+        Outcome outcome = ColonyActions.setHome(registry, colony, 0, new WorkArea(100, 64, 200, 104, 68, 204), 3);
+        assertTrue(outcome.isOk());
+        assertEquals(before + 1, dirty);
+        assertEquals(
+            3,
+            colony.getHomes()
+                .get(0)
+                .getBeds());
+    }
+
+    @Test
+    void anOverlappingHomeIsRefused() {
+        ColonyActions.setHome(registry, colony, 0, new WorkArea(100, 64, 200, 104, 68, 204), 1);
+        Outcome outcome = ColonyActions.setHome(registry, colony, 0, new WorkArea(102, 66, 202, 108, 70, 208), 1);
+        assertFalse(outcome.isOk());
+        assertEquals(
+            1,
+            colony.getHomes()
+                .size());
+    }
+
+    @Test
+    void clearingAHomeThatIsNotThereSaysNothing() {
+        int before = dirty;
+        Outcome outcome = ColonyActions.clearHome(registry, colony, 42);
+        assertFalse(outcome.isOk());
+        assertEquals(before, dirty);
+    }
+
+    @Test
+    void clearingAHomeDropsIt() {
+        ColonyActions.setHome(registry, colony, 0, new WorkArea(100, 64, 200, 104, 68, 204), 1);
+        int id = colony.getHomes()
+            .get(0)
+            .getId();
+        assertTrue(
+            ColonyActions.clearHome(registry, colony, id)
+                .isOk());
+        assertTrue(
+            colony.getHomes()
+                .isEmpty());
+    }
 }

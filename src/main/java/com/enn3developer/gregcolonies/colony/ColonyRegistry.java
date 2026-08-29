@@ -197,6 +197,44 @@ public class ColonyRegistry {
         }
     }
 
+    public ColonyHome addHome(int colonyId, WorkArea area, int beds) {
+        Colony colony = colonies.get(colonyId);
+        if (colony == null) {
+            return null;
+        }
+        ColonyHome home = colony.addHome(area, beds);
+        if (home != null) {
+            markDirty();
+        }
+        return home;
+    }
+
+    public boolean removeHome(int colonyId, int homeId) {
+        return mutate(colonyId, colony -> colony.removeHome(homeId));
+    }
+
+    public boolean setHomeBeds(int colonyId, int homeId, int beds) {
+        return mutate(colonyId, colony -> {
+            ColonyHome home = colony.getHome(homeId);
+            if (home == null || home.getBeds() == beds) {
+                return false;
+            }
+            home.setBeds(beds);
+            return true;
+        });
+    }
+
+    public boolean claimHome(int colonyId, UUID id, int homeId) {
+        return mutate(colonyId, colony -> colony.claimHome(id, homeId));
+    }
+
+    public void releaseHome(int colonyId, UUID id) {
+        mutate(colonyId, colony -> {
+            colony.releaseHome(id);
+            return true;
+        });
+    }
+
     public boolean claimBed(int colonyId, UUID id, int x, int y, int z) {
         return mutate(colonyId, colony -> colony.claimBed(id, x, y, z));
     }
