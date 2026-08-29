@@ -118,21 +118,7 @@ public final class Hazards {
             return null;
         }
 
-        int[] spot = null;
-        double bestDistanceSq = Double.MAX_VALUE;
-        for (int y = minY; y <= maxY; y++) {
-            for (int x = cx - radius; x <= cx + radius; x++) {
-                for (int z = cz - radius; z <= cz + radius; z++) {
-                    double distanceSq = entity.getDistanceSq(x + 0.5D, y, z + 0.5D);
-                    if (distanceSq >= bestDistanceSq || !isWater(world, x, y, z)) {
-                        continue;
-                    }
-                    bestDistanceSq = distanceSq;
-                    spot = new int[] { x, y, z };
-                }
-            }
-        }
-        return spot;
+        return NearestSpot.in(entity, cx - radius, minY, cz - radius, cx + radius, maxY, cz + radius, Hazards::isWater);
     }
 
     private static boolean isWater(World world, int x, int y, int z) {
@@ -151,21 +137,8 @@ public final class Hazards {
             return null;
         }
 
-        int[] spot = null;
-        double bestDistanceSq = Double.MAX_VALUE;
-        for (int y = minY; y <= maxY; y++) {
-            for (int x = cx - radius; x <= cx + radius; x++) {
-                for (int z = cz - radius; z <= cz + radius; z++) {
-                    double distanceSq = entity.getDistanceSq(x + 0.5D, y, z + 0.5D);
-                    if (distanceSq >= bestDistanceSq || !isSafeSpot(world, x, y, z)) {
-                        continue;
-                    }
-                    bestDistanceSq = distanceSq;
-                    spot = new int[] { x, y, z };
-                }
-            }
-        }
-        return spot;
+        return NearestSpot
+            .in(entity, cx - radius, minY, cz - radius, cx + radius, maxY, cz + radius, Hazards::isSafeSpot);
     }
 
     private static boolean isSafeSpot(World world, int x, int y, int z) {

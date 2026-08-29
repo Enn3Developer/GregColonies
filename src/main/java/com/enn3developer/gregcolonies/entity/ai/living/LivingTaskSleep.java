@@ -13,6 +13,7 @@ import com.enn3developer.gregcolonies.colony.Homes;
 import com.enn3developer.gregcolonies.colony.WorkArea;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
 import com.enn3developer.gregcolonies.entity.ai.Hazards;
+import com.enn3developer.gregcolonies.entity.ai.NearestSpot;
 import com.enn3developer.gregcolonies.entity.ai.auto.AutoTask;
 
 public class LivingTaskSleep extends AutoTask {
@@ -147,28 +148,16 @@ public class LivingTaskSleep extends AutoTask {
             return false;
         }
 
-        double bestDistanceSq = Double.MAX_VALUE;
-        boolean found = false;
-        for (int y = area.getMinY(); y <= area.getMaxY(); y++) {
-            for (int x = area.getMinX(); x <= area.getMaxX(); x++) {
-                for (int z = area.getMinZ(); z <= area.getMaxZ(); z++) {
-                    if (!isBed(world, x, y, z)) {
-                        continue;
-                    }
-                    double distanceSq = citizen.getDistanceSq(x + 0.5D, y, z + 0.5D);
-                    if (distanceSq >= bestDistanceSq || !colony.isBedFree(citizen.getUniqueID(), x, y, z)) {
-                        continue;
-                    }
-                    bestDistanceSq = distanceSq;
-                    bedX = x;
-                    bedY = y;
-                    bedZ = z;
-                    found = true;
-                }
-            }
-        }
-        return found && ColonyManager.registry(world)
-            .claimBed(colony.getId(), citizen.getUniqueID(), bedX, bedY, bedZ);
+        int[] bed = NearestSpot.in(
+            citizen,
+            area.getMinX(),
+            area.getMinY(),
+            area.getMinZ(),
+            area.getMaxX(),
+            area.getMaxY(),
+            area.getMaxZ(),
+            (w, x, y, z) -> isBed(w, x, y, z) && colony.isBedFree(citizen.getUniqueID(), x, y, z));
+        return take(citizen, colony, bed);
     }
 
     @Override
@@ -260,28 +249,28 @@ public class LivingTaskSleep extends AutoTask {
             return false;
         }
 
-        double bestDistanceSq = Double.MAX_VALUE;
-        boolean found = false;
-        for (int y = minY; y <= maxY; y++) {
-            for (int x = cx - SEARCH_RADIUS; x <= cx + SEARCH_RADIUS; x++) {
-                for (int z = cz - SEARCH_RADIUS; z <= cz + SEARCH_RADIUS; z++) {
-                    if (!isBed(world, x, y, z) || !colony.isInside(dimension, x + 0.5D, z + 0.5D)
-                        || colony.getHomeAt(x, y, z) != null) {
-                        continue;
-                    }
-                    double distanceSq = citizen.getDistanceSq(x + 0.5D, y, z + 0.5D);
-                    if (distanceSq >= bestDistanceSq || !colony.isBedFree(citizen.getUniqueID(), x, y, z)) {
-                        continue;
-                    }
-                    bestDistanceSq = distanceSq;
-                    bedX = x;
-                    bedY = y;
-                    bedZ = z;
-                    found = true;
-                }
-            }
+        int[] bed = NearestSpot.in(
+            citizen,
+            cx - SEARCH_RADIUS,
+            minY,
+            cz - SEARCH_RADIUS,
+            cx + SEARCH_RADIUS,
+            maxY,
+            cz + SEARCH_RADIUS,
+            (w, x, y, z) -> isBed(w, x, y, z) && colony.isInside(dimension, x + 0.5D, z + 0.5D)
+                && colony.getHomeAt(x, y, z) == null
+                && colony.isBedFree(citizen.getUniqueID(), x, y, z));
+        return take(citizen, colony, bed);
+    }
+
+    private boolean take(EntityCitizen citizen, Colony colony, int[] bed) {
+        if (bed == null) {
+            return false;
         }
-        return found && ColonyManager.registry(world)
+        bedX = bed[0];
+        bedY = bed[1];
+        bedZ = bed[2];
+        return ColonyManager.registry(citizen.worldObj)
             .claimBed(colony.getId(), citizen.getUniqueID(), bedX, bedY, bedZ);
     }
 

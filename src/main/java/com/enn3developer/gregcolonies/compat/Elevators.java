@@ -2,6 +2,7 @@ package com.enn3developer.gregcolonies.compat;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 import net.minecraft.block.Block;
 import net.minecraft.entity.EntityLivingBase;
@@ -85,37 +86,31 @@ public final class Elevators {
     public static int[] findRide(EntityLivingBase entity, double targetY, double minGain, int radius, int height) {
         boolean up = targetY > entity.posY;
         double current = Math.abs(targetY - entity.posY);
-        int[] best = null;
-        double bestDistanceSq = Double.MAX_VALUE;
-
-        for (int[] spot : nearby(entity, radius, height)) {
+        return nearest(entity, radius, height, spot -> {
             int level = findLevel(entity, spot[0], spot[1], spot[2], up);
-            if (level == NO_LEVEL || current - Math.abs(targetY - (level + 1)) < minGain) {
-                continue;
-            }
-            double distanceSq = entity.getDistanceSq(spot[0] + 0.5D, spot[1] + 1, spot[2] + 0.5D);
-            if (distanceSq < bestDistanceSq) {
-                bestDistanceSq = distanceSq;
-                best = spot;
-            }
-        }
-        return best;
+            return level != NO_LEVEL && current - Math.abs(targetY - (level + 1)) >= minGain;
+        });
     }
 
     public static int[] findNearest(EntityLivingBase entity, int radius, int height) {
+        return nearest(
+            entity,
+            radius,
+            height,
+            spot -> findLevel(entity, spot[0], spot[1], spot[2], true) != NO_LEVEL
+                || findLevel(entity, spot[0], spot[1], spot[2], false) != NO_LEVEL);
+    }
+
+    private static int[] nearest(EntityLivingBase entity, int radius, int height, Predicate<int[]> usable) {
         int[] best = null;
         double bestDistanceSq = Double.MAX_VALUE;
-
         for (int[] spot : nearby(entity, radius, height)) {
-            if (findLevel(entity, spot[0], spot[1], spot[2], true) == NO_LEVEL
-                && findLevel(entity, spot[0], spot[1], spot[2], false) == NO_LEVEL) {
+            double distanceSq = entity.getDistanceSq(spot[0] + 0.5D, spot[1] + 1, spot[2] + 0.5D);
+            if (distanceSq >= bestDistanceSq || !usable.test(spot)) {
                 continue;
             }
-            double distanceSq = entity.getDistanceSq(spot[0] + 0.5D, spot[1] + 1, spot[2] + 0.5D);
-            if (distanceSq < bestDistanceSq) {
-                bestDistanceSq = distanceSq;
-                best = spot;
-            }
+            bestDistanceSq = distanceSq;
+            best = spot;
         }
         return best;
     }

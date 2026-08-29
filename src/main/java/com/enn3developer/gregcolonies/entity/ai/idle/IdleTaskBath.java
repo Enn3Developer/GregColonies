@@ -6,6 +6,7 @@ import net.minecraft.world.World;
 
 import com.enn3developer.gregcolonies.colony.Colony;
 import com.enn3developer.gregcolonies.entity.EntityCitizen;
+import com.enn3developer.gregcolonies.entity.ai.NearestSpot;
 import com.enn3developer.gregcolonies.entity.ai.auto.AutoTask;
 
 public class IdleTaskBath extends AutoTask {
@@ -175,27 +176,22 @@ public class IdleTaskBath extends AutoTask {
             return false;
         }
 
-        double bestDistanceSq = Double.MAX_VALUE;
-        boolean found = false;
-        for (int y = minY; y <= maxY; y++) {
-            for (int x = cx - SEARCH_RADIUS; x <= cx + SEARCH_RADIUS; x++) {
-                for (int z = cz - SEARCH_RADIUS; z <= cz + SEARCH_RADIUS; z++) {
-                    if (!isWater(world, x, y, z) || !colony.isInside(dimension, x + 0.5D, z + 0.5D)) {
-                        continue;
-                    }
-                    double distanceSq = citizen.getDistanceSq(x + 0.5D, y, z + 0.5D);
-                    if (distanceSq >= bestDistanceSq || !isPool(world, x, y, z)) {
-                        continue;
-                    }
-                    bestDistanceSq = distanceSq;
-                    spotX = x;
-                    spotY = y;
-                    spotZ = z;
-                    found = true;
-                }
-            }
+        int[] spot = NearestSpot.in(
+            citizen,
+            cx - SEARCH_RADIUS,
+            minY,
+            cz - SEARCH_RADIUS,
+            cx + SEARCH_RADIUS,
+            maxY,
+            cz + SEARCH_RADIUS,
+            (w, x, y, z) -> colony.isInside(dimension, x + 0.5D, z + 0.5D) && isPool(w, x, y, z));
+        if (spot == null) {
+            return false;
         }
-        return found;
+        spotX = spot[0];
+        spotY = spot[1];
+        spotZ = spot[2];
+        return true;
     }
 
     private static boolean isPool(World world, int cx, int cy, int cz) {
