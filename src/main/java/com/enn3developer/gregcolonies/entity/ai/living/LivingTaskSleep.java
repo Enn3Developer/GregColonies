@@ -35,17 +35,11 @@ public class LivingTaskSleep extends AutoTask {
 
     private static final int TRAVEL_TIMEOUT = 1200;
 
-    private static final int REPATH_INTERVAL = 10;
-
     private static final int RETRY_DELAY = 600;
 
     private static final double BED_HEIGHT = 0.5625D;
 
     private static final double BODY_INSET = 0.4D;
-
-    private long nextAttempt;
-
-    private int travelTicks;
 
     private int bedX;
 
@@ -69,7 +63,7 @@ public class LivingTaskSleep extends AutoTask {
     @Override
     public boolean shouldStart(EntityCitizen citizen, Colony colony) {
         World world = citizen.worldObj;
-        if (!isNight(world) || world.getTotalWorldTime() < nextAttempt || !citizen.allowsSleep()) {
+        if (!isNight(world) || !ready(world) || !citizen.allowsSleep()) {
             return false;
         }
         if (isThreatened(citizen)) {
@@ -179,7 +173,7 @@ public class LivingTaskSleep extends AutoTask {
 
     @Override
     public void start(EntityCitizen citizen, Colony colony) {
-        travelTicks = 0;
+        resetTravel();
         pathToBed(citizen);
     }
 
@@ -208,13 +202,9 @@ public class LivingTaskSleep extends AutoTask {
             return true;
         }
 
-        if (++travelTicks > TRAVEL_TIMEOUT) {
+        if (!travel(citizen, bedX + 0.5D, bedY, bedZ + 0.5D, SPEED, TRAVEL_TIMEOUT)) {
             delay(citizen);
             return false;
-        }
-        if (travelTicks % REPATH_INTERVAL == 0 && citizen.getNavigator()
-            .noPath()) {
-            pathToBed(citizen);
         }
         return true;
     }
@@ -300,7 +290,7 @@ public class LivingTaskSleep extends AutoTask {
     }
 
     private void delay(EntityCitizen citizen) {
-        nextAttempt = citizen.worldObj.getTotalWorldTime() + RETRY_DELAY;
+        delay(citizen.worldObj, RETRY_DELAY);
     }
 
     private static boolean isThreatened(EntityCitizen citizen) {

@@ -26,13 +26,7 @@ public class LivingTaskFood extends AutoTask {
 
     private static final int TRAVEL_TIMEOUT = 1200;
 
-    private static final int REPATH_INTERVAL = 10;
-
     private static final int RETRY_DELAY = 1200;
-
-    private long nextAttempt;
-
-    private int travelTicks;
 
     @Override
     public String getId() {
@@ -42,7 +36,7 @@ public class LivingTaskFood extends AutoTask {
     @Override
     public boolean shouldStart(EntityCitizen citizen, Colony colony) {
         World world = citizen.worldObj;
-        if (world.getTotalWorldTime() < nextAttempt || !colony.site(ColonySiteKind.PICK_UP)
+        if (!ready(world) || !colony.site(ColonySiteKind.PICK_UP)
             .isPresent()) {
             return false;
         }
@@ -55,7 +49,7 @@ public class LivingTaskFood extends AutoTask {
 
     @Override
     public void start(EntityCitizen citizen, Colony colony) {
-        travelTicks = 0;
+        resetTravel();
         pathToPickUp(citizen, colony);
     }
 
@@ -73,13 +67,9 @@ public class LivingTaskFood extends AutoTask {
             return take(citizen, x, y, z);
         }
 
-        if (++travelTicks > TRAVEL_TIMEOUT) {
+        if (!travel(citizen, x + 0.5D, y, z + 0.5D, SPEED, TRAVEL_TIMEOUT)) {
             delay(citizen);
             return false;
-        }
-        if (travelTicks % REPATH_INTERVAL == 0 && citizen.getNavigator()
-            .noPath()) {
-            pathToPickUp(citizen, colony);
         }
         return true;
     }
@@ -114,6 +104,6 @@ public class LivingTaskFood extends AutoTask {
     }
 
     private void delay(EntityCitizen citizen) {
-        nextAttempt = citizen.worldObj.getTotalWorldTime() + RETRY_DELAY;
+        delay(citizen.worldObj, RETRY_DELAY);
     }
 }

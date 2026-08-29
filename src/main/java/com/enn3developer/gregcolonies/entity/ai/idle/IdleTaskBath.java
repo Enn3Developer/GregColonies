@@ -30,8 +30,6 @@ public class IdleTaskBath extends AutoTask {
 
     private static final int TRAVEL_TIMEOUT = 600;
 
-    private static final int REPATH_INTERVAL = 10;
-
     private static final int VALIDATE_INTERVAL = 40;
 
     private static final double SPEED = 0.6D;
@@ -42,8 +40,6 @@ public class IdleTaskBath extends AutoTask {
 
     private static final int MIN_AIR = 150;
 
-    private long nextBath;
-
     private boolean hasSpot;
 
     private int spotX;
@@ -51,8 +47,6 @@ public class IdleTaskBath extends AutoTask {
     private int spotY;
 
     private int spotZ;
-
-    private int travelTicks;
 
     private int bathTicks;
 
@@ -70,8 +64,7 @@ public class IdleTaskBath extends AutoTask {
     @Override
     public boolean shouldStart(EntityCitizen citizen, Colony colony) {
         World world = citizen.worldObj;
-        long time = world.getTotalWorldTime();
-        if (time < nextBath) {
+        if (!ready(world)) {
             return false;
         }
 
@@ -87,7 +80,7 @@ public class IdleTaskBath extends AutoTask {
             hasSpot = findPool(citizen, colony, dimension);
         }
         if (!hasSpot) {
-            nextBath = time + SEARCH_RETRY;
+            delay(world, SEARCH_RETRY);
             return false;
         }
         return true;
@@ -95,7 +88,7 @@ public class IdleTaskBath extends AutoTask {
 
     @Override
     public void start(EntityCitizen citizen, Colony colony) {
-        travelTicks = 0;
+        resetTravel();
         bathTicks = 0;
         validateTicks = 0;
         avoidedWater = citizen.getNavigator()
@@ -119,7 +112,7 @@ public class IdleTaskBath extends AutoTask {
         }
 
         if (citizen.getAir() < MIN_AIR) {
-            nextBath = world.getTotalWorldTime() + SEARCH_RETRY;
+            delay(world, SEARCH_RETRY);
             return false;
         }
 
@@ -129,21 +122,17 @@ public class IdleTaskBath extends AutoTask {
             if (++bathTicks < BATH_TICKS) {
                 return true;
             }
-            nextBath = world.getTotalWorldTime() + BATH_INTERVAL
-                + citizen.getRNG()
-                    .nextInt(BATH_JITTER);
+            delay(
+                world,
+                BATH_INTERVAL + citizen.getRNG()
+                    .nextInt(BATH_JITTER));
             return false;
         }
 
-        if (++travelTicks > TRAVEL_TIMEOUT) {
+        if (!travel(citizen, spotX + 0.5D, spotY, spotZ + 0.5D, SPEED, TRAVEL_TIMEOUT)) {
             hasSpot = false;
-            nextBath = world.getTotalWorldTime() + SEARCH_RETRY;
+            delay(world, SEARCH_RETRY);
             return false;
-        }
-
-        if (travelTicks % REPATH_INTERVAL == 0 && citizen.getNavigator()
-            .noPath()) {
-            pathTowards(citizen, spotX + 0.5D, spotY, spotZ + 0.5D, SPEED);
         }
         return true;
     }

@@ -36,8 +36,6 @@ public class IdleTaskBuild extends AutoTask {
 
     private static final int STAND_TIMEOUT = 200;
 
-    private static final int REPATH_INTERVAL = 10;
-
     private static final double REACH = 4.0D;
 
     private static final int PLACE_INTERVAL = 8;
@@ -78,11 +76,7 @@ public class IdleTaskBuild extends AutoTask {
 
     private int columnTop;
 
-    private int travelTicks;
-
     private int placeCooldown;
-
-    private long nextAttempt;
 
     @Override
     public String getId() {
@@ -97,7 +91,7 @@ public class IdleTaskBuild extends AutoTask {
     @Override
     public boolean shouldStart(EntityCitizen citizen, Colony colony) {
         World world = citizen.worldObj;
-        if (!citizen.canWork() || world.getTotalWorldTime() < nextAttempt) {
+        if (!citizen.canWork() || !ready(world)) {
             return false;
         }
         if (world.provider.dimensionId != colony.getDimension() || citizen.getJob() != CitizenJob.BUILDER) {
@@ -110,7 +104,7 @@ public class IdleTaskBuild extends AutoTask {
     @Override
     public void start(EntityCitizen citizen, Colony colony) {
         storing = false;
-        travelTicks = 0;
+        resetTravel();
         placeCooldown = 0;
         breaker.clear(citizen);
         resetApproach();
@@ -149,7 +143,7 @@ public class IdleTaskBuild extends AutoTask {
                 .releaseBuildSite(colony.getId(), citizen.getUniqueID());
         }
         breaker.clear(citizen);
-        nextAttempt = citizen.worldObj.getTotalWorldTime() + RETRY_INTERVAL;
+        delay(citizen.worldObj, RETRY_INTERVAL);
         citizen.getNavigator()
             .clearPathEntity();
     }
@@ -158,7 +152,7 @@ public class IdleTaskBuild extends AutoTask {
         hasStand = false;
         standDenied = false;
         hasColumn = false;
-        travelTicks = 0;
+        resetTravel();
     }
 
     private boolean acquire(Colony colony, BuildSite site) {
@@ -204,7 +198,7 @@ public class IdleTaskBuild extends AutoTask {
         if (result == DigResult.BROKEN || result == DigResult.GONE) {
             plan.markProgress();
             plan.clearTarget();
-            travelTicks = 0;
+            resetTravel();
             return true;
         }
         skipTarget();
@@ -260,7 +254,7 @@ public class IdleTaskBuild extends AutoTask {
             stack -> blueprint.getPalette()
                 .matches(cell, stack),
             64);
-        travelTicks = 0;
+        resetTravel();
         if (taken == null) {
             plan.materialMissing(cell);
             skipCell();
@@ -288,7 +282,7 @@ public class IdleTaskBuild extends AutoTask {
         if (!travel(citizen, standX, standY, standZ, STAND_TIMEOUT)) {
             hasStand = false;
             standDenied = true;
-            travelTicks = 0;
+            resetTravel();
         }
         return true;
     }
@@ -455,7 +449,7 @@ public class IdleTaskBuild extends AutoTask {
         Blueprint blueprint = site.getBlueprint();
         ItemStack taken = Inventories
             .extract(inventory, stack -> WorkBlocks.isScaffold(stack) && !isMaterial(blueprint, stack), SCAFFOLD_FETCH);
-        travelTicks = 0;
+        resetTravel();
         if (taken == null) {
             skipTarget();
             return true;
@@ -528,7 +522,7 @@ public class IdleTaskBuild extends AutoTask {
         if (!inReach(citizen, scaffold[0], scaffold[1], scaffold[2])) {
             if (!travel(citizen, scaffold[0], scaffold[1] + 1, scaffold[2])) {
                 site.removeScaffold(scaffold[0], scaffold[1], scaffold[2]);
-                travelTicks = 0;
+                resetTravel();
             }
             return true;
         }
@@ -561,7 +555,7 @@ public class IdleTaskBuild extends AutoTask {
         ColonyManager.registry(world)
             .markDirty();
         placeCooldown = PLACE_INTERVAL;
-        travelTicks = 0;
+        resetTravel();
         return true;
     }
 
@@ -587,7 +581,7 @@ public class IdleTaskBuild extends AutoTask {
             .deposit(inventory);
         citizen.swingItem();
         storing = false;
-        travelTicks = 0;
+        resetTravel();
         return moved > 0;
     }
 
@@ -606,14 +600,7 @@ public class IdleTaskBuild extends AutoTask {
     }
 
     private boolean travel(EntityCitizen citizen, int x, int y, int z, int limit) {
-        if (++travelTicks > limit) {
-            return false;
-        }
-        if (travelTicks % REPATH_INTERVAL == 1 && citizen.getNavigator()
-            .noPath()) {
-            pathTowards(citizen, x + 0.5D, y, z + 0.5D, SPEED);
-        }
-        return true;
+        return travel(citizen, x + 0.5D, y, z + 0.5D, SPEED, limit);
     }
 
     private static boolean inReach(EntityCitizen citizen, int x, int y, int z) {

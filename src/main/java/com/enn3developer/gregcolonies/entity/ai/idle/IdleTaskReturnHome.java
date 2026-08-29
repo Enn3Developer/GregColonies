@@ -22,8 +22,6 @@ public class IdleTaskReturnHome extends AutoTask {
 
     private static final double MARGIN = 8.0D;
 
-    private long nextAttempt;
-
     private int ticks;
 
     private int pathFailures;
@@ -41,7 +39,7 @@ public class IdleTaskReturnHome extends AutoTask {
     @Override
     public boolean shouldStart(EntityCitizen citizen, Colony colony) {
         World world = citizen.worldObj;
-        if (world.getTotalWorldTime() < nextAttempt) {
+        if (!ready(world)) {
             return false;
         }
         int dimension = world.provider.dimensionId;
@@ -102,6 +100,6 @@ public class IdleTaskReturnHome extends AutoTask {
     }
 
     private void delay(EntityCitizen citizen) {
-        nextAttempt = citizen.worldObj.getTotalWorldTime() + RETRY_DELAY;
+        delay(citizen.worldObj, RETRY_DELAY);
     }
 }

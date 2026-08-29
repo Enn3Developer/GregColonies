@@ -21,8 +21,6 @@ public class IdleTaskBirth extends AutoTask {
 
     private static final int TRAVEL_TIMEOUT = 400;
 
-    private static final int REPATH_INTERVAL = 10;
-
     private static final int BIRTH_COOLDOWN = 24000;
 
     private static final int RETRY_COOLDOWN = 1200;
@@ -33,11 +31,7 @@ public class IdleTaskBirth extends AutoTask {
 
     private static final double REACH_HEIGHT = 2.0D;
 
-    private long nextAttempt;
-
     private EntityCitizen partner;
-
-    private int travelTicks;
 
     @Override
     public String getId() {
@@ -47,8 +41,7 @@ public class IdleTaskBirth extends AutoTask {
     @Override
     public boolean shouldStart(EntityCitizen citizen, Colony colony) {
         World world = citizen.worldObj;
-        long time = world.getTotalWorldTime();
-        if (time < nextAttempt || citizen.isChild() || citizen.getGender() != CitizenGender.FEMALE) {
+        if (!ready(world) || citizen.isChild() || citizen.getGender() != CitizenGender.FEMALE) {
             return false;
         }
         if (citizen.getRNG()
@@ -63,7 +56,7 @@ public class IdleTaskBirth extends AutoTask {
 
         partner = findPartner(citizen, colony);
         if (partner == null) {
-            nextAttempt = time + RETRY_COOLDOWN;
+            delay(world, RETRY_COOLDOWN);
             return false;
         }
         return true;
@@ -71,7 +64,7 @@ public class IdleTaskBirth extends AutoTask {
 
     @Override
     public void start(EntityCitizen citizen, Colony colony) {
-        travelTicks = 0;
+        resetTravel();
         pathTowards(citizen, partner.posX, partner.posY, partner.posZ, SPEED);
     }
 
@@ -84,16 +77,13 @@ public class IdleTaskBirth extends AutoTask {
 
         if (isTogether(citizen, partner)) {
             birth(citizen, partner);
-            nextAttempt = world.getTotalWorldTime() + BIRTH_COOLDOWN;
+            delay(world, BIRTH_COOLDOWN);
             return false;
         }
 
-        if (++travelTicks > TRAVEL_TIMEOUT) {
-            nextAttempt = world.getTotalWorldTime() + RETRY_COOLDOWN;
+        if (!chase(citizen, partner.posX, partner.posY, partner.posZ, SPEED, TRAVEL_TIMEOUT)) {
+            delay(world, RETRY_COOLDOWN);
             return false;
-        }
-        if (travelTicks % REPATH_INTERVAL == 0) {
-            pathTowards(citizen, partner.posX, partner.posY, partner.posZ, SPEED);
         }
         return true;
     }

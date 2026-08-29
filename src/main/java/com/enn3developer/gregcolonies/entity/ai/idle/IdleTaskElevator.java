@@ -33,11 +33,7 @@ public class IdleTaskElevator extends AutoTask {
 
     private static final int TRAVEL_TIMEOUT = 600;
 
-    private static final int REPATH_INTERVAL = 10;
-
     private static final double SPEED = 0.6D;
-
-    private long nextRide;
 
     private boolean hasSpot;
 
@@ -53,8 +49,6 @@ public class IdleTaskElevator extends AutoTask {
 
     private int pauseTicks;
 
-    private int travelTicks;
-
     @Override
     public String getId() {
         return ID;
@@ -68,8 +62,7 @@ public class IdleTaskElevator extends AutoTask {
     @Override
     public boolean shouldStart(EntityCitizen citizen, Colony colony) {
         World world = citizen.worldObj;
-        long time = world.getTotalWorldTime();
-        if (!Mods.openBlocks() || time < nextRide) {
+        if (!Mods.openBlocks() || !ready(world)) {
             return false;
         }
         if (citizen.getRNG()
@@ -95,7 +88,7 @@ public class IdleTaskElevator extends AutoTask {
             }
         }
         if (!hasSpot) {
-            nextRide = time + SEARCH_RETRY;
+            delay(world, SEARCH_RETRY);
             return false;
         }
         return true;
@@ -103,7 +96,7 @@ public class IdleTaskElevator extends AutoTask {
 
     @Override
     public void start(EntityCitizen citizen, Colony colony) {
-        travelTicks = 0;
+        resetTravel();
         pauseTicks = 0;
         rides = MIN_RIDES + citizen.getRNG()
             .nextInt(EXTRA_RIDES);
@@ -127,22 +120,19 @@ public class IdleTaskElevator extends AutoTask {
             return ride(citizen);
         }
 
-        if (++travelTicks > TRAVEL_TIMEOUT) {
+        if (!travel(citizen, spotX + 0.5D, spotY + 1, spotZ + 0.5D, SPEED, TRAVEL_TIMEOUT)) {
             hasSpot = false;
             return false;
-        }
-        if (travelTicks % REPATH_INTERVAL == 0 && citizen.getNavigator()
-            .noPath()) {
-            pathTowards(citizen, spotX + 0.5D, spotY + 1, spotZ + 0.5D, SPEED);
         }
         return true;
     }
 
     @Override
     public void finish(EntityCitizen citizen) {
-        nextRide = citizen.worldObj.getTotalWorldTime() + RIDE_INTERVAL
-            + citizen.getRNG()
-                .nextInt(RIDE_JITTER);
+        delay(
+            citizen.worldObj,
+            RIDE_INTERVAL + citizen.getRNG()
+                .nextInt(RIDE_JITTER));
         citizen.getNavigator()
             .clearPathEntity();
     }
@@ -162,7 +152,7 @@ public class IdleTaskElevator extends AutoTask {
         spotY = level;
         up = !up;
         pauseTicks = RIDE_PAUSE;
-        travelTicks = 0;
+        resetTravel();
         return --rides > 0;
     }
 
